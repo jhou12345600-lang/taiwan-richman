@@ -6,6 +6,12 @@
 <title>寶島富翁 3D｜台灣環島大富翁連線版</title>
 <meta name="description" content="台灣真實景點 3D 大富翁，開房間網址就能 2–6 人連線對戰。">
 <meta name="theme-color" content="#0d6aa8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="寶島富翁">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏝️</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
@@ -14,7 +20,7 @@
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;overflow:hidden;font-family:"Noto Sans TC",system-ui,sans-serif;background:#0d6aa8;color:#222;touch-action:none}
+html,body{margin:0;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;-webkit-user-select:none;user-select:none;font-family:"Noto Sans TC",system-ui,sans-serif;background:#0d6aa8;color:#222;touch-action:none}
 #cv{position:fixed;inset:0;width:100%;height:100%;display:block}
 .hidden{display:none!important}
 button{font-family:inherit;cursor:pointer;border:0;border-radius:12px;font-weight:700;font-size:15px;padding:10px 14px;background:#fff;color:#222;box-shadow:0 3px 0 rgba(0,0,0,.25);transition:transform .08s}
@@ -121,7 +127,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
 <!-- 首頁 -->
 <div class="screen hidden" id="home">
   <div class="panel">
-    <div class="logo"><h1>寶島富翁 3D</h1><p>環島買地蓋樓・台灣真實景點・2–6 人連線</p></div>
+    <div class="logo"><h1>寶島富翁 3D</h1><p>大富翁6玩法・台灣環島 72 格・2–6 人連線</p></div>
     <div class="lab">你的暱稱</div>
     <input id="nameIn" maxlength="8" placeholder="輸入暱稱">
     <div class="lab">自訂頭像（選填，會顯示在角色頭上）</div>
@@ -131,7 +137,9 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
     <div class="col">
       <button class="pri hidden" id="joinBtn" style="font-size:18px">🚪 加入房間</button>
       <button class="pri" id="createBtn" style="font-size:18px">🌐 建立連線房間（傳網址給朋友）</button>
+      <div class="row" id="codeRow"><input id="codeIn" maxlength="8" placeholder="有房號？輸入加入" style="text-transform:uppercase"><button class="blue" id="codeBtn" style="flex:0 0 auto">加入</button></div>
       <button class="ghost" id="soloBtn">🤖 單機遊戲（跟電腦 / 同一台輪流玩）</button>
+      <button class="ghost" id="fsHomeBtn">⛶ 全螢幕</button>
     </div>
     <p class="note" id="homeMsg"></p>
     <p class="note">玩法：擲骰子環島，買下景點、蓋房子收過路費；用點券買道具卡整人，神明附身、股市、銀行、機會與新聞事件，讓對手全部破產或回合結束時資產最多的人獲勝！</p>
@@ -154,8 +162,8 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
       <div class="row" style="margin:6px 0"><button class="ghost" id="addBot">＋ 電腦玩家</button><button class="ghost" id="addLocal">＋ 本機玩家</button></div>
       <div class="row">
         <div><div class="lab">起始資金</div><select id="setCash"><option value="20000">$20,000</option><option value="30000" selected>$30,000</option><option value="50000">$50,000</option></select></div>
-        <div><div class="lab">回合上限</div><select id="setRounds"><option value="20">20 回合</option><option value="30" selected>30 回合</option><option value="50">50 回合</option><option value="0">無限（破產制）</option></select></div>
-        <div><div class="lab">骰子</div><select id="setDice"><option value="1">1 顆</option><option value="2" selected>2 顆</option></select></div>
+        <div><div class="lab">回合上限</div><select id="setRounds"><option value="30">30 回合</option><option value="50" selected>50 回合</option><option value="80">80 回合</option><option value="0">無限（破產制）</option></select></div>
+        <div><div class="lab">骰子</div><select id="setDice"><option value="1" selected>1 顆（大富翁6）</option><option value="2">2 顆（快速）</option></select></div>
       </div>
       <button class="pri" id="startBtn" style="width:100%;margin-top:12px;font-size:18px">🎲 開始遊戲</button>
     </div>
@@ -169,6 +177,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
   <div id="players"></div>
   <div id="roundinfo"></div>
   <div id="topbtn">
+    <button id="fsBtn" title="全螢幕">⛶</button>
     <button id="camBtn" title="視角">🗺️</button>
     <button id="stockBtn" title="股市">📈</button>
     <button id="logBtn" title="紀錄">📜</button>

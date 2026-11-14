@@ -670,24 +670,35 @@ export function buildLandmark(id) {
   return g;
 }
 
-// ---- 房屋（依等級）----
+// ---- 房屋（依等級）：買地就有小屋，越蓋越高 ----
 export function buildHouses(level, color) {
   const g = new THREE.Group();
-  if (level <= 0) return g;
-  if (level === 5) {
+  const wall = '#fff8e1', win = mat('#90caf9', { e: '#fff59d', ei: 0.25 });
+  const windows = (w, h, d, y0, floors) => {
+    for (let f = 0; f < floors; f++) for (const sx of [-1, 1]) B(g, 0.16, 0.16, 0.02, win, sx * w * 0.25, y0 + 0.12 + f * (h / floors), d / 2 + 0.005);
+  };
+  if (level === 0) { // 小木屋
+    B(g, 0.7, 0.45, 0.6, '#d7a86e'); roof(g, 0.95, 0.85, 0.4, color, 0, 0.45, 0);
+    B(g, 0.16, 0.26, 0.02, '#6d4c41', 0, 0, 0.31); windows(0.7, 0.45, 0.6, 0.05, 1);
+    C(g, 0.03, 0.03, 0.9, '#eeeeee', 0.45, 0, -0.2, 4); B(g, 0.32, 0.2, 0.02, color, 0.62, 0.65, -0.2);
+  } else if (level === 1) { // 平房
+    B(g, 1.1, 0.55, 0.8, wall); roof(g, 1.4, 1.1, 0.45, color, 0, 0.55, 0); B(g, 0.2, 0.32, 0.02, '#6d4c41', 0, 0, 0.41); windows(1.1, 0.55, 0.8, 0.08, 1);
+  } else if (level === 2) { // 二層樓
+    B(g, 1.0, 1.0, 0.85, wall); roof(g, 1.3, 1.15, 0.45, color, 0, 1.0, 0); windows(1.0, 1.0, 0.85, 0.05, 2); B(g, 0.2, 0.32, 0.02, '#6d4c41', 0, 0, 0.43);
+  } else if (level === 3) { // 透天厝
+    B(g, 0.95, 1.5, 0.9, wall); B(g, 1.0, 0.1, 0.95, color, 0, 1.5); windows(0.95, 1.5, 0.9, 0.05, 3);
+    B(g, 0.6, 0.3, 0.6, color, 0, 1.6); B(g, 0.2, 0.32, 0.02, '#6d4c41', 0, 0, 0.46);
+  } else if (level === 4) { // 公寓
     const tex = windowsTex(color);
-    const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0.2 });
-    B(g, 0.8, 2.6, 0.8, m, 0, 0, 0);
-    frustum(g, 0.3, 0.75, 0.4, '#eeeeee', 0, 2.6, 0);
-    C(g, 0.02, 0.03, 0.5, '#cfd8dc', 0, 3.0, 0, 4);
-    return g;
+    B(g, 1.1, 2.1, 1.0, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 })); B(g, 1.15, 0.12, 1.05, '#eeeeee', 0, 2.1);
+    C(g, 0.2, 0.2, 0.35, '#90a4ae', 0.3, 2.22, 0.2, 8);
+  } else { // 摩天大樓
+    const tex = windowsTex(color);
+    const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.4, metalness: 0.3 });
+    B(g, 1.0, 2.0, 1.0, m); B(g, 0.8, 1.4, 0.8, m, 0, 2.0); B(g, 0.55, 0.8, 0.55, m, 0, 3.4);
+    C(g, 0.02, 0.04, 0.8, '#cfd8dc', 0, 4.2, 0, 5); S(g, 0.06, '#ff5252', 0, 5.0, 0, { e: '#ff1744' });
   }
-  const xs = [[0], [-0.45, 0.45], [-0.75, 0, 0.75], [-0.9, -0.3, 0.3, 0.9]][level - 1];
-  for (const x of xs) {
-    const h = 0.38 + level * 0.12;
-    B(g, 0.5, h, 0.5, '#fff8e1', x, 0, 0);
-    roof(g, 0.66, 0.66, 0.32, color, x, h, 0);
-  }
+  g.scale.setScalar(0.85);
   return g;
 }
 
@@ -699,10 +710,16 @@ function limb(parent, r, len, c, x, y, z) {
   return pivot;
 }
 const ANIMALS = {
+  bear: { fur: '#1c1c1c', belly: '#262626', ear: 'round', muzzle: '#c8a27a', tail: 'short', tailC: '#1c1c1c' },
+  cloudleo: { fur: '#cdb48a', belly: '#f3e9d2', ear: 'cat', spots: '#4e4030', cloud: 1, tail: 'long' },
+  otter: { fur: '#6d4c41', belly: '#d7ccc8', ear: 'small', tail: 'otter', whisker: 1 },
+  muntjac: { fur: '#b5651d', belly: '#f5deb3', ear: 'deer', antler: 'short', tail: 'short', tailC: '#fff8e1' },
+  owl: { fur: '#8d6e63', belly: '#d7ccc8', ear: 'tuft', beak: '#4e342e', bigEye: '#ffb300', tail: 'owl', leg: '#bdbdbd', wings: 1 },
+  seaturtle: { fur: '#8bc34a', belly: '#fff59d', ear: 'none', tail: 'short', tailC: '#8bc34a', shell: '#4e6b2f', wings: 1 },
   leopard: { fur: '#d9a066', belly: '#fff3e0', ear: 'cat', spots: '#5d4037', tail: 'long' },
-  magpie: { fur: '#1e5bd8', belly: '#cfe3ff', ear: 'none', headC: '#111111', beak: '#e53935', tail: 'bird', leg: '#e53935' },
+  magpie: { fur: '#1e5bd8', belly: '#cfe3ff', ear: 'none', headC: '#111111', beak: '#e53935', tail: 'bird', leg: '#e53935', wings: 1 },
   deer: { fur: '#a0522d', belly: '#fff8e1', ear: 'deer', spots: '#fffde7', antler: 1, tail: 'short' },
-  pheasant: { fur: '#283593', belly: '#1a237e', ear: 'none', headC: '#1a237e', beak: '#eceff1', face: '#e53935', tail: 'pheasant', leg: '#9e9e9e' },
+  pheasant: { fur: '#283593', belly: '#1a237e', ear: 'none', headC: '#1a237e', beak: '#eceff1', face: '#e53935', tail: 'pheasant', leg: '#9e9e9e', wings: 1 },
   pangolin: { fur: '#8d6e63', belly: '#d7ccc8', ear: 'none', scales: '#6d4c41', snout: 1, tail: 'scaly' },
   monkey: { fur: '#8d7b6a', belly: '#d7ccc8', ear: 'round', face: '#f8bbd0', tail: 'long' },
 };
@@ -718,7 +735,7 @@ function buildAnimal(charId, color) {
   const tb = S(torso, 0.3, a.fur, 0, 0.18, 0, undefined, 12, 9); tb.scale.set(1, 1.15, 0.95);
   const bl = S(torso, 0.2, a.belly, 0, 0.15, 0.15, undefined, 10, 8); bl.scale.set(1, 1.2, 0.6);
   let armL, armR;
-  if (a.tail === 'bird' || a.tail === 'pheasant') {
+  if (a.wings) {
     armL = new THREE.Group(); armL.position.set(-0.27, 0.35, 0); torso.add(armL);
     armR = new THREE.Group(); armR.position.set(0.27, 0.35, 0); torso.add(armR);
     for (const [w, sx] of [[armL, -1], [armR, 1]]) { const wing = S(w, 0.2, a.fur, sx * 0.04, -0.18, 0, undefined, 8, 6); wing.scale.set(0.35, 1.1, 0.8); }
@@ -731,15 +748,23 @@ function buildAnimal(charId, color) {
   const hc = a.headC || a.fur;
   const hs = S(head, 0.3, hc, 0, 0, 0, undefined, 12, 10); hs.scale.set(1.05, 0.95, 1);
   if (a.face) { const fc = S(head, 0.2, a.face, 0, -0.02, 0.15, undefined, 10, 8); fc.scale.set(1.1, 1, 0.6); }
-  else if (!a.headC) { const m = S(head, 0.15, a.belly, 0, -0.08, 0.2, undefined, 8, 6); m.scale.set(1.2, 0.8, 0.7); }
+  else if (!a.headC && a.ear !== 'tuft') { const m = S(head, 0.15, a.muzzle || a.belly, 0, -0.08, 0.2, undefined, 8, 6); m.scale.set(1.2, 0.8, 0.7); }
   // 眼睛
-  for (const sx of [-1, 1]) { S(head, 0.06, '#ffffff', sx * 0.11, 0.05, 0.25, undefined, 8, 6); S(head, 0.038, '#111', sx * 0.11, 0.05, 0.29, undefined, 6, 5); S(head, 0.014, '#fff', sx * 0.1, 0.07, 0.32, undefined, 4, 3); }
+  if (a.bigEye) for (const sx of [-1, 1]) { S(head, 0.11, '#f5f5f5', sx * 0.12, 0.04, 0.22, undefined, 10, 8).scale.z = 0.5; S(head, 0.075, a.bigEye, sx * 0.12, 0.04, 0.26, undefined, 8, 6).scale.z = 0.5; S(head, 0.045, '#111', sx * 0.12, 0.04, 0.29, undefined, 6, 5); S(head, 0.016, '#fff', sx * 0.1, 0.07, 0.32, undefined, 4, 3); }
+  else for (const sx of [-1, 1]) { S(head, 0.06, '#ffffff', sx * 0.11, 0.05, 0.25, undefined, 8, 6); S(head, 0.038, '#111', sx * 0.11, 0.05, 0.29, undefined, 6, 5); S(head, 0.014, '#fff', sx * 0.1, 0.07, 0.32, undefined, 4, 3); }
   for (const sx of [-1, 1]) S(head, 0.05, '#ff8a80', sx * 0.19, -0.07, 0.22, undefined, 5, 4).scale.z = 0.3;
   if (a.beak) { const bk = put(head, new THREE.ConeGeometry(0.07, 0.2, 6), a.beak, 0, -0.04, 0.33); bk.rotation.x = Math.PI / 2; }
   else if (a.snout) { const sn = put(head, new THREE.CylinderGeometry(0.05, 0.11, 0.28, 8), a.fur, 0, -0.06, 0.32); sn.rotation.x = Math.PI / 2; S(head, 0.04, '#3e2723', 0, -0.06, 0.46); }
   else S(head, 0.035, '#3e2723', 0, -0.05, 0.31);
   if (a.ear === 'cat') for (const sx of [-1, 1]) { const e = put(head, new THREE.ConeGeometry(0.1, 0.2, 4), a.fur, sx * 0.17, 0.27, 0); e.rotation.z = -sx * 0.25; }
   if (a.ear === 'round' || a.ear === 'deer') for (const sx of [-1, 1]) { const e = S(head, a.ear === 'deer' ? 0.1 : 0.09, a.fur, sx * (a.ear === 'deer' ? 0.3 : 0.29), a.ear === 'deer' ? 0.12 : 0.02, 0, undefined, 6, 5); e.scale.set(a.ear === 'deer' ? 1.6 : 0.6, a.ear === 'deer' ? 0.6 : 1, 0.5); }
+  if (a.ear === 'tuft') for (const sx of [-1, 1]) { const e = put(head, new THREE.ConeGeometry(0.06, 0.18, 4), a.fur, sx * 0.18, 0.3, 0); e.rotation.z = -sx * 0.4; }
+  if (a.ear === 'small') for (const sx of [-1, 1]) S(head, 0.06, a.fur, sx * 0.22, 0.17, 0, undefined, 6, 4).scale.z = 0.5;
+  if (a.whisker) for (const sx of [-1, 1]) for (const dy of [-0.06, -0.1]) { const w = B(head, 0.22, 0.008, 0.008, '#efebe9', sx * 0.2, dy, 0.26); w.rotation.z = sx * dy * 2; }
+  if (charId === 'bear') { const v = B(torso, 0.34, 0.09, 0.05, '#fafafa', 0, 0.3, 0.26); const v2 = B(torso, 0.14, 0.09, 0.05, '#fafafa', 0, 0.22, 0.27); }
+  if (a.cloud) for (let i = 0; i < 7; i++) { const c = S(torso, 0.07, a.spots, Math.cos(i * 0.9) * 0.27, 0.0 + (i % 4) * 0.1, Math.sin(i * 0.9) * 0.22, undefined, 6, 4); c.scale.set(1.5, 0.8, 0.5); }
+  if (a.antler === 'short') for (const sx of [-1, 1]) { const an = C(head, 0.015, 0.025, 0.16, '#5d4037', sx * 0.1, 0.25, 0, 5); an.rotation.z = -sx * 0.2; }
+  if (a.shell) { const sh = S(torso, 0.36, a.shell, 0, 0.2, -0.12, undefined, 12, 8); sh.scale.set(1.05, 1.1, 0.75); for (let i = 0; i < 5; i++) { const h = S(torso, 0.08, '#6b8e3a', Math.cos(i * 1.26) * 0.18, 0.2 + Math.sin(i * 1.26) * 0.2, -0.38, undefined, 6, 4); h.scale.z = 0.3; } }
   if (charId === 'leopard') {
     B(head, 0.035, 0.18, 0.02, '#fffde7', -0.05, 0.12, 0.27).rotation.x = -0.6; B(head, 0.035, 0.18, 0.02, '#fffde7', 0.05, 0.12, 0.27).rotation.x = -0.6;
     for (let i = 0; i < 6; i++) S(torso, 0.04, a.spots, Math.cos(i) * 0.26, 0.05 + (i % 3) * 0.12, Math.sin(i) * 0.2 - 0.05, undefined, 5, 4);
@@ -755,7 +780,9 @@ function buildAnimal(charId, color) {
   // 尾巴
   const tail = new THREE.Group(); tail.position.set(0, 0.0, -0.25); torso.add(tail);
   if (a.tail === 'long') { const tl = C(tail, 0.04, 0.06, 0.6, a.fur, 0, 0, 0, 6); tl.rotation.x = -0.9; if (charId === 'leopard') for (let i = 0; i < 3; i++) C(tail, 0.065, 0.065, 0.05, a.spots, 0, 0.12 + i * 0.13, -0.1 - i * 0.12, 6).rotation.x = -0.9; }
-  if (a.tail === 'short') S(tail, 0.07, '#ffffff', 0, 0.12, 0);
+  if (a.tail === 'short') S(tail, 0.07, a.tailC || '#ffffff', 0, 0.12, 0);
+  if (a.tail === 'otter') { const tl = C(tail, 0.03, 0.09, 0.55, a.fur, 0, -0.1, 0, 7); tl.rotation.x = -1.2; }
+  if (a.tail === 'owl') { const tl = B(tail, 0.22, 0.05, 0.22, a.fur, 0, 0.0, -0.05); tl.rotation.x = -0.6; }
   if (a.tail === 'bird') { for (const sx of [-1, 1]) { const f = B(tail, 0.12, 0.05, 0.85, a.fur, sx * 0.05, 0, -0.4); f.rotation.x = -0.35; B(tail, 0.12, 0.051, 0.15, '#ffffff', sx * 0.05, -0.15, -0.8).rotation.x = -0.35; } }
   if (a.tail === 'pheasant') { for (let i = 0; i < 6; i++) { const f = B(tail, 0.1, 0.04, 0.16, i % 2 ? '#eceff1' : '#212121', 0, 0.02 + i * 0.05, -0.08 - i * 0.15); f.rotation.x = -0.35; } }
   if (a.tail === 'scaly') { for (let i = 0; i < 4; i++) { const f = put(tail, new THREE.ConeGeometry(0.12 - i * 0.02, 0.18, 4), a.scales, 0, -0.1 - i * 0.03, -0.05 - i * 0.14); f.rotation.x = -1.9; } }

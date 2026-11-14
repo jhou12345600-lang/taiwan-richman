@@ -1,6 +1,6 @@
 // ===== 寶島富翁 3D：主程式（房主 / 玩家 / 介面）=====
 import { TILES, N_TILES, GROUPS, CHARS, CARDS, GODS, STOCKS, EMOTES, LEVEL_NAMES, TOLL_MUL } from './data.js';
-import { cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T } from './engine.js';
+import { chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T } from './engine.js';
 import { World } from './world.js';
 import { MqttNet, LocalNet, BROKERS } from './net.js';
 
@@ -61,8 +61,30 @@ function beep(type) {
   } catch (e) {}
 }
 
+// ---------- 全螢幕 ----------
+const isIOS = /iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && !document.documentElement.requestFullscreen);
+const standalone = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone;
+function canFS() { const d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen); }
+function isFS() { return !!(document.fullscreenElement || document.webkitFullscreenElement) || standalone; }
+async function enterFS(manual) {
+  if (isFS()) { if (manual) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {} } return; }
+  const d = document.documentElement;
+  try {
+    if (d.requestFullscreen) await d.requestFullscreen({ navigationUI: 'hide' });
+    else if (d.webkitRequestFullscreen) d.webkitRequestFullscreen();
+    else throw new Error('no');
+    try { await screen.orientation.lock?.('any'); } catch (e) {}
+  } catch (e) {
+    if (manual) openSheet(`<button class="x" data-close>✕</button><h3>⛶ 全螢幕玩</h3><p>iPhone 的 Safari 不支援網頁直接全螢幕，請這樣做：</p>
+      <p>1. 點下方的 <b>分享按鈕</b>（方框加上箭頭）<br>2. 選 <b>「加入主畫面」</b><br>3. 從主畫面的「寶島富翁」圖示打開，就是全螢幕了！</p>
+      <p class="note">Android 和電腦按 ⛶ 就能全螢幕；電腦也可以按 F11。</p>`);
+  }
+}
+document.addEventListener('fullscreenchange', () => setTimeout(() => world.resize(), 200));
+addEventListener('orientationchange', () => setTimeout(() => world.resize(), 300));
+
 // ---------- 首頁 ----------
-let pickChar = LS.get('tr3d-char', 'boss');
+let pickChar = LS.get('tr3d-char', 'bear'); if (!CHARS.find(c => c.id === pickChar)) pickChar = 'bear';
 G.avatars = {};
 let myAvatar = LS.get('tr3d-avatar', null);
 function renderAvatarBtn() { $('#avPrev').innerHTML = myAvatar ? `<img src="${myAvatar}" style="width:40px;height:40px;border-radius:50%;object-fit:cover">` : '（未設定）'; }
@@ -96,20 +118,30 @@ function myName() {
 function show(id) {
   for (const k of ['#home', '#lobby', '#hud']) $(k).classList.toggle('hidden', k !== id);
 }
+$('#codeBtn').onclick = () => {
+  const c = $('#codeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (c.length < 4) { toast('請輸入房號'); return; }
+  location.href = location.pathname + '?r=' + c + '&b=0';
+};
 if (G.room) {
+  $('#codeRow').classList.add('hidden');
   $('#joinBtn').classList.remove('hidden'); $('#joinBtn').textContent = `🚪 加入房間 ${G.room}`;
   $('#createBtn').classList.add('hidden');
 }
 show('#home');
 world.overview();
 
+$('#fsHomeBtn').onclick = () => enterFS(true);
+if (standalone) $('#fsHomeBtn').classList.add('hidden');
 $('#soloBtn').onclick = () => {
+  if (!isIOS) enterFS(false);
   G.solo = true; G.isHost = true; G.room = 'SOLO'; if (myAvatar) G.avatars[myId] = myAvatar;
   G.s = lobbyState(); G.s.seats.push({ id: myId, name: myName(), char: pickChar, ctl: myId });
   addBot(); addBot(); addBot();
   enterLobby();
 };
 $('#createBtn').onclick = async () => {
+  if (!isIOS) enterFS(false);
   const name = myName();
   $('#createBtn').disabled = true; $('#homeMsg').textContent = '正在建立房間…';
   G.room = rid(6);
@@ -129,6 +161,7 @@ $('#createBtn').onclick = async () => {
   enterLobby();
 };
 $('#joinBtn').onclick = async () => {
+  if (!isIOS) enterFS(false);
   myName();
   $('#joinBtn').disabled = true; $('#homeMsg').textContent = '正在連線…';
   try { await connectNet(); } catch (e) {
@@ -147,7 +180,7 @@ function shareUrl() {
   return u.toString();
 }
 function lobbyState() {
-  return { phase: 'lobby', v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 30000, maxRounds: 30, dice: 2 }, fx: [], fxn: 0, log: [] };
+  return { phase: 'lobby', v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 30000, maxRounds: 50, dice: 1 }, fx: [], fxn: 0, log: [] };
 }
 
 // ---------- 連線 ----------
@@ -223,7 +256,7 @@ function onAction(m) {
     if (a.type === 'join') {
       let seat = s.seats.find(x => x.id === m.from);
       const taken = s.seats.filter(x => x.id !== m.from).map(x => x.char);
-      let ch = CHARS.find(c => c.id === a.char) ? a.char : 'boss';
+      let ch = CHARS.find(c => c.id === a.char) ? a.char : 'bear';
       if (taken.includes(ch)) ch = (CHARS.find(c => !taken.includes(c.id)) || CHARS[0]).id;
       const name = String(a.name || '玩家').slice(0, 8);
       if (seat) { seat.name = name; seat.char = ch; }
@@ -426,7 +459,7 @@ function renderPlayers() {
 function renderHud() {
   const s = G.s; if (!s || !s.players) return;
   renderPlayers();
-  $('#roundinfo').textContent = `第 ${s.round}${s.settings.maxRounds ? '/' + s.settings.maxRounds : ''} 回合`;
+  $('#roundinfo').textContent = `📅 ${s.month || 1}月${s.day || 1}日・第 ${s.round}${s.settings.maxRounds ? '/' + s.settings.maxRounds : ''} 回合`;
   const feed = s.log.slice(-4);
   $('#feed').innerHTML = feed.map(l => `<div>${esc(l)}</div>`).join('');
   renderNet();
@@ -540,8 +573,8 @@ function tileInfoHtml(i) {
     h += `<div class="kv"><b>區域</b><span style="color:${GROUPS[t.g].color};font-weight:900">${GROUPS[t.g].name}</span>
       <b>地主</b><span>${o ? esc(o.name) : '（無）'}</span><b>建築</b><span>${LEVEL_NAMES[st.l]}</span>
       <b>地價</b><span>${money(price(s, i))}</span><b>加蓋費</b><span>${money(upCost(s, i))}／層</span>
-      <b>目前過路費</b><span style="color:#e53935;font-weight:900">${o ? money(toll(s, i)) : '—'}</span></div>
-      <p class="note">過路費：空地 ${money(price(s, i) * TOLL_MUL[0])} → 摩天大樓 ${money(price(s, i) * TOLL_MUL[5])}。擁有整個區域時過路費 ×1.5。</p>`;
+      <b>目前過路費</b><span style="color:#e53935;font-weight:900">${o ? money(toll(s, i)) + (chainOf(s, i).length > 1 ? `（${chainOf(s, i).length} 塊連鎖）` : '') : '—'}</span></div>
+      <p class="note">過路費：空地 ${money(price(s, i) * TOLL_MUL[0])} → 摩天大樓 ${money(price(s, i) * TOLL_MUL[5])}。同一地主相連的土地會「連鎖」，過路費一起加總！</p>`;
   }
   return h;
 }
@@ -591,8 +624,8 @@ function openDecide(refresh = false) {
       <div class="choice">${[1, 2, 3, 4, 5, 6].map(n => `<button class="pri" data-pick="${n}">${n}</button>`).join('')}</div>
       <button class="ghost" style="width:100%;margin-top:8px" data-a="no">不玩</button>`;
   } else if (pd.type === 'bank') {
-    h = `<h3>🏦 銀行</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
-      <p class="note">存款每次經過台北車站有 5% 利息，而且不會被查稅、均富卡拿走。</p>
+    h = `<h3>🏦 ${pd.pass ? '經過銀行' : '銀行'}</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
+      <p class="note">每月 1 日存款發 10% 利息，存款不會被查稅、均富卡拿走。</p>
       <div class="choice"><button class="green" data-bank="1000">存 $1000</button><button class="green" data-bank="5000">存 $5000</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
       <div class="choice"><button class="blue" data-bank="-1000">領 $1000</button><button class="blue" data-bank="-5000">領 $5000</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
       <button class="ghost" style="width:100%;margin-top:10px" data-a="done">完成</button>`;
@@ -630,9 +663,9 @@ function useCardFlow(k) {
     $('#sheet').querySelectorAll('[data-v]').forEach(b => b.onclick = () => { closeSheet(); send(p.id, { type: 'card', card: k, value: +b.dataset.v }); });
     return;
   }
-  if (c.target === 'player') {
-    if (!tg.length) { toast('沒有可以選的玩家'); return; }
-    openSheet(`<h3>${c.icon} ${c.name}</h3><p>選擇對象：</p>` + tg.map(id => { const o = pl(s, id); return `<button class="ghost" style="width:100%;margin:4px 0" data-t="${esc(id)}">${charOf(o.char).emoji} ${esc(o.name)}　${money(o.cash)}・${o.cards.length} 張卡</button>`; }).join('') +
+  if (c.target === 'player' || c.target === 'godplayer') {
+    if (!tg.length) { toast(c.target === 'godplayer' ? '目前沒有人被神明附身' : '沒有可以選的玩家'); return; }
+    openSheet(`<h3>${c.icon} ${c.name}</h3><p>選擇對象：</p>` + tg.map(id => { const o = pl(s, id); return `<button class="ghost" style="width:100%;margin:4px 0" data-t="${esc(id)}">${charOf(o.char).emoji} ${esc(o.name)}　${o.god ? GODS[o.god.id].icon + GODS[o.god.id].name : money(o.cash) + '・' + o.cards.length + ' 張卡'}</button>`; }).join('') +
       `<button class="ghost" style="width:100%;margin-top:6px" data-close>取消</button>`);
     $('#sheet').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { closeSheet(); send(p.id, { type: 'card', card: k, target: b.dataset.t }); });
     return;
@@ -694,6 +727,7 @@ function renderOver() {
 }
 
 // 按鈕
+$('#fsBtn').onclick = () => enterFS(true);
 $('#camBtn').onclick = () => { if (world.follow) { world.overview(); toast('全島視角'); } else { world.zoomIn(); toast('跟隨目前玩家'); } };
 $('#stockBtn').onclick = () => openStock();
 $('#logBtn').onclick = () => { if (!G.s) return; openSheet(`<button class="x" data-close>✕</button><h3>📜 遊戲紀錄</h3><div class="note" style="font-size:13px;color:#333">${G.s.log.slice().reverse().map(esc).join('<br>')}</div>`); };
@@ -702,8 +736,9 @@ $('#sndBtn').onclick = () => { G.sound = !G.sound; LS.set('tr3d-snd', G.sound); 
 $('#sndBtn').textContent = G.sound ? '🔊' : '🔇';
 $('#helpBtn').onclick = () => openSheet(`<button class="x" data-close>✕</button><h3>❔ 玩法說明</h3><div class="note" style="font-size:14px;color:#333">
   <p>🎲 輪到你時先可以用道具卡、買賣股票，再擲骰子前進。</p>
-  <p>🏠 停在無人景點可以買下；停在自己的地可以加蓋，最高蓋到摩天大樓。別人停到你的地要付過路費，擁有整個區域過路費 ×1.5。</p>
-  <p>🚉 經過台北車站領薪水 $2000、點券 +10、存款利息 5%。</p>
+  <p>🏠 停在無人景點可以買下；停在自己的地可以加蓋，最高蓋到摩天大樓。別人停到你的地要付過路費；自己的地連在一起會「連鎖」，過路費整串加總（大富翁6規則）。</p>
+  <p>🎲 預設 1 顆骰子；一輪是一天，月曆會走動。🔮魔法屋、👼天使、😈惡魔都會隨機出現。</p>
+  <p>🚉 經過台北車站領環島獎金 $1000、點券 +10；經過或停在🏦銀行可以存提款，每月 1 日發存款利息 10%。</p>
   <p>🏪 道具店用點券買卡；⛩️ 廟會請到神明附身 5 回合（財神、福神、土地公、媽祖是好神，衰神、窮神是壞神）。</p>
   <p>❓ 機會、📰 新聞會發生隨機事件；🏦 銀行可存提款；🎰 彩券行猜點數。</p>
   <p>💸 付不出錢會自動提款、賣股票、賣地，還不夠就破產。最後只剩一人、或回合結束時總資產最多的人獲勝！</p>

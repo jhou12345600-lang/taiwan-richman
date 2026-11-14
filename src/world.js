@@ -216,10 +216,11 @@ export class World {
     this.tileObjs = []; this.pickables = []; this.lmSpots = [];
     const n = this.path.length, size = Math.min(3.5, this.spacing * 0.9);
     this.tileSize = size;
+    // 第一輪：每格的方向與「蓋房子的空地」位置
+    const info = [];
     for (let i = 0; i < n; i++) {
       const p = this.path[i], a = this.path[(i - 1 + n) % n], b = this.path[(i + 1) % n];
       const tan = new THREE.Vector2().subVectors(b, a).normalize();
-      // 往島中央（中央山脈軸線）的方向當作「內側」
       let best = null, bd = 1e9;
       for (let k = 0; k < SPINE.length - 1; k++) {
         const A = SPINE[k], Bq = SPINE[k + 1], d = new THREE.Vector2().subVectors(Bq, A);
@@ -229,6 +230,18 @@ export class World {
       let nm = new THREE.Vector2().subVectors(best, p).normalize();
       const perp = new THREE.Vector2(-tan.y, tan.x); if (perp.dot(nm) < 0) perp.negate();
       nm = nm.multiplyScalar(0.5).addScaledVector(perp, 0.5).normalize();
+      info.push({ p, tan, nm });
+    }
+    for (let i = 0; i < n; i++) {
+      const { p, nm } = info[i], d = size / 2 + 0.95;
+      let lotP = new THREE.Vector2(p.x + nm.x * d, p.y + nm.y * d);
+      if (this.path.some((q, j) => j !== i && q.distanceTo(lotP) < size * 0.85)) lotP = new THREE.Vector2(p.x - nm.x * d, p.y - nm.y * d);
+      info[i].lotP = lotP;
+    }
+    const lots = info.map(x => x.lotP);
+    // 第二輪：建格子、空地、景點（景點不可壓到格子與房子）
+    for (let i = 0; i < n; i++) {
+      const { p, tan, nm, lotP } = info[i];
       const y = Math.max(0.35, heightAt(p.x, p.y)) + 0.18;
       const g = new THREE.Group(); g.position.set(p.x, y, p.y); g.userData.tile = i;
       const ang = Math.atan2(tan.x, tan.y);
@@ -239,23 +252,41 @@ export class World {
       this.scene.add(g); this.pickables.push(g);
       const t = TILES[i];
       const lm = buildLandmark(t.type === 'prop' ? t.model : t.type);
-      let lp;
-      if (t.sea) { lp = new THREE.Vector2(p.x - nm.x * 6.2, p.y - nm.y * 6.2); lm.position.set(lp.x, 0, lp.y); }
-      else {
-        let off = 5.0;
-        lp = new THREE.Vector2(p.x + nm.x * off, p.y + nm.y * off);
-        const bad = q => this.lmSpots.some(r => r.distanceTo(q) < 4.2) || this.path.some(r => r.distanceTo(q) < 3.9);
-        for (let tries = 0; tries < 16 && bad(lp); tries++) { off += 1.0; lp.set(p.x + nm.x * off, p.y + nm.y * off); }
-        lm.position.set(lp.x, heightAt(lp.x, lp.y) - 0.05, lp.y);
+      const R = 2.3; // 景點半徑
+      const clear = q => !this.lmSpots.some(r => r.distanceTo(q) < R * 2) && !this.path.some(r => r.distanceTo(q) < size * 0.72 + R) && !lots.some(r => r.distanceTo(q) < R + 0.9);
+      const dir = t.sea ? -1 : 1;
+      const score = q => Math.min(...this.lmSpots.map(r => r.distanceTo(q) - R * 2), ...this.path.map(r => r.distanceTo(q) - (size * 0.72 + R)), ...lots.map(r => r.distanceTo(q) - (R + 0.9)));
+      let lp = null, bestQ = null, bestS = -1e9, sc = 1.15;
+      search: for (let off = t.sea ? 6.4 : 5.4; off < (t.sea ? 14 : 22); off += 0.7) {
+        for (const sh of [0, 1.5, -1.5, 3, -3, 4.5, -4.5]) {
+          const q = new THREE.Vector2(p.x + dir * nm.x * off, p.y + dir * nm.y * off).addScaledVector(tan, sh);
+          if (!t.sea && (heightAt(q.x, q.y) > 2.2 || heightAt(q.x, q.y) < 0.25)) continue;
+          if (t.sea && heightAt(q.x, q.y) > -0.2) continue;
+          const sv = score(q);
+          if (sv >= 0) { lp = q; break search; }
+          if (sv > bestS) { bestS = sv; bestQ = q; }
+        }
       }
+      if (!lp) { lp = bestQ || new THREE.Vector2(p.x + dir * nm.x * 6, p.y + dir * nm.y * 6); sc = Math.max(0.6, 1.15 + bestS / 3); }
+      lm.position.set(lp.x, t.sea ? 0 : heightAt(lp.x, lp.y) - 0.05, lp.y);
       this.lmSpots.push(lp.clone());
-      lm.rotation.y = Math.atan2(-nm.x, -nm.y); lm.scale.setScalar(1.15);
+      lm.rotation.y = Math.atan2(-nm.x, -nm.y); lm.scale.setScalar(sc);
       lm.userData.tile = i; this.scene.add(lm); this.pickables.push(lm);
       if (!t.sea && t.type === 'prop') {
         const pad = C(new THREE.Group(), 1.9, 2.1, 0.5, '#7fb862', 0, -0.45, 0, 12);
-        pad.position.copy(lm.position).y -= 0.4; this.scene.add(pad);
+        pad.position.copy(lm.position).y -= 0.4; pad.scale.setScalar(sc / 1.15); this.scene.add(pad);
       }
-      const lot = new THREE.Group(); const lotP = new THREE.Vector2(p.x + nm.x * (size / 2 + 0.75), p.y + nm.y * (size / 2 + 0.75));
+      // 連到景點的小步道
+      if (!t.sea) {
+        const mid = p.clone().lerp(lp, 0.5), len = p.distanceTo(lp) - size * 0.6 - 1.6;
+        if (len > 0.3 && len < 5) {
+          const path = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.06, len), mat('#d7c9a7'));
+          const st = p.clone().addScaledVector(new THREE.Vector2().subVectors(lp, p).normalize(), size * 0.6 + len / 2);
+          path.position.set(st.x, Math.max(0.35, heightAt(st.x, st.y)) + 0.03, st.y); path.rotation.y = Math.atan2(lp.x - p.x, lp.y - p.y); path.receiveShadow = true;
+          this.scene.add(path);
+        }
+      }
+      const lot = new THREE.Group();
       lot.position.set(lotP.x, Math.max(0.35, heightAt(lotP.x, lotP.y)), lotP.y); lot.rotation.y = ang; this.scene.add(lot);
       const ring = new THREE.Mesh(new THREE.RingGeometry(size * 0.62, size * 0.74, 32), new THREE.MeshBasicMaterial({ color: '#ffeb3b', transparent: true, opacity: 0, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2; ring.position.y = 0.2; g.add(ring);
@@ -275,9 +306,13 @@ export class World {
       const o = this.tileObjs[i];
       if (o.owner !== t.o) { o.owner = t.o; o.base.material.color.set(t.o ? colors[t.o] : '#cbbf9f'); o.level = -1; }
       if (o.level !== t.l) {
+        const grew = o.level >= -1 && t.o && (o.level === -1 || t.l > o.level) && this.inited;
         o.level = t.l; o.lot.clear();
-        if (t.o && t.l > 0) o.lot.add(buildHouses(t.l, colors[t.o]));
-        else if (t.o) { const f = new THREE.Group(); C(f, 0.03, 0.03, 1.1, '#eeeeee', 0, 0, 0, 4); B(f, 0.55, 0.35, 0.03, colors[t.o], 0.28, 0.72, 0); o.lot.add(f); }
+        if (t.o) {
+          const h = buildHouses(t.l, colors[t.o]);
+          if (grew) { h.scale.setScalar(0.01); h.userData.growT = performance.now(); }
+          o.lot.add(h);
+        }
       }
     });
     for (const k of Object.keys(this.marks)) if (!s.marks[k]) { this.scene.remove(this.marks[k]); delete this.marks[k]; }
@@ -300,6 +335,7 @@ export class World {
       }
       this.tokens[p.id].visible = !p.out;
     });
+    this.inited = true;
     if (!this.arrow) {
       this.arrow = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.6, 4), mat('#ffeb3b', { e: '#ffc107', ei: 0.7 }));
       this.arrow.rotation.x = Math.PI; this.scene.add(this.arrow);
@@ -368,6 +404,7 @@ export class World {
     const dt = Math.min(0.05, this.clock.getDelta()), t = this.clock.elapsedTime;
     const s = this.state;
     this.scene.traverse(o => { if (o.userData.tick) o.userData.tick(t, dt); });
+    if (this.tileObjs) for (const o of this.tileObjs) { const h = o.lot.children[0]; if (h && h.userData.growT) { const f = Math.min(1, (performance.now() - h.userData.growT) / 700); const e = f < 1 ? 1 + Math.sin(f * Math.PI) * 0.25 * (1 - f) : 1; h.scale.setScalar(Math.max(0.01, f * e)); if (f >= 1) h.userData.growT = 0; } }
     this.clouds.forEach((c, i) => { c.position.x += dt * (0.6 + i * 0.05); if (c.position.x > 90) c.position.x = -90; });
     if (s) {
       const now = Date.now() - this.offset;

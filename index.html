@@ -6,6 +6,12 @@
 <title>寶島富翁 3D｜台灣環島大富翁連線版</title>
 <meta name="description" content="台灣真實景點 3D 大富翁，開房間網址就能 2–6 人連線對戰。">
 <meta name="theme-color" content="#0d6aa8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="寶島富翁">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏝️</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
@@ -14,7 +20,7 @@
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;overflow:hidden;font-family:"Noto Sans TC",system-ui,sans-serif;background:#0d6aa8;color:#222;touch-action:none}
+html,body{margin:0;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;-webkit-user-select:none;user-select:none;font-family:"Noto Sans TC",system-ui,sans-serif;background:#0d6aa8;color:#222;touch-action:none}
 #cv{position:fixed;inset:0;width:100%;height:100%;display:block}
 .hidden{display:none!important}
 button{font-family:inherit;cursor:pointer;border:0;border-radius:12px;font-weight:700;font-size:15px;padding:10px 14px;background:#fff;color:#222;box-shadow:0 3px 0 rgba(0,0,0,.25);transition:transform .08s}
@@ -121,7 +127,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
 <!-- 首頁 -->
 <div class="screen hidden" id="home">
   <div class="panel">
-    <div class="logo"><h1>寶島富翁 3D</h1><p>環島買地蓋樓・台灣真實景點・2–6 人連線</p></div>
+    <div class="logo"><h1>寶島富翁 3D</h1><p>大富翁6玩法・台灣環島 72 格・2–6 人連線</p></div>
     <div class="lab">你的暱稱</div>
     <input id="nameIn" maxlength="8" placeholder="輸入暱稱">
     <div class="lab">自訂頭像（選填，會顯示在角色頭上）</div>
@@ -131,7 +137,9 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
     <div class="col">
       <button class="pri hidden" id="joinBtn" style="font-size:18px">🚪 加入房間</button>
       <button class="pri" id="createBtn" style="font-size:18px">🌐 建立連線房間（傳網址給朋友）</button>
+      <div class="row" id="codeRow"><input id="codeIn" maxlength="8" placeholder="有房號？輸入加入" style="text-transform:uppercase"><button class="blue" id="codeBtn" style="flex:0 0 auto">加入</button></div>
       <button class="ghost" id="soloBtn">🤖 單機遊戲（跟電腦 / 同一台輪流玩）</button>
+      <button class="ghost" id="fsHomeBtn">⛶ 全螢幕</button>
     </div>
     <p class="note" id="homeMsg"></p>
     <p class="note">玩法：擲骰子環島，買下景點、蓋房子收過路費；用點券買道具卡整人，神明附身、股市、銀行、機會與新聞事件，讓對手全部破產或回合結束時資產最多的人獲勝！</p>
@@ -154,8 +162,8 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
       <div class="row" style="margin:6px 0"><button class="ghost" id="addBot">＋ 電腦玩家</button><button class="ghost" id="addLocal">＋ 本機玩家</button></div>
       <div class="row">
         <div><div class="lab">起始資金</div><select id="setCash"><option value="20000">$20,000</option><option value="30000" selected>$30,000</option><option value="50000">$50,000</option></select></div>
-        <div><div class="lab">回合上限</div><select id="setRounds"><option value="20">20 回合</option><option value="30" selected>30 回合</option><option value="50">50 回合</option><option value="0">無限（破產制）</option></select></div>
-        <div><div class="lab">骰子</div><select id="setDice"><option value="1">1 顆</option><option value="2" selected>2 顆</option></select></div>
+        <div><div class="lab">回合上限</div><select id="setRounds"><option value="30">30 回合</option><option value="50" selected>50 回合</option><option value="80">80 回合</option><option value="0">無限（破產制）</option></select></div>
+        <div><div class="lab">骰子</div><select id="setDice"><option value="1" selected>1 顆（大富翁6）</option><option value="2">2 顆（快速）</option></select></div>
       </div>
       <button class="pri" id="startBtn" style="width:100%;margin-top:12px;font-size:18px">🎲 開始遊戲</button>
     </div>
@@ -169,6 +177,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
   <div id="players"></div>
   <div id="roundinfo"></div>
   <div id="topbtn">
+    <button id="fsBtn" title="全螢幕">⛶</button>
     <button id="camBtn" title="視角">🗺️</button>
     <button id="stockBtn" title="股市">📈</button>
     <button id="logBtn" title="紀錄">📜</button>
@@ -213,10 +222,10 @@ var GROUPS = {
 var SHOP = { type: "shop", name: "道具店", icon: "🏪", desc: "用點券購買道具卡。" };
 var CH = { type: "chance", name: "機會", icon: "❓" };
 var NEWS = { type: "news", name: "新聞", icon: "📰" };
-var BANK = { type: "bank", name: "銀行", icon: "🏦", desc: "停在這裡可以存款、提款。存款不怕查稅、均富。" };
+var BANK = { type: "bank", name: "銀行", icon: "🏦", desc: "經過或停下都可以存款、提款。每月 1 日發 10% 存款利息，存款不怕查稅、均富。" };
 var P = (g, name, price2, model, desc, sea) => ({ type: "prop", g, name, price: price2, model, desc, sea });
 var TILES = [
-  { type: "start", name: "台北車站", icon: "🚉", desc: "起點。每次經過領薪水 $2000、點券 +10，存款加 5% 利息。" },
+  { type: "start", name: "台北車站", icon: "🚉", desc: "起點。每次經過領環島獎金 $1000、點券 +10。" },
   P("tp", "台北101", 4400, "t101", "台北信義區地標，508 公尺高，曾是世界第一高樓。"),
   P("tp", "中正紀念堂", 3800, "cks", "藍瓦白牆的八角屋頂，自由廣場的牌樓非常壯觀。"),
   CH,
@@ -279,7 +288,7 @@ var TILES = [
   P("tc", "逢甲夜市", 2800, "fengjia", "創意小吃的發源地。"),
   P("tc", "臺中國家歌劇院", 3200, "opera", "伊東豊雄設計的曲牆建築。"),
   P("tc", "高美濕地", 2600, "gaomei", "夕陽、風車與天空之鏡。"),
-  CH,
+  { type: "magic", name: "魔法屋", icon: "🔮", desc: "神秘的魔法屋，會發生意想不到的事。" },
   P("ml", "勝興車站", 2200, "shengxing", "海拔最高的舊山線木造車站。"),
   P("ml", "龍騰斷橋", 2200, "longteng", "地震留下的紅磚拱橋遺跡。"),
   P("ml", "新竹城隍廟", 2400, "chenghuang", "香火鼎盛的城隍廟與貢丸米粉。"),
@@ -290,66 +299,71 @@ var TILES = [
   P("ty", "淡水漁人碼頭", 3e3, "tamsui", "情人橋與淡水夕照。")
 ];
 var N_TILES = TILES.length;
-var LEVEL_NAMES = ["空地", "一層平房", "二層樓", "透天厝", "公寓", "摩天大樓"];
-var TOLL_MUL = [0.3, 0.9, 1.7, 2.8, 4.2, 6];
+var LEVEL_NAMES = ["空地", "平房", "二層樓", "透天厝", "公寓", "摩天大樓"];
+var TOLL_MUL = [0.2, 0.5, 1, 1.7, 2.6, 3.8];
 var UPGRADE_RATE = 0.55;
-var SALARY = 2e3;
+var SALARY = 1e3;
 var CHARS = [
   {
-    id: "boss",
-    name: "金董",
-    emoji: "🤵",
+    id: "bear",
+    name: "黑熊",
+    emoji: "🐻",
+    color: "#43a047",
+    animal: 1,
+    bio: "從玉山下來環島的台灣黑熊，胸前的白色 V 字是招牌，皮粗肉厚、深受山神眷顧。",
+    sk: [["thick", "皮厚", "付過路費與醫藥費 -20%"], ["divine", "山林之子", "神明附身時間 +2 回合"]]
+  },
+  {
+    id: "cloudleo",
+    name: "雲豹",
+    emoji: "🐆",
     color: "#e53935",
-    bio: "白手起家的建設公司董事長，口頭禪是「地段、地段、還是地段」。",
+    animal: 1,
+    bio: "身上有雲朵斑紋的雲豹，傳說中的森林霸主，最懂得圈地收租。",
     sk: [["rent", "收租王", "收到的過路費 +20%"], ["builder", "建商", "加蓋房子費用 -20%"]]
   },
   {
-    id: "ama",
-    name: "阿嬤",
-    emoji: "👵",
+    id: "otter",
+    name: "水獺",
+    emoji: "🦦",
     color: "#8e24aa",
-    bio: "台南市場賣了五十年菜粿，存摺比誰都厚。",
-    sk: [["interest", "存錢筒", "存款利息加倍（10%）"], ["elder", "長輩保佑", "衰神、窮神不會附身"]]
+    animal: 1,
+    bio: "金門來的歐亞水獺，喜歡把寶貝藏在窩裡，存錢一把罩。",
+    sk: [["interest", "存錢筒", "月底存款利息加倍（20%）"], ["elder", "好運水獺", "衰神、窮神、惡魔不會附身"]]
   },
   {
-    id: "chef",
-    name: "夜市王",
-    emoji: "🧑‍🍳",
+    id: "muntjac",
+    name: "山羌",
+    emoji: "🦌",
     color: "#fb8c00",
-    bio: "全台夜市都有他的攤位，朋友多到數不完。",
+    animal: 1,
+    bio: "山林裡叫聲像狗的山羌，到處串門子，人脈超廣。",
     sk: [["network", "人脈廣", "離開道具店時，隨機獲得 1 張卡"], ["bargain", "殺價", "道具店卡片 7 折"]]
   },
   {
-    id: "boba",
-    name: "珍奶妹",
-    emoji: "🧋",
+    id: "owl",
+    name: "領角鴞",
+    emoji: "🦉",
     color: "#fdd835",
-    bio: "手搖飲網紅，走到哪拍到哪，運氣好得不得了。",
+    animal: 1,
+    bio: "大眼睛的領角鴞，晚上出沒的人氣網紅鳥。",
     sk: [["lucky", "人氣王", "機會事件拿到的錢 +50%"], ["encore", "臨場發揮", "使用停留卡、遙控骰子時 40% 機率返還"]]
   },
   {
-    id: "surf",
-    name: "浪人凱",
-    emoji: "🏄",
+    id: "seaturtle",
+    name: "綠蠵龜",
+    emoji: "🐢",
     color: "#039be5",
-    bio: "東海岸衝浪手，身手靈活，什麼都難不倒他。",
-    sk: [["range", "浪裡來去", "路障、地雷放置距離翻倍"], ["agile", "身手矯健", "住院、拘留時間少 1 回合"]]
-  },
-  {
-    id: "bear",
-    name: "黑熊仔",
-    emoji: "🐻",
-    color: "#43a047",
-    bio: "從玉山下來觀光的台灣黑熊，皮粗肉厚、深受山神眷顧。",
-    sk: [["thick", "皮厚", "付過路費與醫藥費 -20%"], ["divine", "山林之子", "神明附身時間 +2 回合"]]
+    animal: 1,
+    bio: "在澎湖望安產卵的綠蠵龜，游遍台灣海域。",
+    sk: [["range", "洄游", "路障、地雷放置距離翻倍"], ["agile", "縮頭", "住院、拘留時間少 1 回合"]]
   },
   {
     id: "leopard",
     name: "石虎",
     emoji: "🐆",
     color: "#d84315",
-    animal: 1,
-    bio: "苗栗淺山的石虎，額頭兩條白線是招牌，夜裡身手最靈巧。",
+    bio: "苗栗淺山的石虎，額頭兩條白線，夜裡身手最靈巧。",
     sk: [["nomine", "夜行", "踩到地雷不會爆炸"], ["noblock", "敏捷", "路障擋不住牠"]]
   },
   {
@@ -357,7 +371,6 @@ var CHARS = [
     name: "藍鵲",
     emoji: "🐦",
     color: "#283593",
-    animal: 1,
     bio: "拖著長尾巴的台灣藍鵲，最愛收集亮晶晶的東西。",
     sk: [["bag", "長尾巴", "道具卡上限 15 張"], ["rob2", "叼走", "搶奪卡一次搶兩張"]]
   },
@@ -366,7 +379,6 @@ var CHARS = [
     name: "梅花鹿",
     emoji: "🦌",
     color: "#ec407a",
-    animal: 1,
     bio: "墾丁復育的梅花鹿，蹦蹦跳跳停不下來。",
     sk: [["swift", "跳躍", "每次擲骰多走 1 步"], ["protected", "保育類", "不會被查稅卡、烏龜卡指定"]]
   },
@@ -375,7 +387,6 @@ var CHARS = [
     name: "帝雉",
     emoji: "🐓",
     color: "#00897b",
-    animal: 1,
     bio: "印在千元鈔上的國寶鳥，走到哪都很有排場。",
     sk: [["salary", "國寶", "經過台北車站薪水 +50%"], ["pointsx", "千元鈔", "獲得的點券加倍"]]
   },
@@ -384,16 +395,14 @@ var CHARS = [
     name: "穿山甲",
     emoji: "🦔",
     color: "#546e7a",
-    animal: 1,
     bio: "全身鱗甲的穿山甲，遇到危險就縮成一顆球。",
-    sk: [["armor", "鱗甲", "怪獸卡、颱風不會摧毀牠的房子"], ["dig", "挖洞", "不會被警察拘留"]]
+    sk: [["armor", "鱗甲", "怪獸卡、惡魔、颱風不會摧毀牠的房子"], ["dig", "挖洞", "不會被警察拘留"]]
   },
   {
     id: "monkey",
     name: "獼猴",
     emoji: "🐒",
     color: "#9e9d24",
-    animal: 1,
     bio: "壽山上的台灣獼猴，最會跟遊客「借」東西。",
     sk: [["pick", "順手牽羊", "付過路費後 25% 機率拿回一半"], ["mischief", "調皮", "每回合開始 15% 機率撿到道具卡"]]
   }
@@ -417,7 +426,10 @@ var CARDS = {
   stay: { name: "停留卡", icon: "🛑", cost: 15, target: "none", desc: "這回合原地不動，再觸發一次腳下的格子。" },
   build: { name: "加蓋卡", icon: "🏗️", cost: 40, target: "myprop", desc: "免費替自己的一塊地加蓋一層。" },
   turtle: { name: "烏龜卡", icon: "🐢", cost: 25, target: "player", desc: "指定玩家接下來 3 回合每次只走 1 步。" },
-  angel: { name: "天使卡", icon: "👼", cost: 70, target: "myprop", desc: "選一塊地，整個區域所有已擁有的土地都加蓋一層。" }
+  angel: { name: "天使卡", icon: "👼", cost: 70, target: "myprop", desc: "選一塊地，整條街所有已擁有的土地都加蓋一層。" },
+  robot: { name: "機器娃娃", icon: "🤖", cost: 25, target: "none", desc: "清除前方 10 格內所有路障和地雷。" },
+  missile: { name: "飛彈卡", icon: "🚀", cost: 60, target: "oppprop", desc: "轟炸對手土地，房子少 2 層，地主住院 1 回合。" },
+  sendgod: { name: "送神卡", icon: "🎐", cost: 30, target: "godplayer", desc: "把任何一位玩家身上的神明送走。" }
 };
 var CARD_IDS = Object.keys(CARDS);
 var GODS = {
@@ -426,7 +438,9 @@ var GODS = {
   tudi: { name: "土地公", icon: "👴", good: true, desc: "停在空地上直接免費獲得土地。" },
   mazu: { name: "媽祖", icon: "🙏", good: true, desc: "保佑平安：不會住院、被抓，也不受壞運影響。" },
   shuai: { name: "衰神", icon: "☠️", good: false, desc: "過路費加倍付。" },
-  qiong: { name: "窮神", icon: "🥀", good: false, desc: "每回合開始損失 8% 現金。" }
+  qiong: { name: "窮神", icon: "🥀", good: false, desc: "每回合開始損失 8% 現金。" },
+  angel: { name: "天使", icon: "😇", good: true, desc: "停在土地上時，整個區域已有房子的地都加蓋一層。" },
+  devil: { name: "惡魔", icon: "😈", good: false, desc: "停在土地上時，整個區域的房子全部倒光。" }
 };
 var STOCKS = [
   { name: "寶島半導體", p: 58 },
@@ -474,17 +488,30 @@ function cardCost(p, k) {
 function propValue(s, i) {
   return price(s, i) + s.tiles[i].l * upCost(s, i);
 }
-function ownsGroup(s, g, pid) {
-  return TILES.every((t, i) => t.g !== g || s.tiles[i].o === pid);
-}
-function toll(s, i) {
+function baseToll(s, i) {
   const t = TILES[i], st = s.tiles[i];
-  if (!st || st.o == null) return 0;
   let v = price(s, i) * TOLL_MUL[st.l];
-  if (ownsGroup(s, t.g, st.o)) v *= 1.5;
   const gm = s.gmod[t.g];
   if (gm) v *= gm.m;
-  return r10(v);
+  return v;
+}
+function chainOf(s, i) {
+  const st = s.tiles[i];
+  if (!st || st.o == null) return [];
+  const out = [i];
+  for (const d of [-1, 1]) {
+    let j = (i + d + N_TILES) % N_TILES;
+    while (j !== i && s.tiles[j] && s.tiles[j].o === st.o) {
+      out.push(j);
+      j = (j + d + N_TILES) % N_TILES;
+    }
+  }
+  return [...new Set(out)];
+}
+function toll(s, i) {
+  const st = s.tiles[i];
+  if (!st || st.o == null) return 0;
+  return r10(chainOf(s, i).reduce((a, j) => a + baseToll(s, j), 0));
 }
 function stockValue(s, p) {
   return p.stocks.reduce((a, q, k) => a + q * s.market[k].p, 0);
@@ -520,6 +547,8 @@ function createGame(players, settings, now) {
     phase: "play",
     settings,
     round: 1,
+    month: 1,
+    day: 1,
     turn: 0,
     step: "pre",
     pending: null,
@@ -538,8 +567,8 @@ function createGame(players, settings, now) {
       name: p.name,
       char: p.char,
       bot: !!p.bot,
-      cash: settings.startCash,
-      deposit: 0,
+      cash: r100(settings.startCash * 0.7),
+      deposit: r100(settings.startCash * 0.3),
       points: 60,
       pos: 0,
       dir: 1,
@@ -567,6 +596,15 @@ function setStep(s, step, now) {
   s.botAt = now + 700 + rnd(700);
 }
 function done(s, now, delay = 1300) {
+  const p = cur(s);
+  if (s.bankAfter && p && s.bankAfter === p.id && !p.out && s.phase === "play") {
+    s.bankAfter = null;
+    s.pending = { type: "bank", pass: 1 };
+    setStep(s, "decide", now + delay - 600);
+    s.deadline = now + delay + DEC_T;
+    return;
+  }
+  s.bankAfter = null;
   s.step = "done";
   s.pending = null;
   s.until = now + delay;
@@ -626,6 +664,19 @@ function nextTurn(s, now) {
 }
 function newRound(s) {
   s.round++;
+  s.day++;
+  if (s.day > 30) {
+    s.day = 1;
+    s.month = s.month % 12 + 1;
+    log(s, `🗓️ ${s.month} 月 1 日：銀行發放存款利息 10%`);
+    alive(s).forEach((p) => {
+      const it = r10(p.deposit * (hasSkill(p, "interest") ? 0.2 : 0.1));
+      if (it > 0) {
+        p.deposit += it;
+        fx(s, { k: "money", pid: p.id, d: it });
+      }
+    });
+  }
   s.market.forEach((m) => {
     const drift = (Math.random() - 0.485) * 0.14;
     m.p = Math.max(2, Math.round(m.p * (1 + drift) * 10) / 10);
@@ -640,7 +691,7 @@ function newRound(s) {
   }
   const mr = s.settings.maxRounds;
   if (mr && s.round > mr) endGame(s, `已滿 ${mr} 回合`);
-  else log(s, `📅 第 ${s.round} 回合`);
+  else log(s, `📅 ${s.month} 月 ${s.day} 日（第 ${s.round} 回合）`);
 }
 function checkEnd(s) {
   if (s.phase !== "play") return true;
@@ -683,14 +734,13 @@ function finishMove(s, now) {
   p.pos = path[path.length - 1];
   const { pass, mark } = s.moveInfo || {};
   s.moveInfo = null;
+  if (path.slice(1, -1).some((i) => TILES[i].type === "bank")) s.bankAfter = p.id;
   for (let k = 0; k < (pass || 0); k++) {
-    const intr = r10(p.deposit * (hasSkill(p, "interest") ? 0.1 : 0.05));
     const sal = hasSkill(p, "salary") ? SALARY * 1.5 : SALARY;
     p.cash += sal;
     addPts(p, 10);
-    p.deposit += intr;
-    log(s, `🚉 ${p.name} 經過台北車站，領薪水 ${money(sal)}${intr ? `、利息 ${money(intr)}` : ""}、點券 +${hasSkill(p, "pointsx") ? 20 : 10}`);
-    fx(s, { k: "money", pid: p.id, d: sal + intr });
+    log(s, `🚉 ${p.name} 經過台北車站，領環島獎金 ${money(sal)}、點券 +${hasSkill(p, "pointsx") ? 20 : 10}`);
+    fx(s, { k: "money", pid: p.id, d: sal });
   }
   if (mark) {
     delete s.marks[p.pos];
@@ -820,6 +870,8 @@ function land(s, now) {
       return news(s, p, now);
     case "temple":
       return temple(s, p, now);
+    case "magic":
+      return magic(s, p, now);
     case "shop":
       if (p.points >= 10 || hasSkill(p, "network")) return ask(s, { type: "shop" }, now);
       log(s, `🏪 ${p.name} 點券不足，逛逛就走`);
@@ -847,6 +899,30 @@ function ask(s, pending, now) {
 }
 function landProp(s, p, i, now) {
   const st = s.tiles[i], t = TILES[i];
+  if (hasGod(p, "angel")) {
+    let n = 0;
+    TILES.forEach((q, j) => {
+      const x = s.tiles[j];
+      if (q.g === t.g && x.o && x.l < 5) {
+        x.l++;
+        n++;
+        fx(s, { k: "build", tile: j });
+      }
+    });
+    if (n) log(s, `👼 天使降臨${GROUPS[t.g].name}，${n} 塊地加蓋一層！`);
+  }
+  if (hasGod(p, "devil")) {
+    let n = 0;
+    TILES.forEach((q, j) => {
+      const x = s.tiles[j];
+      if (q.g === t.g && x.l > 0 && !hasSkill(pl(s, x.o), "armor")) {
+        x.l = 0;
+        n++;
+        fx(s, { k: "boom", tile: j, m: "monster" });
+      }
+    });
+    if (n) log(s, `😈 惡魔肆虐${GROUPS[t.g].name}，${n} 塊地的房子全倒了！`);
+  }
   if (st.o == null) {
     if (hasGod(p, "tudi")) {
       st.o = p.id;
@@ -920,10 +996,10 @@ var CHANCE = [
   } },
   { t: "吃太多鹹酥雞拉肚子，住院 1 回合", bad: 1, f: (s, p) => sendHospital(s, p, 1), stop: 1 },
   { t: "騎車闖紅燈被警察攔下，拘留 2 回合", bad: 1, f: (s, p) => sendJail(s, p, 2), stop: 1 },
-  { t: "搭高鐵回台北，順便領薪水！", f: (s, p) => {
+  { t: "搭高鐵回台北，領環島獎金！", f: (s, p) => {
     teleport(s, p, 0);
     gain(s, p, SALARY);
-    p.points += 10;
+    addPts(p, 10);
   }, stop: 1 },
   { t: "廟口捐香油錢 $500，點券 +25", f: (s, p) => {
     pay(s, p, null, 500);
@@ -1027,11 +1103,11 @@ function giveCard(s, p) {
   log(s, `🃏 ${p.name} 獲得「${CARDS[c].name}」`);
 }
 function temple(s, p, now) {
-  const pool = ["caishen", "caishen", "fushen", "fushen", "tudi", "tudi", "mazu", "shuai", "shuai", "qiong"];
+  const pool = ["caishen", "caishen", "fushen", "fushen", "tudi", "tudi", "mazu", "angel", "shuai", "shuai", "qiong", "devil"];
   const id = pick(pool), g = GODS[id];
   if (!g.good && hasSkill(p, "elder")) {
-    log(s, `👵 長輩保佑！${g.name}不敢附身在 ${p.name} 身上`);
-    fx(s, { k: "notice", kind: "god", title: "長輩保佑", text: `${g.icon}${g.name}被阿嬤趕走了`, pid: p.id });
+    log(s, `🦦 好運水獺！${g.name}不敢附身在 ${p.name} 身上`);
+    fx(s, { k: "notice", kind: "god", title: "好運水獺", text: `${g.icon}${g.name}被趕走了`, pid: p.id });
     return done(s, now, 2200);
   }
   if (!g.good && hasGod(p, "mazu")) {
@@ -1043,6 +1119,49 @@ function temple(s, p, now) {
   p.god = { id, t: dur };
   fx(s, { k: "notice", kind: g.good ? "god" : "evil", title: `${g.icon} ${g.name}附身`, text: `${p.name}：${g.desc}（${dur} 回合）`, pid: p.id });
   log(s, `${g.icon} ${g.name}附身在 ${p.name} 身上！${g.desc}`);
+  done(s, now, 2400);
+}
+var MAGIC = [
+  { t: "咻～被傳送到隨機景點！", f: (s, p, now) => {
+    const props = TILES.map((x, i) => x.type === "prop" ? i : -1).filter((i) => i >= 0);
+    teleport(s, p, pick(props));
+    return "land";
+  } },
+  { t: "和隨機一位對手交換位置！", f: (s, p) => {
+    const o = pick(alive(s).filter((x) => x !== p));
+    if (o) {
+      const a = p.pos;
+      teleport(s, p, o.pos);
+      teleport(s, o, a);
+      return o.name;
+    }
+  } },
+  { t: "所有對手被施了定身術，停一回合", f: (s, p) => alive(s).forEach((o) => {
+    if (o !== p && !hasGod(o, "mazu")) o.st.sleep = Math.max(o.st.sleep, 1);
+  }) },
+  { t: "隨機一位對手變成烏龜 3 回合", f: (s, p) => {
+    const o = pick(alive(s).filter((x) => x !== p && !hasGod(x, "mazu")));
+    if (o) o.st.turtle = 3;
+  } },
+  { t: "點券加倍！", f: (s, p) => {
+    p.points += Math.min(p.points, 100);
+  } },
+  { t: "對手的一張道具卡飛到你手上", f: (s, p) => {
+    const o = pick(alive(s).filter((x) => x !== p && x.cards.length));
+    if (o && p.cards.length < cardLimit(p)) p.cards.push(o.cards.splice(rnd(o.cards.length), 1)[0]);
+  } }
+];
+function magic(s, p, now) {
+  const m = pick(MAGIC);
+  fx(s, { k: "notice", kind: "god", title: "🔮 魔法屋", text: m.t, pid: p.id });
+  log(s, `🔮 ${p.name}：${m.t}`);
+  const r = m.f(s, p, now);
+  if (r === "land") {
+    s.step = "done";
+    s.until = now + 1800;
+    s.landAfter = true;
+    return;
+  }
   done(s, now, 2400);
 }
 function act(s, pid, a, now) {
@@ -1213,6 +1332,8 @@ function cardTargets(s, p, card) {
       for (let i = 0; i < N_TILES; i++) if (i !== p.pos && dist(i, p.pos) <= R && !s.marks[i]) r.push(i);
       return r;
     }
+    case "godplayer":
+      return alive(s).filter((o) => o.god).map((o) => o.id);
     case "oppprop":
       return s.tiles.map((t, i) => t && t.o && t.o !== p.id && t.l > 0 ? i : -1).filter((i) => i >= 0);
     case "myprop":
@@ -1231,8 +1352,9 @@ function useCard(s, p, a, now) {
   const c = CARDS[a.card];
   if (c.target === "auto") return "這張卡會自動使用";
   const tg = cardTargets(s, p, a.card);
-  if (tg && !tg.includes(c.target === "player" ? a.target : c.target === "here" ? p.pos : a.tile)) return "目標無效";
-  const tp = c.target === "player" ? pl(s, a.target) : null;
+  if (tg && c.target !== "godplayer" && !tg.includes(c.target === "player" ? a.target : c.target === "here" ? p.pos : a.tile)) return "目標無效";
+  if (c.target === "godplayer" && !tg.includes(a.target)) return "目標無效";
+  const tp = c.target === "player" || c.target === "godplayer" ? pl(s, a.target) : null;
   const pre = `${c.icon} ${p.name} 使用「${c.name}」`;
   switch (a.card) {
     case "remote": {
@@ -1311,6 +1433,37 @@ function useCard(s, p, a, now) {
       log(s, `${pre}，${TILES[a.tile].name} 的房子全被摧毀！`);
       break;
     }
+    case "robot": {
+      let n = 0;
+      for (let k = 1; k <= 10; k++) {
+        const i = (p.pos + p.dir * k + N_TILES * 2) % N_TILES;
+        if (s.marks[i]) {
+          delete s.marks[i];
+          n++;
+          fx(s, { k: "mark", tile: i });
+        }
+      }
+      log(s, `${pre}，清除了 ${n} 個障礙`);
+      break;
+    }
+    case "sendgod": {
+      const g = GODS[tp.god.id];
+      tp.god = null;
+      log(s, `${pre}，把 ${tp.name} 身上的${g.icon}${g.name}送走了`);
+      break;
+    }
+    case "missile": {
+      const st = s.tiles[a.tile], o = pl(s, st.o);
+      fx(s, { k: "boom", tile: a.tile, m: "monster" });
+      if (hasSkill(o, "armor")) {
+        log(s, `${pre}，但穿山甲的鱗甲擋住了！`);
+        break;
+      }
+      st.l = Math.max(0, st.l - 2);
+      log(s, `${pre}，${TILES[a.tile].name} 被炸掉兩層！`);
+      sendHospital(s, o, 1);
+      break;
+    }
     case "turn":
       p.dir *= -1;
       log(s, `${pre}，改成${p.dir > 0 ? "順時針" : "逆時針"}前進`);
@@ -1367,11 +1520,14 @@ function tick(s, now, isAuto) {
     return false;
   }
   if (s.step === "done") {
-    if (now >= s.until) {
-      nextTurn(s, now);
+    if (now < s.until) return false;
+    if (s.landAfter) {
+      s.landAfter = false;
+      land(s, now);
       return true;
     }
-    return false;
+    nextTurn(s, now);
+    return true;
   }
   if (s.step === "pre" || s.step === "decide") {
     const p = cur(s);
@@ -1482,6 +1638,16 @@ function botCard(s, p) {
   if (has("stay")) {
     const t = s.tiles[p.pos];
     if (t && t.o === p.id && t.l < 5 && p.cash > upCost(s, p.pos) + 6e3 && Math.random() < 0.5) return { type: "card", card: "stay" };
+  }
+  if (has("sendgod")) {
+    const t = alive(s).find((o) => o.god && o === p !== GODS[o.god.id].good);
+    if (t) return { type: "card", card: "sendgod", target: t.id };
+  }
+  if (has("robot")) {
+    for (let k = 1; k <= 6 * (s.settings.dice || 1); k++) {
+      const i = (p.pos + p.dir * k + N_TILES * 2) % N_TILES;
+      if (s.marks[i]) return { type: "card", card: "robot" };
+    }
   }
   if (has("mine") && Math.random() < 0.3) {
     const t = cardTargets(s, p, "mine");
@@ -2405,21 +2571,48 @@ function buildLandmark(id) {
 }
 function buildHouses(level, color) {
   const g = new THREE.Group();
-  if (level <= 0) return g;
-  if (level === 5) {
+  const wall = "#fff8e1", win = mat("#90caf9", { e: "#fff59d", ei: 0.25 });
+  const windows = (w, h, d, y0, floors) => {
+    for (let f = 0; f < floors; f++) for (const sx of [-1, 1]) B(g, 0.16, 0.16, 0.02, win, sx * w * 0.25, y0 + 0.12 + f * (h / floors), d / 2 + 5e-3);
+  };
+  if (level === 0) {
+    B(g, 0.7, 0.45, 0.6, "#d7a86e");
+    roof(g, 0.95, 0.85, 0.4, color, 0, 0.45, 0);
+    B(g, 0.16, 0.26, 0.02, "#6d4c41", 0, 0, 0.31);
+    windows(0.7, 0.45, 0.6, 0.05, 1);
+    C(g, 0.03, 0.03, 0.9, "#eeeeee", 0.45, 0, -0.2, 4);
+    B(g, 0.32, 0.2, 0.02, color, 0.62, 0.65, -0.2);
+  } else if (level === 1) {
+    B(g, 1.1, 0.55, 0.8, wall);
+    roof(g, 1.4, 1.1, 0.45, color, 0, 0.55, 0);
+    B(g, 0.2, 0.32, 0.02, "#6d4c41", 0, 0, 0.41);
+    windows(1.1, 0.55, 0.8, 0.08, 1);
+  } else if (level === 2) {
+    B(g, 1, 1, 0.85, wall);
+    roof(g, 1.3, 1.15, 0.45, color, 0, 1, 0);
+    windows(1, 1, 0.85, 0.05, 2);
+    B(g, 0.2, 0.32, 0.02, "#6d4c41", 0, 0, 0.43);
+  } else if (level === 3) {
+    B(g, 0.95, 1.5, 0.9, wall);
+    B(g, 1, 0.1, 0.95, color, 0, 1.5);
+    windows(0.95, 1.5, 0.9, 0.05, 3);
+    B(g, 0.6, 0.3, 0.6, color, 0, 1.6);
+    B(g, 0.2, 0.32, 0.02, "#6d4c41", 0, 0, 0.46);
+  } else if (level === 4) {
     const tex = windowsTex(color);
-    const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0.2 });
-    B(g, 0.8, 2.6, 0.8, m, 0, 0, 0);
-    frustum(g, 0.3, 0.75, 0.4, "#eeeeee", 0, 2.6, 0);
-    C(g, 0.02, 0.03, 0.5, "#cfd8dc", 0, 3, 0, 4);
-    return g;
+    B(g, 1.1, 2.1, 1, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
+    B(g, 1.15, 0.12, 1.05, "#eeeeee", 0, 2.1);
+    C(g, 0.2, 0.2, 0.35, "#90a4ae", 0.3, 2.22, 0.2, 8);
+  } else {
+    const tex = windowsTex(color);
+    const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.4, metalness: 0.3 });
+    B(g, 1, 2, 1, m);
+    B(g, 0.8, 1.4, 0.8, m, 0, 2);
+    B(g, 0.55, 0.8, 0.55, m, 0, 3.4);
+    C(g, 0.02, 0.04, 0.8, "#cfd8dc", 0, 4.2, 0, 5);
+    S(g, 0.06, "#ff5252", 0, 5, 0, { e: "#ff1744" });
   }
-  const xs = [[0], [-0.45, 0.45], [-0.75, 0, 0.75], [-0.9, -0.3, 0.3, 0.9]][level - 1];
-  for (const x of xs) {
-    const h = 0.38 + level * 0.12;
-    B(g, 0.5, h, 0.5, "#fff8e1", x, 0, 0);
-    roof(g, 0.66, 0.66, 0.32, color, x, h, 0);
-  }
+  g.scale.setScalar(0.85);
   return g;
 }
 function limb(parent, r, len, c, x, y, z) {
@@ -2433,10 +2626,16 @@ function limb(parent, r, len, c, x, y, z) {
   return pivot;
 }
 var ANIMALS = {
+  bear: { fur: "#1c1c1c", belly: "#262626", ear: "round", muzzle: "#c8a27a", tail: "short", tailC: "#1c1c1c" },
+  cloudleo: { fur: "#cdb48a", belly: "#f3e9d2", ear: "cat", spots: "#4e4030", cloud: 1, tail: "long" },
+  otter: { fur: "#6d4c41", belly: "#d7ccc8", ear: "small", tail: "otter", whisker: 1 },
+  muntjac: { fur: "#b5651d", belly: "#f5deb3", ear: "deer", antler: "short", tail: "short", tailC: "#fff8e1" },
+  owl: { fur: "#8d6e63", belly: "#d7ccc8", ear: "tuft", beak: "#4e342e", bigEye: "#ffb300", tail: "owl", leg: "#bdbdbd", wings: 1 },
+  seaturtle: { fur: "#8bc34a", belly: "#fff59d", ear: "none", tail: "short", tailC: "#8bc34a", shell: "#4e6b2f", wings: 1 },
   leopard: { fur: "#d9a066", belly: "#fff3e0", ear: "cat", spots: "#5d4037", tail: "long" },
-  magpie: { fur: "#1e5bd8", belly: "#cfe3ff", ear: "none", headC: "#111111", beak: "#e53935", tail: "bird", leg: "#e53935" },
+  magpie: { fur: "#1e5bd8", belly: "#cfe3ff", ear: "none", headC: "#111111", beak: "#e53935", tail: "bird", leg: "#e53935", wings: 1 },
   deer: { fur: "#a0522d", belly: "#fff8e1", ear: "deer", spots: "#fffde7", antler: 1, tail: "short" },
-  pheasant: { fur: "#283593", belly: "#1a237e", ear: "none", headC: "#1a237e", beak: "#eceff1", face: "#e53935", tail: "pheasant", leg: "#9e9e9e" },
+  pheasant: { fur: "#283593", belly: "#1a237e", ear: "none", headC: "#1a237e", beak: "#eceff1", face: "#e53935", tail: "pheasant", leg: "#9e9e9e", wings: 1 },
   pangolin: { fur: "#8d6e63", belly: "#d7ccc8", ear: "none", scales: "#6d4c41", snout: 1, tail: "scaly" },
   monkey: { fur: "#8d7b6a", belly: "#d7ccc8", ear: "round", face: "#f8bbd0", tail: "long" }
 };
@@ -2461,7 +2660,7 @@ function buildAnimal(charId, color) {
   const bl = S(torso, 0.2, a.belly, 0, 0.15, 0.15, void 0, 10, 8);
   bl.scale.set(1, 1.2, 0.6);
   let armL, armR;
-  if (a.tail === "bird" || a.tail === "pheasant") {
+  if (a.wings) {
     armL = new THREE.Group();
     armL.position.set(-0.27, 0.35, 0);
     torso.add(armL);
@@ -2488,11 +2687,17 @@ function buildAnimal(charId, color) {
   if (a.face) {
     const fc = S(head, 0.2, a.face, 0, -0.02, 0.15, void 0, 10, 8);
     fc.scale.set(1.1, 1, 0.6);
-  } else if (!a.headC) {
-    const m = S(head, 0.15, a.belly, 0, -0.08, 0.2, void 0, 8, 6);
+  } else if (!a.headC && a.ear !== "tuft") {
+    const m = S(head, 0.15, a.muzzle || a.belly, 0, -0.08, 0.2, void 0, 8, 6);
     m.scale.set(1.2, 0.8, 0.7);
   }
-  for (const sx of [-1, 1]) {
+  if (a.bigEye) for (const sx of [-1, 1]) {
+    S(head, 0.11, "#f5f5f5", sx * 0.12, 0.04, 0.22, void 0, 10, 8).scale.z = 0.5;
+    S(head, 0.075, a.bigEye, sx * 0.12, 0.04, 0.26, void 0, 8, 6).scale.z = 0.5;
+    S(head, 0.045, "#111", sx * 0.12, 0.04, 0.29, void 0, 6, 5);
+    S(head, 0.016, "#fff", sx * 0.1, 0.07, 0.32, void 0, 4, 3);
+  }
+  else for (const sx of [-1, 1]) {
     S(head, 0.06, "#ffffff", sx * 0.11, 0.05, 0.25, void 0, 8, 6);
     S(head, 0.038, "#111", sx * 0.11, 0.05, 0.29, void 0, 6, 5);
     S(head, 0.014, "#fff", sx * 0.1, 0.07, 0.32, void 0, 4, 3);
@@ -2513,6 +2718,35 @@ function buildAnimal(charId, color) {
   if (a.ear === "round" || a.ear === "deer") for (const sx of [-1, 1]) {
     const e = S(head, a.ear === "deer" ? 0.1 : 0.09, a.fur, sx * (a.ear === "deer" ? 0.3 : 0.29), a.ear === "deer" ? 0.12 : 0.02, 0, void 0, 6, 5);
     e.scale.set(a.ear === "deer" ? 1.6 : 0.6, a.ear === "deer" ? 0.6 : 1, 0.5);
+  }
+  if (a.ear === "tuft") for (const sx of [-1, 1]) {
+    const e = put(head, new THREE.ConeGeometry(0.06, 0.18, 4), a.fur, sx * 0.18, 0.3, 0);
+    e.rotation.z = -sx * 0.4;
+  }
+  if (a.ear === "small") for (const sx of [-1, 1]) S(head, 0.06, a.fur, sx * 0.22, 0.17, 0, void 0, 6, 4).scale.z = 0.5;
+  if (a.whisker) for (const sx of [-1, 1]) for (const dy of [-0.06, -0.1]) {
+    const w = B(head, 0.22, 8e-3, 8e-3, "#efebe9", sx * 0.2, dy, 0.26);
+    w.rotation.z = sx * dy * 2;
+  }
+  if (charId === "bear") {
+    const v = B(torso, 0.34, 0.09, 0.05, "#fafafa", 0, 0.3, 0.26);
+    const v2 = B(torso, 0.14, 0.09, 0.05, "#fafafa", 0, 0.22, 0.27);
+  }
+  if (a.cloud) for (let i = 0; i < 7; i++) {
+    const c = S(torso, 0.07, a.spots, Math.cos(i * 0.9) * 0.27, 0 + i % 4 * 0.1, Math.sin(i * 0.9) * 0.22, void 0, 6, 4);
+    c.scale.set(1.5, 0.8, 0.5);
+  }
+  if (a.antler === "short") for (const sx of [-1, 1]) {
+    const an = C(head, 0.015, 0.025, 0.16, "#5d4037", sx * 0.1, 0.25, 0, 5);
+    an.rotation.z = -sx * 0.2;
+  }
+  if (a.shell) {
+    const sh = S(torso, 0.36, a.shell, 0, 0.2, -0.12, void 0, 12, 8);
+    sh.scale.set(1.05, 1.1, 0.75);
+    for (let i = 0; i < 5; i++) {
+      const h = S(torso, 0.08, "#6b8e3a", Math.cos(i * 1.26) * 0.18, 0.2 + Math.sin(i * 1.26) * 0.2, -0.38, void 0, 6, 4);
+      h.scale.z = 0.3;
+    }
   }
   if (charId === "leopard") {
     B(head, 0.035, 0.18, 0.02, "#fffde7", -0.05, 0.12, 0.27).rotation.x = -0.6;
@@ -2554,7 +2788,15 @@ function buildAnimal(charId, color) {
     tl.rotation.x = -0.9;
     if (charId === "leopard") for (let i = 0; i < 3; i++) C(tail, 0.065, 0.065, 0.05, a.spots, 0, 0.12 + i * 0.13, -0.1 - i * 0.12, 6).rotation.x = -0.9;
   }
-  if (a.tail === "short") S(tail, 0.07, "#ffffff", 0, 0.12, 0);
+  if (a.tail === "short") S(tail, 0.07, a.tailC || "#ffffff", 0, 0.12, 0);
+  if (a.tail === "otter") {
+    const tl = C(tail, 0.03, 0.09, 0.55, a.fur, 0, -0.1, 0, 7);
+    tl.rotation.x = -1.2;
+  }
+  if (a.tail === "owl") {
+    const tl = B(tail, 0.22, 0.05, 0.22, a.fur, 0, 0, -0.05);
+    tl.rotation.x = -0.6;
+  }
   if (a.tail === "bird") {
     for (const sx of [-1, 1]) {
       const f = B(tail, 0.12, 0.05, 0.85, a.fur, sx * 0.05, 0, -0.4);
@@ -3065,6 +3307,7 @@ var World = class {
     this.lmSpots = [];
     const n = this.path.length, size = Math.min(3.5, this.spacing * 0.9);
     this.tileSize = size;
+    const info = [];
     for (let i = 0; i < n; i++) {
       const p = this.path[i], a = this.path[(i - 1 + n) % n], b = this.path[(i + 1) % n];
       const tan = new THREE2.Vector2().subVectors(b, a).normalize();
@@ -3083,6 +3326,17 @@ var World = class {
       const perp = new THREE2.Vector2(-tan.y, tan.x);
       if (perp.dot(nm) < 0) perp.negate();
       nm = nm.multiplyScalar(0.5).addScaledVector(perp, 0.5).normalize();
+      info.push({ p, tan, nm });
+    }
+    for (let i = 0; i < n; i++) {
+      const { p, nm } = info[i], d = size / 2 + 0.95;
+      let lotP = new THREE2.Vector2(p.x + nm.x * d, p.y + nm.y * d);
+      if (this.path.some((q, j) => j !== i && q.distanceTo(lotP) < size * 0.85)) lotP = new THREE2.Vector2(p.x - nm.x * d, p.y - nm.y * d);
+      info[i].lotP = lotP;
+    }
+    const lots = info.map((x) => x.lotP);
+    for (let i = 0; i < n; i++) {
+      const { p, tan, nm, lotP } = info[i];
       const y = Math.max(0.35, heightAt(p.x, p.y)) + 0.18;
       const g = new THREE2.Group();
       g.position.set(p.x, y, p.y);
@@ -3102,33 +3356,56 @@ var World = class {
       this.pickables.push(g);
       const t = TILES[i];
       const lm = buildLandmark(t.type === "prop" ? t.model : t.type);
-      let lp;
-      if (t.sea) {
-        lp = new THREE2.Vector2(p.x - nm.x * 6.2, p.y - nm.y * 6.2);
-        lm.position.set(lp.x, 0, lp.y);
-      } else {
-        let off = 5;
-        lp = new THREE2.Vector2(p.x + nm.x * off, p.y + nm.y * off);
-        const bad = (q) => this.lmSpots.some((r) => r.distanceTo(q) < 4.2) || this.path.some((r) => r.distanceTo(q) < 3.9);
-        for (let tries = 0; tries < 16 && bad(lp); tries++) {
-          off += 1;
-          lp.set(p.x + nm.x * off, p.y + nm.y * off);
+      const R = 2.3;
+      const clear = (q) => !this.lmSpots.some((r) => r.distanceTo(q) < R * 2) && !this.path.some((r) => r.distanceTo(q) < size * 0.72 + R) && !lots.some((r) => r.distanceTo(q) < R + 0.9);
+      const dir = t.sea ? -1 : 1;
+      const score = (q) => Math.min(...this.lmSpots.map((r) => r.distanceTo(q) - R * 2), ...this.path.map((r) => r.distanceTo(q) - (size * 0.72 + R)), ...lots.map((r) => r.distanceTo(q) - (R + 0.9)));
+      let lp = null, bestQ = null, bestS = -1e9, sc = 1.15;
+      search: for (let off = t.sea ? 6.4 : 5.4; off < (t.sea ? 14 : 22); off += 0.7) {
+        for (const sh of [0, 1.5, -1.5, 3, -3, 4.5, -4.5]) {
+          const q = new THREE2.Vector2(p.x + dir * nm.x * off, p.y + dir * nm.y * off).addScaledVector(tan, sh);
+          if (!t.sea && (heightAt(q.x, q.y) > 2.2 || heightAt(q.x, q.y) < 0.25)) continue;
+          if (t.sea && heightAt(q.x, q.y) > -0.2) continue;
+          const sv = score(q);
+          if (sv >= 0) {
+            lp = q;
+            break search;
+          }
+          if (sv > bestS) {
+            bestS = sv;
+            bestQ = q;
+          }
         }
-        lm.position.set(lp.x, heightAt(lp.x, lp.y) - 0.05, lp.y);
       }
+      if (!lp) {
+        lp = bestQ || new THREE2.Vector2(p.x + dir * nm.x * 6, p.y + dir * nm.y * 6);
+        sc = Math.max(0.6, 1.15 + bestS / 3);
+      }
+      lm.position.set(lp.x, t.sea ? 0 : heightAt(lp.x, lp.y) - 0.05, lp.y);
       this.lmSpots.push(lp.clone());
       lm.rotation.y = Math.atan2(-nm.x, -nm.y);
-      lm.scale.setScalar(1.15);
+      lm.scale.setScalar(sc);
       lm.userData.tile = i;
       this.scene.add(lm);
       this.pickables.push(lm);
       if (!t.sea && t.type === "prop") {
         const pad = C(new THREE2.Group(), 1.9, 2.1, 0.5, "#7fb862", 0, -0.45, 0, 12);
         pad.position.copy(lm.position).y -= 0.4;
+        pad.scale.setScalar(sc / 1.15);
         this.scene.add(pad);
       }
+      if (!t.sea) {
+        const mid = p.clone().lerp(lp, 0.5), len = p.distanceTo(lp) - size * 0.6 - 1.6;
+        if (len > 0.3 && len < 5) {
+          const path = new THREE2.Mesh(new THREE2.BoxGeometry(0.35, 0.06, len), mat("#d7c9a7"));
+          const st = p.clone().addScaledVector(new THREE2.Vector2().subVectors(lp, p).normalize(), size * 0.6 + len / 2);
+          path.position.set(st.x, Math.max(0.35, heightAt(st.x, st.y)) + 0.03, st.y);
+          path.rotation.y = Math.atan2(lp.x - p.x, lp.y - p.y);
+          path.receiveShadow = true;
+          this.scene.add(path);
+        }
+      }
       const lot = new THREE2.Group();
-      const lotP = new THREE2.Vector2(p.x + nm.x * (size / 2 + 0.75), p.y + nm.y * (size / 2 + 0.75));
       lot.position.set(lotP.x, Math.max(0.35, heightAt(lotP.x, lotP.y)), lotP.y);
       lot.rotation.y = ang;
       this.scene.add(lot);
@@ -3160,14 +3437,16 @@ var World = class {
         o.level = -1;
       }
       if (o.level !== t.l) {
+        const grew = o.level >= -1 && t.o && (o.level === -1 || t.l > o.level) && this.inited;
         o.level = t.l;
         o.lot.clear();
-        if (t.o && t.l > 0) o.lot.add(buildHouses(t.l, colors[t.o]));
-        else if (t.o) {
-          const f = new THREE2.Group();
-          C(f, 0.03, 0.03, 1.1, "#eeeeee", 0, 0, 0, 4);
-          B(f, 0.55, 0.35, 0.03, colors[t.o], 0.28, 0.72, 0);
-          o.lot.add(f);
+        if (t.o) {
+          const h = buildHouses(t.l, colors[t.o]);
+          if (grew) {
+            h.scale.setScalar(0.01);
+            h.userData.growT = performance.now();
+          }
+          o.lot.add(h);
         }
       }
     });
@@ -3210,6 +3489,7 @@ var World = class {
       }
       this.tokens[p.id].visible = !p.out;
     });
+    this.inited = true;
     if (!this.arrow) {
       this.arrow = new THREE2.Mesh(new THREE2.ConeGeometry(0.28, 0.6, 4), mat("#ffeb3b", { e: "#ffc107", ei: 0.7 }));
       this.arrow.rotation.x = Math.PI;
@@ -3312,6 +3592,15 @@ var World = class {
     this.scene.traverse((o) => {
       if (o.userData.tick) o.userData.tick(t, dt);
     });
+    if (this.tileObjs) for (const o of this.tileObjs) {
+      const h = o.lot.children[0];
+      if (h && h.userData.growT) {
+        const f = Math.min(1, (performance.now() - h.userData.growT) / 700);
+        const e = f < 1 ? 1 + Math.sin(f * Math.PI) * 0.25 * (1 - f) : 1;
+        h.scale.setScalar(Math.max(0.01, f * e));
+        if (f >= 1) h.userData.growT = 0;
+      }
+    }
     this.clouds.forEach((c, i) => {
       c.position.x += dt * (0.6 + i * 0.05);
       if (c.position.x > 90) c.position.x = -90;
@@ -3652,7 +3941,40 @@ function beep(type) {
   } catch (e) {
   }
 }
-var pickChar = LS.get("tr3d-char", "boss");
+var isIOS = /iPhone|iPod/.test(navigator.userAgent) || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1 && !document.documentElement.requestFullscreen;
+var standalone = matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches || navigator.standalone;
+function isFS() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement) || standalone;
+}
+async function enterFS(manual) {
+  if (isFS()) {
+    if (manual) {
+      try {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } catch (e) {
+      }
+    }
+    return;
+  }
+  const d = document.documentElement;
+  try {
+    if (d.requestFullscreen) await d.requestFullscreen({ navigationUI: "hide" });
+    else if (d.webkitRequestFullscreen) d.webkitRequestFullscreen();
+    else throw new Error("no");
+    try {
+      await screen.orientation.lock?.("any");
+    } catch (e) {
+    }
+  } catch (e) {
+    if (manual) openSheet(`<button class="x" data-close>✕</button><h3>⛶ 全螢幕玩</h3><p>iPhone 的 Safari 不支援網頁直接全螢幕，請這樣做：</p>
+      <p>1. 點下方的 <b>分享按鈕</b>（方框加上箭頭）<br>2. 選 <b>「加入主畫面」</b><br>3. 從主畫面的「寶島富翁」圖示打開，就是全螢幕了！</p>
+      <p class="note">Android 和電腦按 ⛶ 就能全螢幕；電腦也可以按 F11。</p>`);
+  }
+}
+document.addEventListener("fullscreenchange", () => setTimeout(() => world.resize(), 200));
+addEventListener("orientationchange", () => setTimeout(() => world.resize(), 300));
+var pickChar = LS.get("tr3d-char", "bear");
+if (!CHARS.find((c) => c.id === pickChar)) pickChar = "bear";
 G.avatars = {};
 var myAvatar = LS.get("tr3d-avatar", null);
 function renderAvatarBtn() {
@@ -3713,14 +4035,26 @@ function myName() {
 function show(id) {
   for (const k of ["#home", "#lobby", "#hud"]) $(k).classList.toggle("hidden", k !== id);
 }
+$("#codeBtn").onclick = () => {
+  const c = $("#codeIn").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (c.length < 4) {
+    toast("請輸入房號");
+    return;
+  }
+  location.href = location.pathname + "?r=" + c + "&b=0";
+};
 if (G.room) {
+  $("#codeRow").classList.add("hidden");
   $("#joinBtn").classList.remove("hidden");
   $("#joinBtn").textContent = `🚪 加入房間 ${G.room}`;
   $("#createBtn").classList.add("hidden");
 }
 show("#home");
 world.overview();
+$("#fsHomeBtn").onclick = () => enterFS(true);
+if (standalone) $("#fsHomeBtn").classList.add("hidden");
 $("#soloBtn").onclick = () => {
+  if (!isIOS) enterFS(false);
   G.solo = true;
   G.isHost = true;
   G.room = "SOLO";
@@ -3733,6 +4067,7 @@ $("#soloBtn").onclick = () => {
   enterLobby();
 };
 $("#createBtn").onclick = async () => {
+  if (!isIOS) enterFS(false);
   const name = myName();
   $("#createBtn").disabled = true;
   $("#homeMsg").textContent = "正在建立房間…";
@@ -3766,6 +4101,7 @@ $("#createBtn").onclick = async () => {
   enterLobby();
 };
 $("#joinBtn").onclick = async () => {
+  if (!isIOS) enterFS(false);
   myName();
   $("#joinBtn").disabled = true;
   $("#homeMsg").textContent = "正在連線…";
@@ -3795,7 +4131,7 @@ function shareUrl() {
   return u.toString();
 }
 function lobbyState() {
-  return { phase: "lobby", v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 3e4, maxRounds: 30, dice: 2 }, fx: [], fxn: 0, log: [] };
+  return { phase: "lobby", v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 3e4, maxRounds: 50, dice: 1 }, fx: [], fxn: 0, log: [] };
 }
 async function connectNet() {
   if (G.net) G.net.close();
@@ -3893,7 +4229,7 @@ function onAction(m) {
     if (a.type === "join") {
       let seat = s.seats.find((x) => x.id === m.from);
       const taken = s.seats.filter((x) => x.id !== m.from).map((x) => x.char);
-      let ch = CHARS.find((c) => c.id === a.char) ? a.char : "boss";
+      let ch = CHARS.find((c) => c.id === a.char) ? a.char : "bear";
       if (taken.includes(ch)) ch = (CHARS.find((c) => !taken.includes(c.id)) || CHARS[0]).id;
       const name = String(a.name || "玩家").slice(0, 8);
       if (seat) {
@@ -4190,7 +4526,7 @@ function renderHud() {
   const s = G.s;
   if (!s || !s.players) return;
   renderPlayers();
-  $("#roundinfo").textContent = `第 ${s.round}${s.settings.maxRounds ? "/" + s.settings.maxRounds : ""} 回合`;
+  $("#roundinfo").textContent = `📅 ${s.month || 1}月${s.day || 1}日・第 ${s.round}${s.settings.maxRounds ? "/" + s.settings.maxRounds : ""} 回合`;
   const feed = s.log.slice(-4);
   $("#feed").innerHTML = feed.map((l) => `<div>${esc(l)}</div>`).join("");
   renderNet();
@@ -4357,8 +4693,8 @@ function tileInfoHtml(i) {
     h += `<div class="kv"><b>區域</b><span style="color:${GROUPS[t.g].color};font-weight:900">${GROUPS[t.g].name}</span>
       <b>地主</b><span>${o ? esc(o.name) : "（無）"}</span><b>建築</b><span>${LEVEL_NAMES[st.l]}</span>
       <b>地價</b><span>${money(price(s, i))}</span><b>加蓋費</b><span>${money(upCost(s, i))}／層</span>
-      <b>目前過路費</b><span style="color:#e53935;font-weight:900">${o ? money(toll(s, i)) : "—"}</span></div>
-      <p class="note">過路費：空地 ${money(price(s, i) * TOLL_MUL[0])} → 摩天大樓 ${money(price(s, i) * TOLL_MUL[5])}。擁有整個區域時過路費 ×1.5。</p>`;
+      <b>目前過路費</b><span style="color:#e53935;font-weight:900">${o ? money(toll(s, i)) + (chainOf(s, i).length > 1 ? `（${chainOf(s, i).length} 塊連鎖）` : "") : "—"}</span></div>
+      <p class="note">過路費：空地 ${money(price(s, i) * TOLL_MUL[0])} → 摩天大樓 ${money(price(s, i) * TOLL_MUL[5])}。同一地主相連的土地會「連鎖」，過路費一起加總！</p>`;
   }
   return h;
 }
@@ -4407,8 +4743,8 @@ function openDecide(refresh = false) {
       <div class="choice">${[1, 2, 3, 4, 5, 6].map((n) => `<button class="pri" data-pick="${n}">${n}</button>`).join("")}</div>
       <button class="ghost" style="width:100%;margin-top:8px" data-a="no">不玩</button>`;
   } else if (pd.type === "bank") {
-    h = `<h3>🏦 銀行</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
-      <p class="note">存款每次經過台北車站有 5% 利息，而且不會被查稅、均富卡拿走。</p>
+    h = `<h3>🏦 ${pd.pass ? "經過銀行" : "銀行"}</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
+      <p class="note">每月 1 日存款發 10% 利息，存款不會被查稅、均富卡拿走。</p>
       <div class="choice"><button class="green" data-bank="1000">存 $1000</button><button class="green" data-bank="5000">存 $5000</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
       <div class="choice"><button class="blue" data-bank="-1000">領 $1000</button><button class="blue" data-bank="-5000">領 $5000</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
       <button class="ghost" style="width:100%;margin-top:10px" data-a="done">完成</button>`;
@@ -4467,14 +4803,14 @@ function useCardFlow(k) {
     });
     return;
   }
-  if (c.target === "player") {
+  if (c.target === "player" || c.target === "godplayer") {
     if (!tg.length) {
-      toast("沒有可以選的玩家");
+      toast(c.target === "godplayer" ? "目前沒有人被神明附身" : "沒有可以選的玩家");
       return;
     }
     openSheet(`<h3>${c.icon} ${c.name}</h3><p>選擇對象：</p>` + tg.map((id) => {
       const o = pl(s, id);
-      return `<button class="ghost" style="width:100%;margin:4px 0" data-t="${esc(id)}">${charOf(o.char).emoji} ${esc(o.name)}　${money(o.cash)}・${o.cards.length} 張卡</button>`;
+      return `<button class="ghost" style="width:100%;margin:4px 0" data-t="${esc(id)}">${charOf(o.char).emoji} ${esc(o.name)}　${o.god ? GODS[o.god.id].icon + GODS[o.god.id].name : money(o.cash) + "・" + o.cards.length + " 張卡"}</button>`;
     }).join("") + `<button class="ghost" style="width:100%;margin-top:6px" data-close>取消</button>`);
     $("#sheet").querySelectorAll("[data-t]").forEach((b) => b.onclick = () => {
       closeSheet();
@@ -4557,6 +4893,7 @@ function renderOver() {
   };
   $("#status").textContent = "遊戲結束";
 }
+$("#fsBtn").onclick = () => enterFS(true);
 $("#camBtn").onclick = () => {
   if (world.follow) {
     world.overview();
@@ -4580,8 +4917,9 @@ $("#sndBtn").onclick = () => {
 $("#sndBtn").textContent = G.sound ? "🔊" : "🔇";
 $("#helpBtn").onclick = () => openSheet(`<button class="x" data-close>✕</button><h3>❔ 玩法說明</h3><div class="note" style="font-size:14px;color:#333">
   <p>🎲 輪到你時先可以用道具卡、買賣股票，再擲骰子前進。</p>
-  <p>🏠 停在無人景點可以買下；停在自己的地可以加蓋，最高蓋到摩天大樓。別人停到你的地要付過路費，擁有整個區域過路費 ×1.5。</p>
-  <p>🚉 經過台北車站領薪水 $2000、點券 +10、存款利息 5%。</p>
+  <p>🏠 停在無人景點可以買下；停在自己的地可以加蓋，最高蓋到摩天大樓。別人停到你的地要付過路費；自己的地連在一起會「連鎖」，過路費整串加總（大富翁6規則）。</p>
+  <p>🎲 預設 1 顆骰子；一輪是一天，月曆會走動。🔮魔法屋、👼天使、😈惡魔都會隨機出現。</p>
+  <p>🚉 經過台北車站領環島獎金 $1000、點券 +10；經過或停在🏦銀行可以存提款，每月 1 日發存款利息 10%。</p>
   <p>🏪 道具店用點券買卡；⛩️ 廟會請到神明附身 5 回合（財神、福神、土地公、媽祖是好神，衰神、窮神是壞神）。</p>
   <p>❓ 機會、📰 新聞會發生隨機事件；🏦 銀行可存提款；🎰 彩券行猜點數。</p>
   <p>💸 付不出錢會自動提款、賣股票、賣地，還不夠就破產。最後只剩一人、或回合結束時總資產最多的人獲勝！</p>

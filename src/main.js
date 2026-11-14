@@ -62,23 +62,39 @@ function beep(type) {
 }
 
 // ---------- 全螢幕 ----------
-const isIOS = /iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && !document.documentElement.requestFullscreen);
-const standalone = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone;
+const UA = navigator.userAgent;
+const isIPhone = /iPhone|iPod/.test(UA);
+const isIPad = /iPad/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone === true;
 function canFS() { const d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen); }
+const isIOS = (isIPhone || isIPad) && !canFS();   // iPhone Safari 不支援網頁全螢幕
 function isFS() { return !!(document.fullscreenElement || document.webkitFullscreenElement) || standalone; }
+if (standalone) document.documentElement.classList.add('pwa');
+function iosGuide(first) {
+  openSheet(`<h3 style="text-align:center">📱 iPhone 全螢幕玩法</h3>
+    <p class="note" style="text-align:center">iPhone 的 Safari 不允許網頁直接全螢幕，<br>把遊戲加到主畫面，打開就是全螢幕 App！</p>
+    <div class="iosStep"><span>1</span><div>點 Safari 下方的 <b>分享按鈕</b> <span class="ico">⬆️</span><br><small>（iOS 26 在右下角「⋯」選單裡）</small></div></div>
+    <div class="iosStep"><span>2</span><div>往下滑，點 <b>「加入主畫面」</b> <span class="ico">➕</span></div></div>
+    <div class="iosStep"><span>3</span><div>確認 <b>「打開為網頁 App」</b> 是開啟的，按 <b>「加入」</b></div></div>
+    <div class="iosStep"><span>4</span><div>從主畫面的 <b>寶島富翁</b> 圖示打開 → 全螢幕！<br><small>朋友傳來的房間連結：在 App 裡按「📋 貼上邀請連結」就能加入</small></div></div>
+    <button class="pri" style="width:100%;margin-top:10px" data-close>知道了</button>
+    ${first ? '<button class="ghost" style="width:100%;margin-top:6px" id="iosNever">不要再提醒</button>' : ''}`, 'info', true);
+  const nv = document.getElementById('iosNever'); if (nv) nv.onclick = () => { LS.set('tr3d-iosguide', 'never'); closeSheet(); };
+  if (!$('#iosArrow')) { const ar = document.createElement('div'); ar.id = 'iosArrow'; ar.textContent = '⬇️'; document.body.appendChild(ar); }
+  $('#iosArrow').classList.remove('hidden');
+  const hide = () => $('#iosArrow') && $('#iosArrow').classList.add('hidden');
+  $('#modal').addEventListener('click', hide, { once: true });
+}
 async function enterFS(manual) {
-  if (isFS()) { if (manual) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {} } return; }
+  if (standalone) { if (manual) toast('已經是全螢幕 App 模式了'); return; }
+  if (document.fullscreenElement || document.webkitFullscreenElement) { if (manual) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {} } return; }
+  if (isIOS) { if (manual) iosGuide(false); return; }
   const d = document.documentElement;
   try {
     if (d.requestFullscreen) await d.requestFullscreen({ navigationUI: 'hide' });
     else if (d.webkitRequestFullscreen) d.webkitRequestFullscreen();
-    else throw new Error('no');
     try { await screen.orientation.lock?.('any'); } catch (e) {}
-  } catch (e) {
-    if (manual) openSheet(`<button class="x" data-close>✕</button><h3>⛶ 全螢幕玩</h3><p>iPhone 的 Safari 不支援網頁直接全螢幕，請這樣做：</p>
-      <p>1. 點下方的 <b>分享按鈕</b>（方框加上箭頭）<br>2. 選 <b>「加入主畫面」</b><br>3. 從主畫面的「寶島富翁」圖示打開，就是全螢幕了！</p>
-      <p class="note">Android 和電腦按 ⛶ 就能全螢幕；電腦也可以按 F11。</p>`);
-  }
+  } catch (e) { if (manual) toast('這個瀏覽器不支援全螢幕，電腦可以按 F11'); }
 }
 document.addEventListener('fullscreenchange', () => setTimeout(() => world.resize(), 200));
 addEventListener('orientationchange', () => setTimeout(() => world.resize(), 300));
@@ -118,10 +134,28 @@ function myName() {
 function show(id) {
   for (const k of ['#home', '#lobby', '#hud']) $(k).classList.toggle('hidden', k !== id);
 }
+function goRoom(r, b) { location.href = location.pathname + '?r=' + r + '&b=' + (b | 0); }
+function parseInvite(t) {
+  t = String(t || '').trim();
+  const m = t.match(/[?&]r=([A-Z0-9]{4,8})(?:.*?[?&]b=(\d))?/i); if (m) return { r: m[1].toUpperCase(), b: +(m[2] || 0) };
+  const c = t.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c.length >= 4 && c.length <= 8) return { r: c, b: 0 };
+  return null;
+}
+$('#pasteBtn').onclick = async () => {
+  try { const t = await navigator.clipboard.readText(); const v = parseInvite(t); if (v) goRoom(v.r, v.b); else toast('剪貼簿裡沒有房間連結'); }
+  catch (e) { toast('無法讀取剪貼簿，請在下面輸入房號'); $('#codeIn').focus(); }
+};
+const lastRoom = LS.get('tr3d-lastroom', null);
+if (!G.room && lastRoom && Date.now() - lastRoom.t < 6 * 3600e3) {
+  $('#lastBtn').classList.remove('hidden'); $('#lastBtn').textContent = `↩️ 回到上次的房間 ${lastRoom.r}`;
+  $('#lastBtn').onclick = () => goRoom(lastRoom.r, lastRoom.b);
+}
+if (isIOS && !standalone && LS.get('tr3d-iosguide', null) !== 'never') setTimeout(() => { if (!G.s) iosGuide(true); }, 1500);
+if (isIOS && !standalone) $('#fsHomeBtn').textContent = '📱 iPhone 全螢幕玩法（加到主畫面）';
 $('#codeBtn').onclick = () => {
   const c = $('#codeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (c.length < 4) { toast('請輸入房號'); return; }
-  location.href = location.pathname + '?r=' + c + '&b=0';
+  goRoom(c, 0);
 };
 if (G.room) {
   $('#codeRow').classList.add('hidden');
@@ -134,14 +168,14 @@ world.overview();
 $('#fsHomeBtn').onclick = () => enterFS(true);
 if (standalone) $('#fsHomeBtn').classList.add('hidden');
 $('#soloBtn').onclick = () => {
-  if (!isIOS) enterFS(false);
+  enterFS(false);
   G.solo = true; G.isHost = true; G.room = 'SOLO'; if (myAvatar) G.avatars[myId] = myAvatar;
   G.s = lobbyState(); G.s.seats.push({ id: myId, name: myName(), char: pickChar, ctl: myId });
   addBot(); addBot(); addBot();
   enterLobby();
 };
 $('#createBtn').onclick = async () => {
-  if (!isIOS) enterFS(false);
+  enterFS(false);
   const name = myName();
   $('#createBtn').disabled = true; $('#homeMsg').textContent = '正在建立房間…';
   G.room = rid(6);
@@ -157,11 +191,12 @@ $('#createBtn').onclick = async () => {
   G.s = lobbyState(); G.s.seats.push({ id: myId, name, char: pickChar, ctl: myId });
   history.replaceState(null, '', shareUrl());
   LS.set('tr3d-seat-' + G.room, myId);
+  LS.set('tr3d-lastroom', { r: G.room, b: G.bi, t: Date.now() });
   publish(true);
   enterLobby();
 };
 $('#joinBtn').onclick = async () => {
-  if (!isIOS) enterFS(false);
+  enterFS(false);
   myName();
   $('#joinBtn').disabled = true; $('#homeMsg').textContent = '正在連線…';
   try { await connectNet(); } catch (e) {
@@ -169,6 +204,7 @@ $('#joinBtn').onclick = async () => {
   }
   $('#homeMsg').textContent = '正在取得房間資料…';
   G.joinWanted = true;
+  LS.set('tr3d-lastroom', { r: G.room, b: G.bi, t: Date.now() });
   G.net.pub('hi', { from: myId, t: 'hello' });
   setTimeout(() => { if (!G.s) { $('#homeMsg').textContent = '⌛ 找不到房間，可能房主已離開或網址錯誤。'; $('#joinBtn').disabled = false; } }, 9000);
 };
@@ -405,6 +441,10 @@ $('#addLocal').onclick = () => {
   publish();
 };
 for (const [id, k] of [['#setCash', 'startCash'], ['#setRounds', 'maxRounds'], ['#setDice', 'dice']]) $(id).onchange = e => { G.s.settings[k] = +e.target.value; publish(); };
+$('#shareBtn').onclick = async () => {
+  try { await navigator.share({ title: '寶島富翁 3D', text: `一起來玩寶島富翁！房號 ${G.room}`, url: $('#shareUrl').value }); } catch (e) {}
+};
+if (!navigator.share) $('#shareBtn').classList.add('hidden');
 $('#copyBtn').onclick = async () => {
   try { await navigator.clipboard.writeText($('#shareUrl').value); toast('已複製網址'); }
   catch (e) { $('#shareUrl').select(); toast('請長按網址複製'); }

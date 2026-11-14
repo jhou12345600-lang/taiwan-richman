@@ -1,0 +1,4656 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>寶島富翁 3D｜台灣環島大富翁連線版</title>
+<meta name="description" content="台灣真實景點 3D 大富翁，開房間網址就能 2–6 人連線對戰。">
+<meta name="theme-color" content="#0d6aa8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏝️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;font-family:"Noto Sans TC",system-ui,sans-serif;background:#0d6aa8;color:#222;touch-action:none}
+#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hidden{display:none!important}
+button{font-family:inherit;cursor:pointer;border:0;border-radius:12px;font-weight:700;font-size:15px;padding:10px 14px;background:#fff;color:#222;box-shadow:0 3px 0 rgba(0,0,0,.25);transition:transform .08s}
+button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+button:disabled{opacity:.45;pointer-events:none}
+.pri{background:linear-gradient(#ffd54f,#ffb300);color:#4a2c00}
+.red{background:linear-gradient(#ff7043,#e53935);color:#fff}
+.blue{background:linear-gradient(#4fc3f7,#0288d1);color:#fff}
+.green{background:linear-gradient(#81c784,#388e3c);color:#fff}
+.ghost{background:rgba(255,255,255,.85)}
+input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:10px;border:2px solid #d0d7de;width:100%}
+/* screens */
+.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;padding-top:max(16px,env(safe-area-inset-top));z-index:20;overflow:auto;touch-action:pan-y}
+.panel{background:rgba(255,253,245,.97);border-radius:22px;padding:20px;width:min(520px,100%);box-shadow:0 10px 40px rgba(0,0,0,.35);max-height:100%;overflow:auto}
+.logo{text-align:center;margin-bottom:6px}
+.logo h1{margin:0;font-size:38px;font-weight:900;letter-spacing:2px;background:linear-gradient(90deg,#e53935,#fb8c00,#fdd835,#43a047,#1e88e5,#8e24aa);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 2px 0 rgba(0,0,0,.05)}
+.logo p{margin:2px 0 0;color:#666;font-size:14px}
+.chars{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.skillbox{grid-column:1/-1;background:#fff;border:2px solid;border-radius:12px;padding:8px 10px;font-size:13px;line-height:1.6}
+.char{border:3px solid transparent;border-radius:14px;padding:8px 4px;text-align:center;background:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.1)}
+.char .e{font-size:30px}.char .n{font-size:13px;font-weight:700}
+.char.sel{border-color:#ffb300;background:#fff8e1}
+.char.taken{opacity:.35;pointer-events:none}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+.col{display:flex;flex-direction:column;gap:10px}
+.lab{font-size:13px;color:#666;font-weight:700;margin:8px 0 4px}
+.seat{display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:8px 10px;margin:6px 0;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.seat .e{font-size:26px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.seat .nm{flex:1;font-weight:700}.seat small{color:#888;font-weight:500}
+.seat button{padding:6px 10px;font-size:13px}
+.code{font-size:30px;font-weight:900;letter-spacing:6px;text-align:center;color:#0d6aa8}
+.share{display:flex;gap:8px;align-items:center}
+.share input{font-size:12px}
+#qr{display:flex;justify-content:center;margin:8px 0}
+#qr img,#qr canvas{width:140px;height:140px;image-rendering:pixelated}
+.note{font-size:12px;color:#777;line-height:1.5}
+/* HUD */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+#hud>*{pointer-events:auto}
+#players{position:absolute;top:max(6px,env(safe-area-inset-top));left:6px;right:6px;display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.pc{flex:0 0 auto;min-width:118px;background:rgba(255,255,255,.92);border-radius:14px;padding:5px 8px 5px 6px;display:flex;gap:6px;align-items:center;border:3px solid transparent;box-shadow:0 2px 8px rgba(0,0,0,.2);position:relative}
+.pc.cur{border-color:#ffeb3b;box-shadow:0 0 0 2px #ff9800,0 2px 12px rgba(0,0,0,.3);transform:scale(1.03)}
+.pc.out{opacity:.4;filter:grayscale(1)}
+.pc .av{font-size:22px;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.pc .nm{font-size:12px;font-weight:900;white-space:nowrap;max-width:84px;overflow:hidden;text-overflow:ellipsis}
+.pc .cash{font-size:13px;font-weight:700;color:#2e7d32}
+.pc .ic{font-size:12px;line-height:1}
+.pc .off{position:absolute;right:4px;top:2px;font-size:10px;color:#e53935;font-weight:900}
+#topbtn{position:absolute;right:8px;top:calc(max(6px,env(safe-area-inset-top)) + 64px);display:flex;flex-direction:column;gap:6px}
+#topbtn button{width:44px;height:44px;padding:0;font-size:20px;border-radius:50%;background:rgba(255,255,255,.9)}
+#roundinfo{position:absolute;left:8px;top:calc(max(6px,env(safe-area-inset-top)) + 66px);background:rgba(0,0,0,.45);color:#fff;font-size:12px;padding:4px 10px;border-radius:10px;font-weight:700}
+#feed{position:absolute;left:8px;bottom:calc(118px + env(safe-area-inset-bottom));width:min(420px,72vw);display:flex;flex-direction:column;gap:3px;pointer-events:none}
+#feed div{background:rgba(0,0,0,.55);color:#fff;font-size:12.5px;padding:4px 9px;border-radius:9px;width:fit-content;max-width:100%;animation:fin .3s}
+@keyframes fin{from{opacity:0;transform:translateX(-10px)}}
+#bar{position:absolute;left:0;right:0;bottom:0;padding:10px 10px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.45) 35%);display:flex;flex-direction:column;align-items:center;gap:6px}
+#status{color:#fff;font-weight:900;text-shadow:0 2px 3px rgba(0,0,0,.6);font-size:15px;text-align:center}
+#acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+#acts button{min-width:88px}
+#rollBtn{font-size:22px;padding:12px 26px;min-width:150px!important}
+#timer{height:5px;width:min(360px,80vw);background:rgba(255,255,255,.3);border-radius:4px;overflow:hidden}
+#timer i{display:block;height:100%;background:#ffeb3b;width:100%}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;z-index:30;padding:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+.modal.center{align-items:center}
+.sheet{background:#fffdf5;border-radius:20px;padding:16px;width:min(520px,100%);max-height:78vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.4);animation:up .22s;touch-action:pan-y}
+@keyframes up{from{transform:translateY(30px);opacity:0}}
+.sheet h3{margin:0 0 8px;font-size:20px}
+.sheet .x{float:right;padding:4px 10px;background:#eee;box-shadow:none}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;margin:8px 0}
+.kv b{color:#555}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.card{background:#fff;border-radius:12px;padding:8px;box-shadow:0 2px 6px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:4px}
+.card .t{font-weight:900}.card .d{font-size:12px;color:#666;flex:1}
+.card button{padding:6px;font-size:13px}
+.stk{display:grid;grid-template-columns:1fr auto;gap:6px;background:#fff;border-radius:12px;padding:8px 10px;margin:6px 0;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.stk .bt{display:flex;gap:4px;flex-wrap:wrap;grid-column:1/3}
+.stk .bt button{padding:5px 8px;font-size:12px;flex:1}
+.up{color:#e53935}.dn{color:#2e7d32}
+.choice{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.choice button{flex:1 1 30%}
+#notice{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.6);opacity:0;z-index:25;pointer-events:none;transition:.25s;width:min(360px,86vw)}
+#notice.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#notice .nb{border-radius:20px;padding:18px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.45);border:4px solid #fff}
+#notice .nt{font-size:22px;font-weight:900;margin-bottom:6px}#notice .nx{font-size:17px;font-weight:700;line-height:1.5}
+.k-chance{background:linear-gradient(#fff3c4,#ffd54f)}.k-news{background:linear-gradient(#ffcdd2,#ef9a9a)}.k-god{background:linear-gradient(#fff9c4,#ffe082)}.k-evil{background:linear-gradient(#cfd8dc,#78909c);color:#fff}
+#dice{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);display:flex;gap:14px;z-index:24;pointer-events:none}
+.die{width:74px;height:74px;background:#fff;border-radius:16px;box-shadow:0 8px 20px rgba(0,0,0,.4),inset 0 -5px 0 #ddd;display:grid;grid-template-columns:repeat(3,1fr);padding:10px;gap:2px}
+.die i{width:13px;height:13px;border-radius:50%;margin:auto;background:transparent}.die i.on{background:#222}.die.one i.on{background:#e53935;width:18px;height:18px}
+.die.spin{animation:sp .15s infinite}
+@keyframes sp{50%{transform:rotate(25deg) scale(1.08)}}
+#toast{position:fixed;left:50%;top:20%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:8px 16px;border-radius:12px;font-weight:700;z-index:40;pointer-events:none;transition:opacity .3s;opacity:0}
+#emotes{position:absolute;right:60px;top:calc(max(6px,env(safe-area-inset-top)) + 64px);background:rgba(255,255,255,.95);border-radius:14px;padding:6px;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+#emotes button{font-size:22px;padding:4px;box-shadow:none;background:transparent}
+#net{position:absolute;right:8px;bottom:calc(118px + env(safe-area-inset-bottom));font-size:11px;color:#fff;background:rgba(0,0,0,.4);padding:3px 8px;border-radius:8px}
+.rank{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:#fff;margin:6px 0;font-weight:700}
+.rank .m{font-size:26px;width:34px;text-align:center}
+.loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700;z-index:50;background:#0d6aa8}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="loading" id="loading">🏝️ 正在建造寶島…</div>
+
+<!-- 首頁 -->
+<div class="screen hidden" id="home">
+  <div class="panel">
+    <div class="logo"><h1>寶島富翁 3D</h1><p>環島買地蓋樓・台灣真實景點・2–6 人連線</p></div>
+    <div class="lab">你的暱稱</div>
+    <input id="nameIn" maxlength="8" placeholder="輸入暱稱">
+    <div class="lab">自訂頭像（選填，會顯示在角色頭上）</div>
+    <div class="row" style="align-items:center"><span id="avPrev" style="flex:0 0 auto"></span><label class="ghost" style="flex:1;text-align:center;background:#fff;border-radius:12px;padding:9px;box-shadow:0 3px 0 rgba(0,0,0,.25);font-weight:700;cursor:pointer">📷 上傳圖片<input type="file" id="avFile" accept="image/*" style="display:none"></label><button class="ghost" id="avClear" style="flex:0 0 auto">清除</button></div>
+    <div class="lab">選擇角色</div>
+    <div class="chars" id="charPick"></div>
+    <div class="col">
+      <button class="pri hidden" id="joinBtn" style="font-size:18px">🚪 加入房間</button>
+      <button class="pri" id="createBtn" style="font-size:18px">🌐 建立連線房間（傳網址給朋友）</button>
+      <button class="ghost" id="soloBtn">🤖 單機遊戲（跟電腦 / 同一台輪流玩）</button>
+    </div>
+    <p class="note" id="homeMsg"></p>
+    <p class="note">玩法：擲骰子環島，買下景點、蓋房子收過路費；用點券買道具卡整人，神明附身、股市、銀行、機會與新聞事件，讓對手全部破產或回合結束時資產最多的人獲勝！</p>
+  </div>
+</div>
+
+<!-- 等待室 -->
+<div class="screen hidden" id="lobby">
+  <div class="panel">
+    <div class="logo"><h1 style="font-size:26px">等待室</h1></div>
+    <div id="roomBox">
+      <div class="code" id="roomCode"></div>
+      <div class="share"><input id="shareUrl" readonly><button class="blue" id="copyBtn">複製</button></div>
+      <div id="qr"></div>
+      <p class="note" style="text-align:center">把網址或 QR Code 傳給朋友，打開就能加入（最多 6 人）</p>
+    </div>
+    <div class="lab">玩家 <span id="seatCount"></span></div>
+    <div id="seats"></div>
+    <div id="hostCtl">
+      <div class="row" style="margin:6px 0"><button class="ghost" id="addBot">＋ 電腦玩家</button><button class="ghost" id="addLocal">＋ 本機玩家</button></div>
+      <div class="row">
+        <div><div class="lab">起始資金</div><select id="setCash"><option value="20000">$20,000</option><option value="30000" selected>$30,000</option><option value="50000">$50,000</option></select></div>
+        <div><div class="lab">回合上限</div><select id="setRounds"><option value="20">20 回合</option><option value="30" selected>30 回合</option><option value="50">50 回合</option><option value="0">無限（破產制）</option></select></div>
+        <div><div class="lab">骰子</div><select id="setDice"><option value="1">1 顆</option><option value="2" selected>2 顆</option></select></div>
+      </div>
+      <button class="pri" id="startBtn" style="width:100%;margin-top:12px;font-size:18px">🎲 開始遊戲</button>
+    </div>
+    <p class="note" id="lobbyMsg" style="text-align:center"></p>
+    <button class="ghost" id="leaveBtn" style="width:100%;margin-top:6px">離開</button>
+  </div>
+</div>
+
+<!-- 遊戲 HUD -->
+<div id="hud" class="hidden">
+  <div id="players"></div>
+  <div id="roundinfo"></div>
+  <div id="topbtn">
+    <button id="camBtn" title="視角">🗺️</button>
+    <button id="stockBtn" title="股市">📈</button>
+    <button id="logBtn" title="紀錄">📜</button>
+    <button id="emoBtn" title="表情">😀</button>
+    <button id="sndBtn" title="音效">🔊</button>
+    <button id="helpBtn" title="說明">❔</button>
+  </div>
+  <div id="emotes" class="hidden"></div>
+  <div id="feed"></div>
+  <div id="net"></div>
+  <div id="bar">
+    <div id="status"></div>
+    <div id="timer"><i></i></div>
+    <div id="acts"></div>
+  </div>
+</div>
+<div id="notice"><div class="nb"><div class="nt"></div><div class="nx"></div></div></div>
+<div id="dice" class="hidden"></div>
+<div id="toast"></div>
+<div id="modal" class="modal hidden"><div class="sheet" id="sheet"></div></div>
+
+<script type="module">
+// src/data.js
+var GROUPS = {
+  tp: { name: "台北", color: "#e53935" },
+  wh: { name: "萬華士林", color: "#ff7043" },
+  nc: { name: "北海岸", color: "#00897b" },
+  yl: { name: "宜蘭", color: "#7cb342" },
+  hl: { name: "花蓮", color: "#1e88e5" },
+  tt: { name: "台東", color: "#f4511e" },
+  ld: { name: "東部離島", color: "#26a69a" },
+  pt: { name: "屏東", color: "#fbc02d" },
+  ks: { name: "高雄", color: "#8e24aa" },
+  tn: { name: "台南", color: "#6d4c41" },
+  ph: { name: "澎湖", color: "#00acc1" },
+  mt: { name: "中部山林", color: "#2e7d32" },
+  ch: { name: "彰化", color: "#c0ca33" },
+  tc: { name: "台中", color: "#d81b60" },
+  ml: { name: "竹苗", color: "#5e35b1" },
+  ty: { name: "桃園淡水", color: "#3949ab" }
+};
+var SHOP = { type: "shop", name: "道具店", icon: "🏪", desc: "用點券購買道具卡。" };
+var CH = { type: "chance", name: "機會", icon: "❓" };
+var NEWS = { type: "news", name: "新聞", icon: "📰" };
+var BANK = { type: "bank", name: "銀行", icon: "🏦", desc: "停在這裡可以存款、提款。存款不怕查稅、均富。" };
+var P = (g, name, price2, model, desc, sea) => ({ type: "prop", g, name, price: price2, model, desc, sea });
+var TILES = [
+  { type: "start", name: "台北車站", icon: "🚉", desc: "起點。每次經過領薪水 $2000、點券 +10，存款加 5% 利息。" },
+  P("tp", "台北101", 4400, "t101", "台北信義區地標，508 公尺高，曾是世界第一高樓。"),
+  P("tp", "中正紀念堂", 3800, "cks", "藍瓦白牆的八角屋頂，自由廣場的牌樓非常壯觀。"),
+  CH,
+  P("tp", "故宮博物院", 4e3, "npm", "收藏翠玉白菜、肉形石等近 70 萬件文物。"),
+  SHOP,
+  P("wh", "士林夜市", 3e3, "shilin", "台北最大夜市，大餅包小餅、豪大雞排。"),
+  P("wh", "西門町", 3200, "ximen", "年輕人的潮流聖地，八角形的西門紅樓。"),
+  P("wh", "艋舺龍山寺", 3200, "longshan", "近 300 年歷史的古剎，香火鼎盛。"),
+  NEWS,
+  P("nc", "野柳女王頭", 2200, "queen", "北海岸的蕈狀岩，風化出女王側臉。"),
+  P("nc", "基隆廟口", 2e3, "miaokou", "奠濟宮前的小吃街，鼎邊趖、營養三明治。"),
+  P("nc", "九份老街", 2400, "jiufen", "依山而建的山城，紅燈籠與茶樓。"),
+  P("nc", "平溪天燈", 2e3, "lantern", "在鐵道旁寫下願望，放上天空的天燈。"),
+  { type: "temple", name: "土地公廟", icon: "⛩️", desc: "隨機請到一位神明附身。" },
+  P("yl", "龜山島", 1600, "turtle", "蘭陽平原外海的火山島，形狀像一隻海龜。", true),
+  P("yl", "礁溪溫泉", 1800, "onsen", "平地溫泉，泡湯與溫泉蔬菜聞名。"),
+  P("yl", "蘭陽博物館", 1800, "lanyang", "仿單面山傾斜造型的博物館。"),
+  CH,
+  P("hl", "清水斷崖", 2200, "cliff", "蘇花公路上的千尺斷崖，直落太平洋。"),
+  P("hl", "太魯閣峽谷", 2600, "taroko", "大理石峽谷，燕子口與長春祠。"),
+  P("hl", "七星潭", 2200, "qixing", "彎月形的礫石海灘，看日出的好地方。"),
+  { type: "lottery", name: "彩券行", icon: "🎰", desc: "花 $500 猜骰子點數，猜中贏 $3000。" },
+  { type: "hospital", name: "醫院", icon: "🏥", desc: "住院的玩家會在這裡休養。" },
+  P("tt", "三仙台", 1800, "sanxian", "八拱跨海步橋連接離岸小島。", true),
+  P("tt", "伯朗大道", 1600, "brown", "池上稻田間筆直的道路與金城武樹。"),
+  P("tt", "鹿野高台", 1800, "balloon", "夏天的熱氣球嘉年華，滿天彩色氣球。"),
+  NEWS,
+  P("ld", "綠島", 2e3, "greenisland", "海底溫泉與白色燈塔的離島。", true),
+  P("ld", "蘭嶼", 2200, "lanyu", "達悟族的拼板舟與飛魚季。", true),
+  BANK,
+  P("pt", "鵝鑾鼻燈塔", 2400, "eluanbi", "台灣最南端的白色燈塔，被稱為東亞之光。"),
+  P("pt", "墾丁大街", 2800, "kenting", "椰影、沙灘與船帆石，南國度假勝地。"),
+  P("pt", "小琉球", 2400, "xiaoliuqiu", "花瓶岩與海龜，珊瑚礁島嶼。", true),
+  CH,
+  SHOP,
+  P("ks", "美麗島站", 2800, "formosa", "捷運站裡的光之穹頂彩繪玻璃。"),
+  P("ks", "蓮池潭龍虎塔", 2600, "dragontiger", "龍喉進、虎口出，象徵消災解厄。"),
+  P("ks", "駁二藝術特區", 2800, "pier2", "港邊倉庫改造的文創園區。"),
+  P("ks", "高雄85大樓", 3400, "t85", "形似「高」字的高雄地標摩天樓。"),
+  { type: "temple", name: "媽祖廟", icon: "⛩️", desc: "隨機請到一位神明附身。" },
+  P("tn", "奇美博物館", 3200, "chimei", "白色宮殿式博物館，前有阿波羅噴泉。"),
+  P("tn", "安平古堡", 2800, "anping", "荷蘭人建造的熱蘭遮城，台灣最古老城堡。"),
+  P("tn", "赤崁樓", 3e3, "chihkan", "府城古蹟，紅牆飛簷的普羅民遮城。"),
+  P("tn", "台南孔廟", 2800, "confucius", "全台首學，紅牆黃瓦的文廟。"),
+  CH,
+  P("ph", "澎湖跨海大橋", 2e3, "phbridge", "連接白沙與西嶼的跨海大橋。", true),
+  P("ph", "七美雙心石滬", 2400, "twoheart", "先民堆砌的雙心形捕魚石滬。", true),
+  P("ph", "吉貝沙尾", 2e3, "jibei", "白沙延伸入海的沙嘴，水上活動天堂。", true),
+  { type: "police", name: "警察局", icon: "🚓", desc: "被抓的玩家會在這裡拘留。" },
+  P("mt", "阿里山", 3200, "alishan", "神木、雲海、日出與森林小火車。"),
+  P("mt", "日月潭", 3600, "sunmoon", "台灣最大天然湖泊，拉魯島與慈恩塔。"),
+  P("mt", "清境農場", 3e3, "cingjing", "高山草原上的綿羊秀。"),
+  P("mt", "合歡山", 3200, "hehuan", "冬天會下雪的高山，武嶺的星空。"),
+  NEWS,
+  P("ch", "八卦山大佛", 2200, "buddha", "彰化地標，俯瞰市區的大佛。"),
+  P("ch", "扇形車庫", 2e3, "roundhouse", "全台僅存的扇形火車頭車庫與轉車台。"),
+  P("ch", "鹿港老街", 2400, "lukang", "一府二鹿三艋舺，紅磚老街與龍山寺。"),
+  SHOP,
+  P("tc", "彩虹眷村", 2600, "rainbow", "彩虹爺爺畫滿繽紛圖案的眷村。"),
+  P("tc", "逢甲夜市", 2800, "fengjia", "創意小吃的發源地。"),
+  P("tc", "臺中國家歌劇院", 3200, "opera", "伊東豊雄設計的曲牆建築。"),
+  P("tc", "高美濕地", 2600, "gaomei", "夕陽、風車與天空之鏡。"),
+  CH,
+  P("ml", "勝興車站", 2200, "shengxing", "海拔最高的舊山線木造車站。"),
+  P("ml", "龍騰斷橋", 2200, "longteng", "地震留下的紅磚拱橋遺跡。"),
+  P("ml", "新竹城隍廟", 2400, "chenghuang", "香火鼎盛的城隍廟與貢丸米粉。"),
+  P("ml", "內灣老街", 2200, "neiwan", "新竹山城，內灣線火車與吊橋。"),
+  BANK,
+  P("ty", "大溪老街", 2400, "daxi", "巴洛克牌樓立面與豆干。"),
+  P("ty", "淡水紅毛城", 2800, "fortsd", "紅色的西班牙、荷蘭古城堡。"),
+  P("ty", "淡水漁人碼頭", 3e3, "tamsui", "情人橋與淡水夕照。")
+];
+var N_TILES = TILES.length;
+var LEVEL_NAMES = ["空地", "一層平房", "二層樓", "透天厝", "公寓", "摩天大樓"];
+var TOLL_MUL = [0.3, 0.9, 1.7, 2.8, 4.2, 6];
+var UPGRADE_RATE = 0.55;
+var SALARY = 2e3;
+var CHARS = [
+  {
+    id: "boss",
+    name: "金董",
+    emoji: "🤵",
+    color: "#e53935",
+    bio: "白手起家的建設公司董事長，口頭禪是「地段、地段、還是地段」。",
+    sk: [["rent", "收租王", "收到的過路費 +20%"], ["builder", "建商", "加蓋房子費用 -20%"]]
+  },
+  {
+    id: "ama",
+    name: "阿嬤",
+    emoji: "👵",
+    color: "#8e24aa",
+    bio: "台南市場賣了五十年菜粿，存摺比誰都厚。",
+    sk: [["interest", "存錢筒", "存款利息加倍（10%）"], ["elder", "長輩保佑", "衰神、窮神不會附身"]]
+  },
+  {
+    id: "chef",
+    name: "夜市王",
+    emoji: "🧑‍🍳",
+    color: "#fb8c00",
+    bio: "全台夜市都有他的攤位，朋友多到數不完。",
+    sk: [["network", "人脈廣", "離開道具店時，隨機獲得 1 張卡"], ["bargain", "殺價", "道具店卡片 7 折"]]
+  },
+  {
+    id: "boba",
+    name: "珍奶妹",
+    emoji: "🧋",
+    color: "#fdd835",
+    bio: "手搖飲網紅，走到哪拍到哪，運氣好得不得了。",
+    sk: [["lucky", "人氣王", "機會事件拿到的錢 +50%"], ["encore", "臨場發揮", "使用停留卡、遙控骰子時 40% 機率返還"]]
+  },
+  {
+    id: "surf",
+    name: "浪人凱",
+    emoji: "🏄",
+    color: "#039be5",
+    bio: "東海岸衝浪手，身手靈活，什麼都難不倒他。",
+    sk: [["range", "浪裡來去", "路障、地雷放置距離翻倍"], ["agile", "身手矯健", "住院、拘留時間少 1 回合"]]
+  },
+  {
+    id: "bear",
+    name: "黑熊仔",
+    emoji: "🐻",
+    color: "#43a047",
+    bio: "從玉山下來觀光的台灣黑熊，皮粗肉厚、深受山神眷顧。",
+    sk: [["thick", "皮厚", "付過路費與醫藥費 -20%"], ["divine", "山林之子", "神明附身時間 +2 回合"]]
+  },
+  {
+    id: "leopard",
+    name: "石虎",
+    emoji: "🐆",
+    color: "#d84315",
+    animal: 1,
+    bio: "苗栗淺山的石虎，額頭兩條白線是招牌，夜裡身手最靈巧。",
+    sk: [["nomine", "夜行", "踩到地雷不會爆炸"], ["noblock", "敏捷", "路障擋不住牠"]]
+  },
+  {
+    id: "magpie",
+    name: "藍鵲",
+    emoji: "🐦",
+    color: "#283593",
+    animal: 1,
+    bio: "拖著長尾巴的台灣藍鵲，最愛收集亮晶晶的東西。",
+    sk: [["bag", "長尾巴", "道具卡上限 15 張"], ["rob2", "叼走", "搶奪卡一次搶兩張"]]
+  },
+  {
+    id: "deer",
+    name: "梅花鹿",
+    emoji: "🦌",
+    color: "#ec407a",
+    animal: 1,
+    bio: "墾丁復育的梅花鹿，蹦蹦跳跳停不下來。",
+    sk: [["swift", "跳躍", "每次擲骰多走 1 步"], ["protected", "保育類", "不會被查稅卡、烏龜卡指定"]]
+  },
+  {
+    id: "pheasant",
+    name: "帝雉",
+    emoji: "🐓",
+    color: "#00897b",
+    animal: 1,
+    bio: "印在千元鈔上的國寶鳥，走到哪都很有排場。",
+    sk: [["salary", "國寶", "經過台北車站薪水 +50%"], ["pointsx", "千元鈔", "獲得的點券加倍"]]
+  },
+  {
+    id: "pangolin",
+    name: "穿山甲",
+    emoji: "🦔",
+    color: "#546e7a",
+    animal: 1,
+    bio: "全身鱗甲的穿山甲，遇到危險就縮成一顆球。",
+    sk: [["armor", "鱗甲", "怪獸卡、颱風不會摧毀牠的房子"], ["dig", "挖洞", "不會被警察拘留"]]
+  },
+  {
+    id: "monkey",
+    name: "獼猴",
+    emoji: "🐒",
+    color: "#9e9d24",
+    animal: 1,
+    bio: "壽山上的台灣獼猴，最會跟遊客「借」東西。",
+    sk: [["pick", "順手牽羊", "付過路費後 25% 機率拿回一半"], ["mischief", "調皮", "每回合開始 15% 機率撿到道具卡"]]
+  }
+];
+var hasSkill = (p, k) => {
+  const c = CHARS.find((x) => x.id === p.char);
+  return !!(c && c.sk.some((x) => x[0] === k));
+};
+var CARDS = {
+  remote: { name: "遙控骰子", icon: "🎲", cost: 30, target: "dice", desc: "這回合自己決定骰出的點數。" },
+  block: { name: "路障", icon: "🚧", cost: 20, target: "place", desc: "在前後 8 格內放路障，經過的人會被擋下。" },
+  mine: { name: "地雷", icon: "💣", cost: 35, target: "place", desc: "在前後 8 格內埋地雷，踩到的人住院 2 回合。" },
+  free: { name: "免費卡", icon: "🎫", cost: 20, target: "auto", desc: "自動抵免一次過路費。" },
+  equal: { name: "均富卡", icon: "⚖️", cost: 60, target: "none", desc: "所有玩家的現金平均分配。" },
+  tax: { name: "查稅卡", icon: "🧾", cost: 40, target: "player", desc: "指定玩家繳交現金 25% 的稅金。" },
+  rob: { name: "搶奪卡", icon: "🦹", cost: 30, target: "player", desc: "隨機搶走指定玩家一張道具卡。" },
+  sleep: { name: "冬眠卡", icon: "😴", cost: 50, target: "none", desc: "其他所有玩家冬眠 2 回合。" },
+  buyland: { name: "購地卡", icon: "📜", cost: 50, target: "here", desc: "強制以原價買下你腳下的別人土地（含房子）。" },
+  monster: { name: "怪獸卡", icon: "🦖", cost: 40, target: "oppprop", desc: "摧毀指定對手土地上的所有房子。" },
+  turn: { name: "轉向卡", icon: "🔄", cost: 15, target: "none", desc: "自己的前進方向反轉。" },
+  stay: { name: "停留卡", icon: "🛑", cost: 15, target: "none", desc: "這回合原地不動，再觸發一次腳下的格子。" },
+  build: { name: "加蓋卡", icon: "🏗️", cost: 40, target: "myprop", desc: "免費替自己的一塊地加蓋一層。" },
+  turtle: { name: "烏龜卡", icon: "🐢", cost: 25, target: "player", desc: "指定玩家接下來 3 回合每次只走 1 步。" },
+  angel: { name: "天使卡", icon: "👼", cost: 70, target: "myprop", desc: "選一塊地，整個區域所有已擁有的土地都加蓋一層。" }
+};
+var CARD_IDS = Object.keys(CARDS);
+var GODS = {
+  caishen: { name: "財神", icon: "💰", good: true, desc: "不用付過路費，收過路費加倍。" },
+  fushen: { name: "福神", icon: "🍀", good: true, desc: "蓋房子免費。" },
+  tudi: { name: "土地公", icon: "👴", good: true, desc: "停在空地上直接免費獲得土地。" },
+  mazu: { name: "媽祖", icon: "🙏", good: true, desc: "保佑平安：不會住院、被抓，也不受壞運影響。" },
+  shuai: { name: "衰神", icon: "☠️", good: false, desc: "過路費加倍付。" },
+  qiong: { name: "窮神", icon: "🥀", good: false, desc: "每回合開始損失 8% 現金。" }
+};
+var STOCKS = [
+  { name: "寶島半導體", p: 58 },
+  { name: "珍奶食品", p: 22 },
+  { name: "環島航運", p: 35 },
+  { name: "高山觀光", p: 18 },
+  { name: "夜市控股", p: 12 },
+  { name: "黑熊科技", p: 40 }
+];
+var EMOTES = ["👍", "😂", "😭", "😡", "🤑", "🙏", "🎉", "💩"];
+
+// src/engine.js
+var PRE_T = 4e4;
+var DEC_T = 25e3;
+var HOSP = TILES.findIndex((t) => t.type === "hospital");
+var POLICE = TILES.findIndex((t) => t.type === "police");
+var rnd = (n) => Math.floor(Math.random() * n);
+var pick = (a) => a[rnd(a.length)];
+var r100 = (x) => Math.round(x / 100) * 100;
+var r10 = (x) => Math.round(x / 10) * 10;
+var money = (n) => "$" + Math.round(n).toLocaleString("en-US");
+function cur(s) {
+  return s.players[s.turn];
+}
+function pl(s, id) {
+  return s.players.find((p) => p.id === id);
+}
+function alive(s) {
+  return s.players.filter((p) => !p.out);
+}
+function price(s, i) {
+  const t = TILES[i];
+  return r100(t.price * (s.gprice[t.g] || 1));
+}
+function upCost(s, i) {
+  return r100(price(s, i) * UPGRADE_RATE);
+}
+function upCostFor(s, i, p) {
+  if (p.god && p.god.id === "fushen") return 0;
+  return r100(upCost(s, i) * (hasSkill(p, "builder") ? 0.8 : 1));
+}
+function cardCost(p, k) {
+  return Math.round(CARDS[k].cost * (hasSkill(p, "bargain") ? 0.7 : 1));
+}
+function propValue(s, i) {
+  return price(s, i) + s.tiles[i].l * upCost(s, i);
+}
+function ownsGroup(s, g, pid) {
+  return TILES.every((t, i) => t.g !== g || s.tiles[i].o === pid);
+}
+function toll(s, i) {
+  const t = TILES[i], st = s.tiles[i];
+  if (!st || st.o == null) return 0;
+  let v = price(s, i) * TOLL_MUL[st.l];
+  if (ownsGroup(s, t.g, st.o)) v *= 1.5;
+  const gm = s.gmod[t.g];
+  if (gm) v *= gm.m;
+  return r10(v);
+}
+function stockValue(s, p) {
+  return p.stocks.reduce((a, q, k) => a + q * s.market[k].p, 0);
+}
+function assets(s, p) {
+  let v = p.cash + p.deposit + stockValue(s, p);
+  s.tiles.forEach((t, i) => {
+    if (t && t.o === p.id) v += propValue(s, i);
+  });
+  return Math.round(v);
+}
+function dist(a, b) {
+  const d = Math.abs(a - b) % N_TILES;
+  return Math.min(d, N_TILES - d);
+}
+var hasGod = (p, id) => p.god && p.god.id === id;
+var cardLimit = (p) => hasSkill(p, "bag") ? 15 : 10;
+function addPts(p, n) {
+  p.points += hasSkill(p, "pointsx") ? n * 2 : n;
+}
+function log(s, msg) {
+  s.log.push(msg);
+  if (s.log.length > 60) s.log.shift();
+}
+function fx(s, o) {
+  o.n = ++s.fxn;
+  s.fx.push(o);
+  if (s.fx.length > 30) s.fx.shift();
+}
+function createGame(players, settings, now) {
+  const s = {
+    v: 0,
+    phase: "play",
+    settings,
+    round: 1,
+    turn: 0,
+    step: "pre",
+    pending: null,
+    anim: null,
+    until: 0,
+    deadline: 0,
+    botAt: 0,
+    botUses: 0,
+    tiles: TILES.map((t) => t.type === "prop" ? { o: null, l: 0 } : null),
+    marks: {},
+    gmod: {},
+    gprice: {},
+    market: STOCKS.map((x) => ({ p: x.p, h: [x.p] })),
+    players: players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      char: p.char,
+      bot: !!p.bot,
+      cash: settings.startCash,
+      deposit: 0,
+      points: 60,
+      pos: 0,
+      dir: 1,
+      cards: ["free", pick(["remote", "block", "turn", "stay", "turtle"])],
+      stocks: STOCKS.map(() => 0),
+      st: { hosp: 0, jail: 0, sleep: 0, turtle: 0 },
+      god: null,
+      out: false,
+      remote: 0,
+      stay: false
+    })),
+    log: [],
+    fx: [],
+    fxn: 0,
+    rank: null,
+    startedAt: now
+  };
+  log(s, `🎉 環島之旅開始！共 ${players.length} 位玩家，起始資金 ${money(settings.startCash)}`);
+  beginTurn(s, now);
+  return s;
+}
+function setStep(s, step, now) {
+  s.step = step;
+  s.deadline = now + (step === "pre" ? PRE_T : DEC_T);
+  s.botAt = now + 700 + rnd(700);
+}
+function done(s, now, delay = 1300) {
+  s.step = "done";
+  s.pending = null;
+  s.until = now + delay;
+}
+function beginTurn(s, now) {
+  const p = cur(s);
+  s.pending = null;
+  s.anim = null;
+  s.botUses = 0;
+  if (hasSkill(p, "mischief") && !p.out && Math.random() < 0.15) {
+    log(s, `🐒 ${p.name} 調皮地撿到一張卡`);
+    giveCard(s, p);
+  }
+  if (p.god) {
+    if (p.god.id === "qiong") {
+      const loss = r10(p.cash * 0.08);
+      if (loss > 0) {
+        p.cash -= loss;
+        log(s, `🥀 窮神作祟，${p.name} 損失 ${money(loss)}`);
+        fx(s, { k: "money", pid: p.id, d: -loss });
+      }
+    }
+    p.god.t--;
+    if (p.god.t <= 0) {
+      log(s, `${GODS[p.god.id].icon} ${GODS[p.god.id].name}離開了 ${p.name}`);
+      p.god = null;
+    }
+  }
+  for (const [k, txt] of [["hosp", "🏥 住院休養中"], ["jail", "🚓 拘留中"], ["sleep", "😴 冬眠中"]]) {
+    if (p.st[k] > 0) {
+      p.st[k]--;
+      log(s, `${txt}：${p.name} 暫停一回合（剩 ${p.st[k]}）`);
+      done(s, now, 1100);
+      return;
+    }
+  }
+  setStep(s, "pre", now);
+}
+function nextTurn(s, now) {
+  if (checkEnd(s)) return;
+  const n = s.players.length;
+  let idx = s.turn, wrapped = false;
+  for (let k = 0; k < n; k++) {
+    idx++;
+    if (idx >= n) {
+      idx = 0;
+      wrapped = true;
+    }
+    if (!s.players[idx].out) break;
+  }
+  s.turn = idx;
+  if (wrapped) {
+    newRound(s);
+    if (s.phase !== "play") return;
+  }
+  beginTurn(s, now);
+}
+function newRound(s) {
+  s.round++;
+  s.market.forEach((m) => {
+    const drift = (Math.random() - 0.485) * 0.14;
+    m.p = Math.max(2, Math.round(m.p * (1 + drift) * 10) / 10);
+    m.h.push(m.p);
+    if (m.h.length > 24) m.h.shift();
+  });
+  for (const g of Object.keys(s.gmod)) {
+    if (--s.gmod[g].r <= 0) {
+      log(s, `📉 ${GROUPS[g].name}的過路費恢復正常`);
+      delete s.gmod[g];
+    }
+  }
+  const mr = s.settings.maxRounds;
+  if (mr && s.round > mr) endGame(s, `已滿 ${mr} 回合`);
+  else log(s, `📅 第 ${s.round} 回合`);
+}
+function checkEnd(s) {
+  if (s.phase !== "play") return true;
+  if (alive(s).length <= 1) {
+    endGame(s, "其他玩家都破產了");
+    return true;
+  }
+  return false;
+}
+function endGame(s, reason) {
+  s.phase = "over";
+  s.step = "over";
+  s.pending = null;
+  const order = [...s.players].sort((a, b) => a.out - b.out || assets(s, b) - assets(s, a));
+  s.rank = order.map((p) => ({ id: p.id, a: p.out ? 0 : assets(s, p) }));
+  log(s, `🏁 遊戲結束（${reason}）！冠軍：${order[0].name}`);
+  fx(s, { k: "over" });
+}
+function startMove(s, p, steps, now, dice) {
+  const path = [p.pos];
+  let pos = p.pos, pass = 0, mark = null;
+  for (let k = 0; k < steps; k++) {
+    pos = (pos + p.dir + N_TILES) % N_TILES;
+    path.push(pos);
+    if (pos === 0 && p.dir > 0) pass++;
+    const mk = s.marks[pos];
+    if (mk && !(mk === "block" && hasSkill(p, "noblock")) && !(mk === "mine" && hasSkill(p, "nomine"))) {
+      mark = mk;
+      break;
+    }
+  }
+  s.anim = { pid: p.id, path, t0: now, dice: dice || null, dur: (dice ? 900 : 200) + (path.length - 1) * 340 };
+  s.moveInfo = { pass, mark };
+  s.step = "move";
+  s.until = now + s.anim.dur;
+}
+function finishMove(s, now) {
+  const p = cur(s);
+  const path = s.anim.path;
+  p.pos = path[path.length - 1];
+  const { pass, mark } = s.moveInfo || {};
+  s.moveInfo = null;
+  for (let k = 0; k < (pass || 0); k++) {
+    const intr = r10(p.deposit * (hasSkill(p, "interest") ? 0.1 : 0.05));
+    const sal = hasSkill(p, "salary") ? SALARY * 1.5 : SALARY;
+    p.cash += sal;
+    addPts(p, 10);
+    p.deposit += intr;
+    log(s, `🚉 ${p.name} 經過台北車站，領薪水 ${money(sal)}${intr ? `、利息 ${money(intr)}` : ""}、點券 +${hasSkill(p, "pointsx") ? 20 : 10}`);
+    fx(s, { k: "money", pid: p.id, d: sal + intr });
+  }
+  if (mark) {
+    delete s.marks[p.pos];
+    if (mark === "block") {
+      log(s, `🚧 ${p.name} 被路障擋下了！`);
+      fx(s, { k: "boom", tile: p.pos, m: "block" });
+    } else {
+      fx(s, { k: "boom", tile: p.pos, m: "mine" });
+      log(s, `💣 轟！${p.name} 踩到地雷！`);
+      if (sendHospital(s, p, 2)) {
+        done(s, now, 1800);
+        return;
+      }
+    }
+  }
+  land(s, now);
+}
+function teleport(s, p, pos) {
+  p.pos = pos;
+  fx(s, { k: "tp", pid: p.id, pos });
+}
+function sendHospital(s, p, turns) {
+  if (hasGod(p, "mazu")) {
+    log(s, `🙏 媽祖保佑，${p.name} 平安無事`);
+    return false;
+  }
+  if (hasSkill(p, "agile")) turns = Math.max(0, turns - 1);
+  teleport(s, p, HOSP);
+  p.st.hosp = turns;
+  const fee = Math.min(p.cash, hasSkill(p, "thick") ? 400 : 500);
+  p.cash -= fee;
+  log(s, `🚑 ${p.name} 被送進醫院，住院 ${turns} 回合（醫藥費 ${money(fee)}）`);
+  return true;
+}
+function sendJail(s, p, turns) {
+  if (hasSkill(p, "dig")) {
+    log(s, `🕳️ ${p.name} 挖了個洞溜走了，不用被拘留`);
+    return false;
+  }
+  if (hasGod(p, "mazu")) {
+    log(s, `🙏 媽祖保佑，${p.name} 逃過一劫`);
+    return false;
+  }
+  if (hasSkill(p, "agile")) turns = Math.max(0, turns - 1);
+  teleport(s, p, POLICE);
+  p.st.jail = turns;
+  log(s, `🚓 ${p.name} 被帶到警察局，拘留 ${turns} 回合`);
+  return true;
+}
+function liquidate(s, p, need) {
+  let short = need - p.cash;
+  if (short > 0 && p.deposit > 0) {
+    const w = Math.min(p.deposit, short);
+    p.deposit -= w;
+    p.cash += w;
+    short -= w;
+    log(s, `🏦 ${p.name} 從存款提領 ${money(w)} 付款`);
+  }
+  for (let k = 0; k < p.stocks.length && short > 0; k++) {
+    if (p.stocks[k] > 0) {
+      const v = Math.round(p.stocks[k] * s.market[k].p);
+      p.cash += v;
+      short -= v;
+      p.stocks[k] = 0;
+      log(s, `📈 ${p.name} 賣出 ${STOCKS[k].name} 股票得 ${money(v)}`);
+    }
+  }
+  if (short > 0) {
+    const mine = s.tiles.map((t, i) => t && t.o === p.id ? i : -1).filter((i) => i >= 0).sort((a, b) => propValue(s, a) - propValue(s, b));
+    for (const i of mine) {
+      if (short <= 0) break;
+      const v = r10(propValue(s, i) * 0.5);
+      p.cash += v;
+      short -= v;
+      s.tiles[i].o = null;
+      s.tiles[i].l = 0;
+      log(s, `🏚️ ${p.name} 變賣 ${TILES[i].name} 得 ${money(v)}`);
+    }
+  }
+}
+function pay(s, p, to, amt) {
+  amt = Math.round(amt);
+  if (amt <= 0) return 0;
+  if (p.cash < amt) liquidate(s, p, amt);
+  const paid = Math.min(amt, p.cash);
+  p.cash -= paid;
+  if (to) to.cash += paid;
+  fx(s, { k: "money", pid: p.id, d: -paid });
+  if (to) fx(s, { k: "money", pid: to.id, d: paid });
+  if (paid < amt) bankrupt(s, p);
+  return paid;
+}
+function gain(s, p, amt) {
+  if (s.chanceCtx === p.id && hasSkill(p, "lucky")) amt = r10(amt * 1.5);
+  p.cash += amt;
+  fx(s, { k: "money", pid: p.id, d: amt });
+}
+function bankrupt(s, p) {
+  if (p.out) return;
+  p.out = true;
+  p.cash = 0;
+  p.deposit = 0;
+  p.cards = [];
+  p.god = null;
+  s.tiles.forEach((t) => {
+    if (t && t.o === p.id) {
+      t.o = null;
+      t.l = 0;
+    }
+  });
+  log(s, `💸 ${p.name} 破產出局了！`);
+  fx(s, { k: "bankrupt", pid: p.id });
+}
+function land(s, now) {
+  const p = cur(s);
+  if (p.out) {
+    done(s, now);
+    return;
+  }
+  const i = p.pos, t = TILES[i];
+  switch (t.type) {
+    case "prop":
+      return landProp(s, p, i, now);
+    case "chance":
+      return chance(s, p, now);
+    case "news":
+      return news(s, p, now);
+    case "temple":
+      return temple(s, p, now);
+    case "shop":
+      if (p.points >= 10 || hasSkill(p, "network")) return ask(s, { type: "shop" }, now);
+      log(s, `🏪 ${p.name} 點券不足，逛逛就走`);
+      return done(s, now);
+    case "lottery":
+      if (p.cash >= 500) return ask(s, { type: "lottery" }, now);
+      return done(s, now);
+    case "bank":
+      return ask(s, { type: "bank" }, now);
+    case "hospital":
+      log(s, `🏥 ${p.name} 來醫院探病，獲得點券`);
+      addPts(p, 5);
+      return done(s, now);
+    case "police":
+      log(s, `🚓 ${p.name} 到警察局做筆錄，獲得點券`);
+      addPts(p, 5);
+      return done(s, now);
+    default:
+      return done(s, now);
+  }
+}
+function ask(s, pending, now) {
+  s.pending = pending;
+  setStep(s, "decide", now);
+}
+function landProp(s, p, i, now) {
+  const st = s.tiles[i], t = TILES[i];
+  if (st.o == null) {
+    if (hasGod(p, "tudi")) {
+      st.o = p.id;
+      log(s, `👴 土地公顯靈！${p.name} 免費獲得 ${t.name}`);
+      fx(s, { k: "buy", tile: i, pid: p.id });
+      return done(s, now, 1600);
+    }
+    if (p.cash >= price(s, i)) return ask(s, { type: "buy", tile: i }, now);
+    log(s, `${p.name} 錢不夠買 ${t.name}`);
+    return done(s, now);
+  }
+  if (st.o === p.id) {
+    if (st.l < 5 && p.cash >= upCostFor(s, i, p)) return ask(s, { type: "upgrade", tile: i }, now);
+    return done(s, now);
+  }
+  const o = pl(s, st.o);
+  if (o.st.hosp > 0 || o.st.jail > 0) {
+    log(s, `😮 ${t.name} 的主人 ${o.name} 不在，${p.name} 免付過路費`);
+    return done(s, now);
+  }
+  let amt = toll(s, i);
+  if (hasGod(p, "caishen")) {
+    log(s, `💰 財神護體，${p.name} 不用付過路費`);
+    return done(s, now);
+  }
+  const fi = p.cards.indexOf("free");
+  if (fi >= 0) {
+    p.cards.splice(fi, 1);
+    log(s, `🎫 ${p.name} 使用免費卡，省下 ${money(amt)}`);
+    fx(s, { k: "card", pid: p.id, card: "free" });
+    return done(s, now, 1500);
+  }
+  if (hasGod(p, "shuai")) amt *= 2;
+  if (hasGod(o, "caishen")) amt *= 2;
+  if (hasSkill(o, "rent")) amt *= 1.2;
+  if (hasSkill(p, "thick")) amt *= 0.8;
+  amt = r10(amt);
+  const paid = pay(s, p, o, amt);
+  log(s, `💵 ${p.name} 付給 ${o.name} 過路費 ${money(paid)}（${t.name}・${LEVEL_NAMES[st.l]}）`);
+  if (!p.out && hasSkill(p, "pick") && Math.random() < 0.25) {
+    const back = Math.min(o.cash, r10(paid / 2));
+    o.cash -= back;
+    gain(s, p, back);
+    fx(s, { k: "money", pid: o.id, d: -back });
+    log(s, `🐒 ${p.name} 順手牽羊拿回 ${money(back)}`);
+  }
+  fx(s, { k: "toll", from: p.id, to: o.id, amt: paid, tile: i });
+  done(s, now, 1700);
+}
+var CHANCE = [
+  { t: "統一發票中了二獎！", f: (s, p) => gain(s, p, 4e3) },
+  { t: "在夜市擺攤大賺一筆", f: (s, p) => gain(s, p, 1500) },
+  { t: "颳中刮刮樂頭獎！", f: (s, p) => gain(s, p, 6e3), w: 0.5 },
+  { t: "參加路跑，獲得點券 30 點", f: (s, p) => {
+    addPts(p, 30);
+  } },
+  { t: "朋友送你一張道具卡", f: (s, p) => giveCard(s, p) },
+  { t: "生日快樂！每位玩家送你 $500", f: (s, p) => alive(s).forEach((o) => {
+    if (o !== p) pay(s, o, p, 500);
+  }) },
+  { t: "請大家喝珍奶，每人付 $300", bad: 1, f: (s, p) => alive(s).forEach((o) => {
+    if (o !== p) pay(s, p, o, 300);
+  }) },
+  { t: "違規停車，罰單 $1200", bad: 1, f: (s, p) => pay(s, p, null, 1200) },
+  { t: "繳交房屋稅：每層樓 $250", bad: 1, f: (s, p) => {
+    let n = 0;
+    s.tiles.forEach((t) => {
+      if (t && t.o === p.id) n += t.l;
+    });
+    pay(s, p, null, n * 250);
+  } },
+  { t: "吃太多鹹酥雞拉肚子，住院 1 回合", bad: 1, f: (s, p) => sendHospital(s, p, 1), stop: 1 },
+  { t: "騎車闖紅燈被警察攔下，拘留 2 回合", bad: 1, f: (s, p) => sendJail(s, p, 2), stop: 1 },
+  { t: "搭高鐵回台北，順便領薪水！", f: (s, p) => {
+    teleport(s, p, 0);
+    gain(s, p, SALARY);
+    p.points += 10;
+  }, stop: 1 },
+  { t: "廟口捐香油錢 $500，點券 +25", f: (s, p) => {
+    pay(s, p, null, 500);
+    addPts(p, 25);
+  } },
+  { t: "股票配息：持股市值 8%", f: (s, p) => gain(s, p, r10(stockValue(s, p) * 0.08)) },
+  { t: "搭上順風車，前進 3 格", f: (s, p) => ({ move: 3 }) },
+  { t: "忘了帶錢包，回頭走 2 格", bad: 1, f: (s, p) => {
+    p.dir *= -1;
+    return { move: 2, flip: 1 };
+  } },
+  { t: "颱風天在家追劇，什麼事也沒發生", f: () => {
+  } }
+];
+function chance(s, p, now) {
+  const pool = CHANCE.flatMap((c2) => c2.w === 0.5 ? Math.random() < 0.5 ? [c2] : [] : [c2]);
+  const c = pick(pool);
+  fx(s, { k: "notice", kind: "chance", title: "機會", text: c.t, pid: p.id });
+  log(s, `❓ ${p.name}：${c.t}`);
+  if (c.bad && hasGod(p, "mazu")) {
+    log(s, `🙏 媽祖保佑，${p.name} 逢凶化吉`);
+    return done(s, now, 2200);
+  }
+  s.chanceCtx = p.id;
+  const r = c.f(s, p) || {};
+  s.chanceCtx = null;
+  if (p.out) return done(s, now, 2e3);
+  if (r.move) {
+    s.until = 0;
+    startMove(s, p, r.move, now + 1600, null);
+    s.anim.t0 = now + 1600;
+    s.until = now + 1600 + s.anim.dur;
+    if (r.flip) s.flipBack = p.id;
+    return;
+  }
+  done(s, now, 2400);
+}
+var NEWS2 = [
+  { t: "中央銀行升息！所有人存款增加 10%", f: (s) => alive(s).forEach((p) => {
+    p.deposit = r10(p.deposit * 1.1);
+  }) },
+  { t: "政府發放振興券，每人 $2000", f: (s) => alive(s).forEach((p) => gain(s, p, 2e3)) },
+  { t: "繳交所得稅，每人繳現金 10%", f: (s) => alive(s).forEach((p) => {
+    if (!hasGod(p, "mazu")) pay(s, p, null, r10(p.cash * 0.1));
+  }) },
+  { t: "國旅補助！每人獲得一張道具卡", f: (s) => alive(s).forEach((p) => giveCard(s, p)) },
+  { t: "股市大漲！所有股價上漲 20%", f: (s) => s.market.forEach((m) => {
+    m.p = Math.round(m.p * 12) / 10;
+    m.h.push(m.p);
+  }) },
+  { t: "股市重挫！所有股價下跌 25%", f: (s) => s.market.forEach((m) => {
+    m.p = Math.max(2, Math.round(m.p * 7.5) / 10);
+    m.h.push(m.p);
+  }) },
+  { t: "健保補助，住院中的玩家全部出院", f: (s) => alive(s).forEach((p) => {
+    p.st.hosp = 0;
+  }) },
+  { t: "最富有的玩家捐出 10% 現金給最窮的玩家", f: (s) => {
+    const a = alive(s).sort((x, y) => assets(s, y) - assets(s, x));
+    if (a.length > 1) {
+      const amt = r10(a[0].cash * 0.1);
+      pay(s, a[0], a[a.length - 1], amt);
+    }
+  } },
+  { tg: 1, t: (g) => `觀光熱潮！${GROUPS[g].name}過路費 ×1.6，持續 4 回合`, f: (s, g) => {
+    s.gmod[g] = { m: 1.6, r: 4 };
+  } },
+  { tg: 1, t: (g) => `景氣低迷，${GROUPS[g].name}過路費減半，持續 4 回合`, f: (s, g) => {
+    s.gmod[g] = { m: 0.5, r: 4 };
+  } },
+  { tg: 1, t: (g) => `重大建設通車！${GROUPS[g].name}地價永久上漲 20%`, f: (s, g) => {
+    s.gprice[g] = (s.gprice[g] || 1) * 1.2;
+  } },
+  { tg: 1, t: (g) => `颱風過境${GROUPS[g].name}，區內房子各倒一層`, f: (s, g) => {
+    TILES.forEach((t, i) => {
+      const st = s.tiles[i];
+      if (t.g === g && st.l > 0 && !hasSkill(pl(s, st.o), "armor")) st.l--;
+    });
+  } }
+];
+function news(s, p, now) {
+  const n = pick(NEWS2);
+  let text;
+  if (n.tg) {
+    const g = pick(Object.keys(GROUPS));
+    text = n.t(g);
+    n.f(s, g);
+  } else {
+    text = n.t;
+    n.f(s);
+  }
+  fx(s, { k: "notice", kind: "news", title: "新聞快報", text, pid: p.id });
+  log(s, `📰 ${text}`);
+  done(s, now, 2600);
+}
+function giveCard(s, p) {
+  if (p.cards.length >= cardLimit(p)) return;
+  const c = pick(CARD_IDS);
+  p.cards.push(c);
+  fx(s, { k: "card", pid: p.id, card: c, got: 1 });
+  log(s, `🃏 ${p.name} 獲得「${CARDS[c].name}」`);
+}
+function temple(s, p, now) {
+  const pool = ["caishen", "caishen", "fushen", "fushen", "tudi", "tudi", "mazu", "shuai", "shuai", "qiong"];
+  const id = pick(pool), g = GODS[id];
+  if (!g.good && hasSkill(p, "elder")) {
+    log(s, `👵 長輩保佑！${g.name}不敢附身在 ${p.name} 身上`);
+    fx(s, { k: "notice", kind: "god", title: "長輩保佑", text: `${g.icon}${g.name}被阿嬤趕走了`, pid: p.id });
+    return done(s, now, 2200);
+  }
+  if (!g.good && hasGod(p, "mazu")) {
+    log(s, `🙏 ${g.name}想附身，被媽祖擋下了！`);
+    fx(s, { k: "notice", kind: "god", title: "媽祖保佑", text: `${g.icon}${g.name}被擋在廟外`, pid: p.id });
+    return done(s, now, 2200);
+  }
+  const dur = 5 + (hasSkill(p, "divine") ? 2 : 0);
+  p.god = { id, t: dur };
+  fx(s, { k: "notice", kind: g.good ? "god" : "evil", title: `${g.icon} ${g.name}附身`, text: `${p.name}：${g.desc}（${dur} 回合）`, pid: p.id });
+  log(s, `${g.icon} ${g.name}附身在 ${p.name} 身上！${g.desc}`);
+  done(s, now, 2400);
+}
+function act(s, pid, a, now) {
+  if (!a || !a.type) return "無效動作";
+  if (a.type === "emote") {
+    const p2 = pl(s, pid);
+    if (!p2) return "x";
+    fx(s, { k: "emote", pid, e: String(a.e).slice(0, 4) });
+    return null;
+  }
+  if (s.phase !== "play") return "遊戲未進行";
+  const p = cur(s);
+  if (!p || p.id !== pid) return "還沒輪到你";
+  if (s.step === "pre") {
+    if (a.type === "roll") return doRoll(s, p, now);
+    if (a.type === "card") return useCard(s, p, a, now);
+    if (a.type === "stock") return doStock(s, p, a);
+    return "現在不能這樣做";
+  }
+  if (s.step !== "decide" || !s.pending) return "現在不能這樣做";
+  const pd = s.pending;
+  switch (pd.type) {
+    case "buy": {
+      if (a.type === "yes") {
+        const c = price(s, pd.tile);
+        if (p.cash < c) return "現金不足";
+        p.cash -= c;
+        s.tiles[pd.tile].o = p.id;
+        log(s, `🏠 ${p.name} 買下 ${TILES[pd.tile].name}（${money(c)}）`);
+        fx(s, { k: "buy", tile: pd.tile, pid: p.id });
+        fx(s, { k: "money", pid: p.id, d: -c });
+      }
+      return done(s, now, 900), null;
+    }
+    case "upgrade": {
+      if (a.type === "yes") {
+        const st = s.tiles[pd.tile];
+        const n = Math.max(1, Math.min(2, a.n | 0 || 1, 5 - st.l));
+        const c = upCostFor(s, pd.tile, p) * n;
+        if (p.cash < c) return "現金不足";
+        if (st.l >= 5) return "已經最高級";
+        p.cash -= c;
+        st.l += n;
+        log(s, `🏗️ ${p.name} 把 ${TILES[pd.tile].name} 蓋成${LEVEL_NAMES[st.l]}${c ? `（${money(c)}）` : "（福神免費）"}`);
+        fx(s, { k: "build", tile: pd.tile, pid: p.id });
+        if (c) fx(s, { k: "money", pid: p.id, d: -c });
+      }
+      return done(s, now, 900), null;
+    }
+    case "shop": {
+      if (a.type === "buyCard") {
+        const c = CARDS[a.card];
+        if (!c) return "沒有這張卡";
+        const cc = cardCost(p, a.card);
+        if (p.points < cc) return "點券不足";
+        if (p.cards.length >= cardLimit(p)) return `道具卡最多 ${cardLimit(p)} 張`;
+        p.points -= cc;
+        p.cards.push(a.card);
+        log(s, `🛍️ ${p.name} 買了「${c.name}」`);
+        s.deadline = now + DEC_T;
+        s.botAt = now + 600;
+        return null;
+      }
+      if (hasSkill(p, "network")) {
+        log(s, `🤝 ${p.name} 人脈廣，老闆多送一張卡`);
+        giveCard(s, p);
+      }
+      return done(s, now, 900), null;
+    }
+    case "lottery": {
+      if (a.type === "pick") {
+        const num = Math.max(1, Math.min(6, a.num | 0));
+        pay(s, p, null, 500);
+        const r = 1 + rnd(6);
+        const win = r === num;
+        if (win) gain(s, p, 3e3);
+        fx(s, { k: "notice", kind: win ? "god" : "chance", title: "🎰 開獎", text: `你猜 ${num}，開出 ${r}　${win ? "中獎！贏得 $3000" : "槓龜了…"}`, pid: p.id });
+        log(s, `🎰 ${p.name} 猜 ${num} 開出 ${r}，${win ? "中獎 $3000！" : "沒中"}`);
+        return done(s, now, 2200), null;
+      }
+      return done(s, now, 500), null;
+    }
+    case "bank": {
+      if (a.type === "bank") {
+        let amt = Math.round(a.amount || 0);
+        if (amt > 0) {
+          amt = Math.min(amt, p.cash);
+          p.cash -= amt;
+          p.deposit += amt;
+          log(s, `🏦 ${p.name} 存入 ${money(amt)}`);
+        } else if (amt < 0) {
+          amt = Math.min(-amt, p.deposit);
+          p.deposit -= amt;
+          p.cash += amt;
+          log(s, `🏦 ${p.name} 提領 ${money(amt)}`);
+        }
+        pd.did = (pd.did || 0) + 1;
+        s.deadline = now + DEC_T;
+        s.botAt = now + 600;
+        return null;
+      }
+      return done(s, now, 500), null;
+    }
+  }
+  return "無效動作";
+}
+function doRoll(s, p, now) {
+  if (p.stay) {
+    p.stay = false;
+    log(s, `🛑 ${p.name} 原地停留`);
+    s.anim = { pid: p.id, path: [p.pos], t0: now, dice: null, dur: 300 };
+    s.moveInfo = { pass: 0, mark: null };
+    s.step = "move";
+    s.until = now + 300;
+    return null;
+  }
+  const n = s.settings.dice || 1;
+  let dice;
+  if (p.remote) {
+    let left = p.remote;
+    dice = [];
+    for (let k = n; k > 0; k--) {
+      const v = Math.max(1, Math.min(6, left - (k - 1)));
+      dice.push(v);
+      left -= v;
+    }
+    p.remote = 0;
+  } else dice = Array.from({ length: n }, () => 1 + rnd(6));
+  let steps = dice.reduce((a, b) => a + b, 0);
+  if (hasSkill(p, "swift")) steps += 1;
+  if (p.st.turtle > 0) {
+    p.st.turtle--;
+    steps = 1;
+    log(s, `🐢 ${p.name} 被烏龜卡影響，只能走 1 步`);
+  }
+  log(s, `🎲 ${p.name} 擲出 ${dice.join("+")}${dice.length > 1 ? "=" + dice.reduce((a, b) => a + b, 0) : ""}`);
+  startMove(s, p, steps, now, dice);
+  return null;
+}
+function doStock(s, p, a) {
+  const k = a.sid | 0, q = Math.round(a.qty || 0);
+  const m = s.market[k];
+  if (!m || !q) return "無效";
+  if (q > 0) {
+    const c = Math.round(m.p * q);
+    if (c > p.cash) return "現金不足";
+    p.cash -= c;
+    p.stocks[k] += q;
+    log(s, `📈 ${p.name} 買進 ${STOCKS[k].name} ${q} 股（${money(c)}）`);
+  } else {
+    const n = Math.min(-q, p.stocks[k]);
+    if (!n) return "沒有持股";
+    const c = Math.round(m.p * n);
+    p.cash += c;
+    p.stocks[k] -= n;
+    log(s, `📉 ${p.name} 賣出 ${STOCKS[k].name} ${n} 股（${money(c)}）`);
+  }
+  return null;
+}
+function cardTargets(s, p, card) {
+  const c = CARDS[card];
+  switch (c.target) {
+    case "player":
+      return alive(s).filter((o) => o !== p && !((card === "tax" || card === "turtle") && hasSkill(o, "protected"))).map((o) => o.id);
+    case "place": {
+      const r = [];
+      const R = hasSkill(p, "range") ? 16 : 8;
+      for (let i = 0; i < N_TILES; i++) if (i !== p.pos && dist(i, p.pos) <= R && !s.marks[i]) r.push(i);
+      return r;
+    }
+    case "oppprop":
+      return s.tiles.map((t, i) => t && t.o && t.o !== p.id && t.l > 0 ? i : -1).filter((i) => i >= 0);
+    case "myprop":
+      return s.tiles.map((t, i) => t && t.o === p.id && t.l < 5 ? i : -1).filter((i) => i >= 0);
+    case "here": {
+      const t = s.tiles[p.pos];
+      return t && t.o && t.o !== p.id && p.cash >= propValue(s, p.pos) ? [p.pos] : [];
+    }
+    default:
+      return null;
+  }
+}
+function useCard(s, p, a, now) {
+  const ci = p.cards.indexOf(a.card);
+  if (ci < 0) return "你沒有這張卡";
+  const c = CARDS[a.card];
+  if (c.target === "auto") return "這張卡會自動使用";
+  const tg = cardTargets(s, p, a.card);
+  if (tg && !tg.includes(c.target === "player" ? a.target : c.target === "here" ? p.pos : a.tile)) return "目標無效";
+  const tp = c.target === "player" ? pl(s, a.target) : null;
+  const pre = `${c.icon} ${p.name} 使用「${c.name}」`;
+  switch (a.card) {
+    case "remote": {
+      const max = 6 * (s.settings.dice || 1), min = s.settings.dice || 1;
+      const v = a.value | 0;
+      if (v < min || v > max) return "點數無效";
+      p.remote = v;
+      log(s, `${pre}，指定 ${v} 點`);
+      break;
+    }
+    case "block":
+    case "mine":
+      s.marks[a.tile] = a.card;
+      log(s, `${pre}，放在 ${TILES[a.tile].name}`);
+      fx(s, { k: "mark", tile: a.tile });
+      break;
+    case "equal": {
+      const al = alive(s);
+      const avg = r10(al.reduce((x, o) => x + o.cash, 0) / al.length);
+      al.forEach((o) => {
+        fx(s, { k: "money", pid: o.id, d: avg - o.cash });
+        o.cash = avg;
+      });
+      log(s, `${pre}，所有人現金變成 ${money(avg)}`);
+      break;
+    }
+    case "tax": {
+      if (hasGod(tp, "mazu")) {
+        log(s, `${pre}，但 ${tp.name} 有媽祖保佑`);
+        break;
+      }
+      const amt = r10(tp.cash * 0.25);
+      tp.cash -= amt;
+      fx(s, { k: "money", pid: tp.id, d: -amt });
+      log(s, `${pre}，${tp.name} 被查稅 ${money(amt)}`);
+      break;
+    }
+    case "rob": {
+      if (!tp.cards.length) {
+        log(s, `${pre}，可是 ${tp.name} 沒有卡`);
+        break;
+      }
+      const n = hasSkill(p, "rob2") ? 2 : 1, got = [];
+      for (let q = 0; q < n && tp.cards.length; q++) {
+        const k = rnd(tp.cards.length);
+        const g = tp.cards.splice(k, 1)[0];
+        p.cards.push(g);
+        got.push(CARDS[g].name);
+      }
+      log(s, `${pre}，從 ${tp.name} 搶走「${got.join("、")}」`);
+      break;
+    }
+    case "sleep":
+      alive(s).forEach((o) => {
+        if (o !== p && !hasGod(o, "mazu")) o.st.sleep = 2;
+      });
+      log(s, `${pre}，其他人全部冬眠 2 回合！`);
+      break;
+    case "buyland": {
+      const i = p.pos, st = s.tiles[i], o = pl(s, st.o), v = propValue(s, i);
+      p.cash -= v;
+      o.cash += v;
+      st.o = p.id;
+      fx(s, { k: "buy", tile: i, pid: p.id });
+      log(s, `${pre}，以 ${money(v)} 強制買下 ${o.name} 的 ${TILES[i].name}`);
+      break;
+    }
+    case "monster": {
+      const st = s.tiles[a.tile];
+      fx(s, { k: "boom", tile: a.tile, m: "monster" });
+      if (hasSkill(pl(s, st.o), "armor")) {
+        log(s, `${pre}，但穿山甲的鱗甲擋住了！`);
+        break;
+      }
+      st.l = 0;
+      log(s, `${pre}，${TILES[a.tile].name} 的房子全被摧毀！`);
+      break;
+    }
+    case "turn":
+      p.dir *= -1;
+      log(s, `${pre}，改成${p.dir > 0 ? "順時針" : "逆時針"}前進`);
+      break;
+    case "stay":
+      p.stay = true;
+      log(s, `${pre}`);
+      break;
+    case "build": {
+      const st = s.tiles[a.tile];
+      st.l++;
+      fx(s, { k: "build", tile: a.tile, pid: p.id });
+      log(s, `${pre}，${TILES[a.tile].name} 加蓋成${LEVEL_NAMES[st.l]}`);
+      break;
+    }
+    case "turtle":
+      if (hasGod(tp, "mazu")) {
+        log(s, `${pre}，但 ${tp.name} 有媽祖保佑`);
+        break;
+      }
+      tp.st.turtle = 3;
+      log(s, `${pre}，${tp.name} 變成烏龜 3 回合`);
+      break;
+    case "angel": {
+      const g = TILES[a.tile].g;
+      TILES.forEach((t, i) => {
+        if (t.g === g && s.tiles[i].o && s.tiles[i].l < 5) {
+          s.tiles[i].l++;
+          fx(s, { k: "build", tile: i });
+        }
+      });
+      log(s, `${pre}，${GROUPS[g].name}所有土地加蓋一層！`);
+      break;
+    }
+  }
+  if ((a.card === "stay" || a.card === "remote") && hasSkill(p, "encore") && Math.random() < 0.4) log(s, `✨ ${p.name} 臨場發揮，「${c.name}」沒有用掉！`);
+  else p.cards.splice(p.cards.indexOf(a.card), 1);
+  fx(s, { k: "card", pid: p.id, card: a.card });
+  s.botUses++;
+  return null;
+}
+function tick(s, now, isAuto) {
+  if (s.phase !== "play") return false;
+  if (s.step === "move") {
+    if (now >= s.until) {
+      finishMove(s, now);
+      if (s.flipBack && s.step !== "move") {
+        const p = pl(s, s.flipBack);
+        if (p) p.dir *= -1;
+        s.flipBack = null;
+      }
+      return true;
+    }
+    return false;
+  }
+  if (s.step === "done") {
+    if (now >= s.until) {
+      nextTurn(s, now);
+      return true;
+    }
+    return false;
+  }
+  if (s.step === "pre" || s.step === "decide") {
+    const p = cur(s);
+    if (isAuto(p)) {
+      if (now >= s.botAt) {
+        const a = botAction(s, p);
+        act(s, p.id, a, now);
+        return true;
+      }
+    } else if (now >= s.deadline) {
+      const a = s.step === "pre" ? { type: "roll" } : { type: s.pending && (s.pending.type === "shop" || s.pending.type === "bank") ? "done" : "no" };
+      act(s, p.id, a, now);
+      return true;
+    }
+  }
+  return false;
+}
+function botAction(s, p) {
+  if (s.step === "pre") {
+    if (s.botUses < 2 && p.cards.length) {
+      const a = botCard(s, p);
+      if (a) return a;
+    }
+    if (Math.random() < 0.15) {
+      const k = rnd(6), m = s.market[k];
+      if (p.stocks[k] > 0 && m.p > STOCKS[k].p * 1.25) return { type: "stock", sid: k, qty: -p.stocks[k] };
+      if (p.cash > 18e3 && m.p < STOCKS[k].p * 0.95) {
+        const q = Math.floor(p.cash * 0.12 / m.p / 100) * 100;
+        if (q > 0) return { type: "stock", sid: k, qty: q };
+      }
+    }
+    return { type: "roll" };
+  }
+  const pd = s.pending;
+  switch (pd.type) {
+    case "buy":
+      return { type: p.cash - price(s, pd.tile) >= 2500 ? "yes" : "no" };
+    case "upgrade": {
+      const c = upCostFor(s, pd.tile, p);
+      if (p.cash - 2 * c >= 6e3) return { type: "yes", n: 2 };
+      return { type: p.cash - c >= 3e3 ? "yes" : "no" };
+    }
+    case "shop": {
+      if (p.cards.length >= cardLimit(p) - 3) return { type: "done" };
+      const pref = ["remote", "block", "free", "tax", "monster", "build", "turtle", "buyland", "equal"];
+      for (const c of pref) if (cardCost(p, c) <= p.points && Math.random() < 0.6) return { type: "buyCard", card: c };
+      return { type: "done" };
+    }
+    case "lottery":
+      return Math.random() < 0.3 ? { type: "pick", num: 1 + rnd(6) } : { type: "no" };
+    case "bank":
+      if (!pd.did && p.cash > 26e3) return { type: "bank", amount: r100(p.cash - 16e3) };
+      if (!pd.did && p.cash < 4e3 && p.deposit > 0) return { type: "bank", amount: -Math.min(p.deposit, 8e3) };
+      return { type: "done" };
+  }
+  return { type: "no" };
+}
+function botCard(s, p) {
+  const has = (c) => p.cards.includes(c);
+  const others = alive(s).filter((o) => o !== p);
+  const richest = [...others].sort((a, b) => assets(s, b) - assets(s, a))[0];
+  if (has("buyland")) {
+    const t = cardTargets(s, p, "buyland");
+    if (t.length && p.cash - propValue(s, p.pos) > 5e3) return { type: "card", card: "buyland" };
+  }
+  if (has("equal")) {
+    const avg = alive(s).reduce((a, o) => a + o.cash, 0) / alive(s).length;
+    if (p.cash < avg * 0.55) return { type: "card", card: "equal" };
+  }
+  if (has("tax") && richest && richest.cash > 9e3 && Math.random() < 0.6) return { type: "card", card: "tax", target: richest.id };
+  if (has("monster")) {
+    const t = cardTargets(s, p, "monster").filter((i) => s.tiles[i].l >= 3);
+    if (t.length) return { type: "card", card: "monster", tile: t.sort((a, b) => s.tiles[b].l - s.tiles[a].l)[0] };
+  }
+  if (has("build")) {
+    const t = cardTargets(s, p, "build");
+    if (t.length) return { type: "card", card: "build", tile: t.sort((a, b) => price(s, b) - price(s, a))[0] };
+  }
+  if (has("angel")) {
+    const t = cardTargets(s, p, "angel");
+    if (t.length >= 2) return { type: "card", card: "angel", tile: t[0] };
+  }
+  if (has("block")) {
+    const t = cardTargets(s, p, "block").filter((i) => s.tiles[i] && s.tiles[i].o === p.id && s.tiles[i].l >= 1);
+    if (t.length) return { type: "card", card: "block", tile: t.sort((a, b) => toll(s, b) - toll(s, a))[0] };
+  }
+  if (has("turtle") && richest && Math.random() < 0.4) return { type: "card", card: "turtle", target: richest.id };
+  if (has("rob")) {
+    const t = others.filter((o) => o.cards.length >= 2);
+    if (t.length && Math.random() < 0.5) return { type: "card", card: "rob", target: t[0].id };
+  }
+  if (has("sleep") && others.length >= 2 && Math.random() < 0.35) return { type: "card", card: "sleep" };
+  if (has("remote")) {
+    const n = s.settings.dice || 1;
+    let best = null, bs = -1e9, sum = 0, cnt = 0;
+    for (let v = n; v <= 6 * n; v++) {
+      const i = (p.pos + p.dir * v + N_TILES * 10) % N_TILES;
+      const sc = scoreTile(s, p, i);
+      sum += sc;
+      cnt++;
+      if (sc > bs) {
+        bs = sc;
+        best = v;
+      }
+    }
+    if (bs - sum / cnt > 1500) return { type: "card", card: "remote", value: best };
+  }
+  if (has("stay")) {
+    const t = s.tiles[p.pos];
+    if (t && t.o === p.id && t.l < 5 && p.cash > upCost(s, p.pos) + 6e3 && Math.random() < 0.5) return { type: "card", card: "stay" };
+  }
+  if (has("mine") && Math.random() < 0.3) {
+    const t = cardTargets(s, p, "mine");
+    if (t.length) return { type: "card", card: "mine", tile: pick(t) };
+  }
+  return null;
+}
+function scoreTile(s, p, i) {
+  const t = TILES[i], st = s.tiles[i];
+  if (t.type === "prop") {
+    if (st.o == null) return p.cash > price(s, i) ? 2e3 : 0;
+    if (st.o === p.id) return st.l < 5 ? 1500 : 200;
+    return -toll(s, i);
+  }
+  return { shop: 500, temple: 600, chance: 300, news: 100, bank: 200, lottery: 100 }[t.type] || 0;
+}
+
+// src/world.js
+import * as THREE2 from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+// src/landmarks.js
+import * as THREE from "three";
+var _mats = {};
+function mat(c, o = {}) {
+  const k = c + JSON.stringify(o);
+  if (_mats[k]) return _mats[k];
+  const m = new THREE.MeshStandardMaterial({
+    color: c,
+    flatShading: o.flat !== false,
+    roughness: o.r ?? 0.75,
+    metalness: o.m ?? 0.05,
+    transparent: (o.op ?? 1) < 1,
+    opacity: o.op ?? 1,
+    emissive: o.e || "#000000",
+    emissiveIntensity: o.ei ?? 1,
+    side: o.ds ? THREE.DoubleSide : THREE.FrontSide
+  });
+  return _mats[k] = m;
+}
+function put(g, geo, c, x, y, z, o) {
+  const m = new THREE.Mesh(geo, c instanceof THREE.Material ? c : mat(c, o));
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  g.add(m);
+  return m;
+}
+var B = (g, w, h, d, c, x = 0, y = 0, z = 0, o) => put(g, new THREE.BoxGeometry(w, h, d), c, x, y + h / 2, z, o);
+var C = (g, rt, rb, h, c, x = 0, y = 0, z = 0, seg = 10, o) => put(g, new THREE.CylinderGeometry(rt, rb, h, seg), c, x, y + h / 2, z, o);
+var S = (g, r, c, x = 0, y = 0, z = 0, o, ws = 10, hs = 7) => put(g, new THREE.SphereGeometry(r, ws, hs), c, x, y, z, o);
+function roof(g, w, d, h, c, x = 0, y = 0, z = 0, o) {
+  const m = put(g, new THREE.ConeGeometry(Math.SQRT1_2, 1, 4), c, x, y + h / 2, z, o);
+  m.rotation.y = Math.PI / 4;
+  m.scale.set(w, h, d);
+  return m;
+}
+function frustum(g, wt, wb, h, c, x = 0, y = 0, z = 0, seg = 4, o) {
+  const m = put(g, new THREE.CylinderGeometry(wt * Math.SQRT1_2, wb * Math.SQRT1_2, h, seg), c, x, y + h / 2, z, o);
+  if (seg === 4) m.rotation.y = Math.PI / 4;
+  return m;
+}
+function arch(g, r, tube, c, x, y, z, rotY = 0, o) {
+  const m = put(g, new THREE.TorusGeometry(r, tube, 6, 14, Math.PI), c, x, y, z, o);
+  m.rotation.y = rotY;
+  return m;
+}
+function water(g, r, x = 0, z = 0, y = 0.04, c = "#3fa7d6", seg = 20) {
+  const m = put(g, new THREE.CylinderGeometry(r, r, 0.06, seg), mat(c, { r: 0.15, m: 0.3, op: 0.92 }), x, y, z);
+  m.castShadow = false;
+  return m;
+}
+function rocks(g, n, R, c = "#8b8378", y = 0, sz = 0.25) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, r = R * (0.5 + Math.random() * 0.5);
+    S(g, sz * (0.6 + Math.random() * 0.8), c, Math.cos(a) * r, y, Math.sin(a) * r, void 0, 5, 4);
+  }
+}
+function tree(g, x, z, h = 0.9, c = "#3c8d3a", y = 0) {
+  C(g, 0.05, 0.07, h * 0.45, "#6b4a2b", x, y, z, 5);
+  put(g, new THREE.ConeGeometry(h * 0.32, h * 0.75, 6), c, x, y + h * 0.45 + h * 0.3, z);
+}
+function roundTree(g, x, z, r = 0.35, c = "#4a9a3c", y = 0) {
+  C(g, 0.05, 0.07, 0.45, "#6b4a2b", x, y, z, 5);
+  S(g, r, c, x, y + 0.45 + r * 0.7, z, void 0, 7, 5);
+}
+function palm(g, x, z, h = 1.4, y = 0) {
+  const seg = 4;
+  let px = x, py = y, pz = z;
+  for (let i = 0; i < seg; i++) {
+    const m = C(g, 0.05, 0.07, h / seg, "#8a6a43", px, py, pz, 5);
+    m.rotation.z = 0.08 * i;
+    px += 0.04 * i;
+    py += h / seg;
+  }
+  for (let i = 0; i < 6; i++) {
+    const leaf = put(g, new THREE.ConeGeometry(0.09, 0.8, 4), "#2f9e44", px, py, pz);
+    leaf.rotation.z = Math.PI / 2.4;
+    leaf.rotation.y = i / 6 * Math.PI * 2;
+    leaf.position.x += Math.cos(-leaf.rotation.y) * 0.3;
+    leaf.position.z += Math.sin(-leaf.rotation.y) * 0.3;
+  }
+}
+function lantern(g, x, y, z) {
+  S(g, 0.09, "#e53935", x, y, z, { e: "#c62828", ei: 0.8 }, 6, 5);
+}
+function islet(g, r = 1.6, c = "#5b9a4a", h = 0.35) {
+  const m = C(g, r * 0.85, r, h, c, 0, -0.1, 0, 12);
+  C(g, r * 1.05, r * 1.1, 0.12, "#e8d9a8", 0, -0.12, 0, 12);
+  return m;
+}
+function hall(g, w, d, h, wall, roofc, x = 0, y = 0, z = 0, rh = 0.5) {
+  B(g, w, h, d, wall, x, y, z);
+  roof(g, w * 1.35, d * 1.45, rh, roofc, x, y + h, z);
+}
+function windowsTex(base = "#3d5a80", lit = "#ffe9a8") {
+  const cv = document.createElement("canvas");
+  cv.width = 64;
+  cv.height = 128;
+  const x = cv.getContext("2d");
+  x.fillStyle = base;
+  x.fillRect(0, 0, 64, 128);
+  for (let r = 0; r < 16; r++) for (let c = 0; c < 4; c++) {
+    x.fillStyle = Math.random() < 0.35 ? lit : "rgba(255,255,255,0.18)";
+    x.fillRect(4 + c * 15, 4 + r * 8, 10, 5);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function anim(g, f) {
+  const prev = g.userData.tick;
+  g.userData.tick = prev ? (t, dt) => {
+    prev(t, dt);
+    f(t, dt);
+  } : f;
+}
+var M = {};
+M.t101 = (g) => {
+  B(g, 2.4, 0.5, 2.4, "#9fb4b0");
+  frustum(g, 1.15, 1.45, 1.1, "#4f9a90", 0, 0.5, 0, 4, { m: 0.35, r: 0.35 });
+  let y = 1.6;
+  for (let i = 0; i < 8; i++) {
+    frustum(g, 1.25, 0.95, 0.56, "#5fb0a4", 0, y, 0, 4, { m: 0.4, r: 0.3 });
+    B(g, 0.6, 0.05, 1.3, "#d4af37", 0, y + 0.02, 0);
+    y += 0.56;
+  }
+  frustum(g, 0.55, 0.8, 0.5, "#4f9a90", 0, y, 0, 4, { m: 0.4 });
+  B(g, 0.35, 0.35, 0.35, "#7cc4b8", 0, y + 0.5, 0);
+  C(g, 0.03, 0.07, 1.4, "#cfd8dc", 0, y + 0.85, 0, 6, { m: 0.8 });
+  S(g, 0.06, "#ff5252", 0, y + 2.25, 0, { e: "#ff1744" });
+};
+M.cks = (g) => {
+  B(g, 3.2, 0.25, 3.2, "#e8e8e8");
+  B(g, 2.8, 0.25, 2.8, "#f2f2f2", 0, 0.25);
+  B(g, 2.4, 0.3, 2.4, "#fafafa", 0, 0.5);
+  B(g, 0.8, 0.8, 0.9, "#f5f5f5", 0, 0, 1.45);
+  B(g, 1.7, 1.25, 1.7, "#ffffff", 0, 0.8);
+  C(g, 0.55, 1.35, 0.7, "#1f4fa8", 0, 2.05, 0, 8, { r: 0.4 });
+  C(g, 0.55, 0.55, 0.3, "#ffffff", 0, 2.75, 0, 8);
+  C(g, 0.05, 0.75, 0.6, "#1f4fa8", 0, 3.05, 0, 8, { r: 0.4 });
+  S(g, 0.1, "#d4af37", 0, 3.7, 0, { m: 0.8 });
+};
+M.npm = (g) => {
+  B(g, 3.4, 0.35, 1.9, "#efe7d6");
+  B(g, 1.2, 0.35, 0.8, "#efe7d6", 0, 0, 1.2);
+  hall(g, 1.6, 0.9, 1, "#f3e6c8", "#2f7d4a", 0, 0.35, -0.1, 0.55);
+  roof(g, 1, 0.6, 0.35, "#2f7d4a", 0, 1.85, -0.1);
+  hall(g, 0.8, 0.7, 0.7, "#f3e6c8", "#2f7d4a", -1.25, 0.35, 0, 0.4);
+  hall(g, 0.8, 0.7, 0.7, "#f3e6c8", "#2f7d4a", 1.25, 0.35, 0, 0.4);
+  B(g, 0.4, 0.5, 0.05, "#7a5230", 0, 0.35, 0.36);
+};
+M.queen = (g) => {
+  C(g, 1.6, 1.8, 0.25, "#d8c39a", 0, 0, 0, 9);
+  C(g, 0.22, 0.42, 1, "#c69a62", 0, 0.25, 0, 7);
+  const h = S(g, 0.55, "#c9a46e", 0.1, 1.55, 0, void 0, 9, 7);
+  h.scale.set(1.25, 0.75, 0.85);
+  h.rotation.z = -0.25;
+  const n = S(g, 0.22, "#c9a46e", 0.75, 1.4, 0, void 0, 6, 5);
+  n.scale.set(1.2, 0.7, 0.7);
+  const hair = S(g, 0.32, "#b58b55", -0.45, 1.75, 0, void 0, 7, 5);
+  hair.scale.set(1, 0.8, 0.9);
+  C(g, 0.15, 0.3, 0.5, "#c69a62", -1, 0.25, 0.6, 6);
+  S(g, 0.3, "#caa673", -1, 0.85, 0.6, void 0, 6, 4).scale.y = 0.6;
+  C(g, 0.12, 0.25, 0.4, "#c69a62", 0.9, 0.25, -0.8, 6);
+  S(g, 0.25, "#caa673", 0.9, 0.7, -0.8, void 0, 6, 4).scale.y = 0.6;
+};
+M.jiufen = (g) => {
+  put(g, new THREE.ConeGeometry(2, 2.4, 7), "#3e7b3a", 0, 1.2, -0.6);
+  const rows = [[0.9, 0, 1.1], [0.75, 0.5, 0.45], [0.6, 1, -0.2], [0.5, 1.5, -0.8]];
+  const cs = ["#a1887f", "#8d6e63", "#bcaaa4", "#6d4c41"];
+  rows.forEach(([w, y, z], r) => {
+    for (let k = -1; k <= 1; k++) {
+      const x = k * (w + 0.1);
+      B(g, w, 0.55, 0.55, cs[(r + k + 3) % 4], x, y, z);
+      B(g, w * 1.1, 0.08, 0.65, "#3b3b3b", x, y + 0.55, z);
+      lantern(g, x - w * 0.3, y + 0.35, z + 0.32);
+      lantern(g, x + w * 0.3, y + 0.35, z + 0.32);
+    }
+  });
+  B(g, 0.9, 0.7, 0.6, "#b71c1c", 0, 0, 1.1);
+  B(g, 1.1, 0.1, 0.7, "#212121", 0, 0.7, 1.1);
+};
+M.turtle = (g) => {
+  islet(g, 1.7, "#567d46", 0.2);
+  const sh = S(g, 1.1, "#5f8a4c", -0.2, 0.15, 0, void 0, 10, 6);
+  sh.scale.set(1.2, 0.7, 0.9);
+  S(g, 0.35, "#6b9656", -0.2, 0.9, 0, void 0, 6, 4);
+  const nk = C(g, 0.18, 0.25, 0.9, "#6f9a58", 1, 0, 0, 6);
+  nk.rotation.z = -1.1;
+  nk.position.set(1.15, 0.35, 0);
+  S(g, 0.3, "#6f9a58", 1.65, 0.55, 0, void 0, 7, 5);
+  S(g, 0.12, "#6f9a58", -1.5, 0.1, 0.1, void 0, 5, 4);
+};
+M.onsen = (g) => {
+  C(g, 1.6, 1.7, 0.2, "#9e9e9e", 0, 0, 0, 12);
+  water(g, 1.2, 0, 0, 0.21, "#7fd3e6");
+  rocks(g, 10, 1.45, "#7d7268", 0.25, 0.2);
+  B(g, 0.08, 0.9, 0.08, "#6d4c41", -1.2, 0.2, -1);
+  B(g, 0.08, 0.9, 0.08, "#6d4c41", -0.4, 0.2, -1);
+  roof(g, 1.3, 0.8, 0.35, "#5d4037", -0.8, 1.1, -1);
+  const steam = [];
+  for (let i = 0; i < 7; i++) {
+    const s = S(g, 0.22, "#ffffff", (Math.random() - 0.5) * 1.6, 0.4, (Math.random() - 0.5) * 1.4, { op: 0.45 }, 6, 5);
+    s.castShadow = false;
+    s.userData.ph = Math.random();
+    steam.push(s);
+  }
+  anim(g, (t) => steam.forEach((s) => {
+    const f = (t * 0.25 + s.userData.ph) % 1;
+    s.position.y = 0.4 + f * 1.6;
+    s.material.opacity = 0.5 * (1 - f);
+    s.scale.setScalar(0.6 + f);
+  }));
+};
+M.taroko = (g) => {
+  water(g, 0.5, 0, 0, 0.04, "#5ec4c4").scale.set(0.8, 1, 4.5);
+  for (const side of [-1, 1]) for (let k = 0; k < 5; k++) {
+    const h = 2.3 + Math.random() * 1.2;
+    const m = B(g, 0.7 + Math.random() * 0.3, h, 0.8, k % 2 ? "#cfcac0" : "#b9b3a8", side * (0.75 + Math.random() * 0.25), 0, -1.6 + k * 0.8);
+    m.rotation.y = (Math.random() - 0.5) * 0.3;
+    tree(g, side * 0.95, -1.6 + k * 0.8, 0.7, "#2e6b2e", h);
+  }
+  arch(g, 0.45, 0.06, "#d32f2f", 0, 0.25, 0.9, Math.PI / 2);
+  B(g, 0.15, 0.05, 1.1, "#d32f2f", 0, 0.7, 0.9).rotation.y = Math.PI / 2;
+};
+M.cliff = (g) => {
+  water(g, 1.8, 0.6, 0, 0.03, "#1976d2");
+  const sh = new THREE.Shape();
+  sh.moveTo(0, 0);
+  sh.lineTo(1.5, 0);
+  sh.lineTo(1, 3.2);
+  sh.lineTo(0, 3.6);
+  sh.lineTo(0, 0);
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: 3, bevelEnabled: false });
+  const m = put(g, geo, "#4a7c3f", -1.6, 0, -1.5);
+  m.scale.set(1, 1, 1);
+  const face = B(g, 0.1, 3, 3, "#9e9a8f", -0.15, 0.1, 0);
+  face.rotation.z = 0.15;
+  B(g, 0.3, 0.06, 3, "#555555", -0.25, 1.2, 0);
+  B(g, 0.3, 0.06, 3, "#555555", -0.4, 2, 0);
+  for (let k = 0; k < 4; k++) tree(g, -1.2, -1.2 + k * 0.8, 0.8, "#2e7d32", 3.2);
+};
+M.qixing = (g) => {
+  water(g, 1.8, 0, 0.3, 0.03, "#1e88e5");
+  const beach = put(g, new THREE.TorusGeometry(1.7, 0.35, 5, 24, Math.PI), "#9e9e9e", 0, 0.05, 0.3);
+  beach.rotation.x = Math.PI / 2;
+  beach.rotation.z = Math.PI;
+  beach.scale.z = 0.3;
+  rocks(g, 14, 1.9, "#bdbdbd", 0.1, 0.1);
+  for (let i = 0; i < 7; i++) S(g, 0.07, "#fff59d", -1.2 + i * 0.4, 1.6 + Math.sin(i * 1.3) * 0.25, -1.4, { e: "#fff176" }, 5, 4);
+};
+M.sanxian = (g) => {
+  const a = new THREE.Group();
+  g.add(a);
+  C(a, 1, 1.2, 0.5, "#5b8f4a", 0, -0.15, -1.2, 9);
+  put(a, new THREE.ConeGeometry(0.8, 1, 6), "#6b7d5a", 0, 0.85, -1.2);
+  C(a, 0.6, 0.8, 0.25, "#9a8f7a", 0, -0.1, 1.6, 8);
+  for (let i = 0; i < 8; i++) {
+    const z = 1.2 - i * 0.3;
+    arch(a, 0.17, 0.05, i % 2 ? "#e53935" : "#fbc02d", 0, 0.1, z, Math.PI / 2);
+  }
+  B(a, 0.18, 0.04, 2.6, "#8d6e63", 0, 0.26, 0.15);
+};
+M.brown = (g) => {
+  B(g, 3.3, 0.12, 3.3, "#8bc34a");
+  for (let k = -3; k <= 3; k++) B(g, 3.3, 0.02, 0.06, "#7cb342", 0, 0.12, k * 0.45);
+  B(g, 0.45, 0.04, 3.3, "#616161", 0.2, 0.12, 0);
+  roundTree(g, -0.5, -0.4, 0.5, "#33691e", 0.12);
+  put(g, new THREE.ConeGeometry(1, 1.3, 5), "#5c7c5a", -1.1, 0.75, -1.4);
+  put(g, new THREE.ConeGeometry(0.8, 1, 5), "#6d8b6a", 0.9, 0.6, -1.5);
+};
+M.greenisland = (g) => {
+  islet(g, 1.8, "#4caf50", 0.4);
+  put(g, new THREE.ConeGeometry(1.1, 1.1, 7), "#43a047", -0.4, 0.8, -0.4);
+  C(g, 0.18, 0.26, 1.7, "#ffffff", 0.7, 0.3, 0.5, 10);
+  C(g, 0.22, 0.22, 0.25, "#fdd835", 0.7, 2, 0.5, 8, { e: "#ffeb3b", ei: 0.6 });
+  C(g, 0.02, 0.24, 0.18, "#c62828", 0.7, 2.25, 0.5, 8);
+};
+M.eluanbi = (g) => {
+  C(g, 1.7, 1.8, 0.15, "#7cb342", 0, 0, 0, 12);
+  C(g, 0.32, 0.48, 2.3, "#ffffff", 0, 0.15, 0, 12);
+  C(g, 0.4, 0.4, 0.08, "#263238", 0, 2.45, 0, 12);
+  C(g, 0.28, 0.28, 0.35, "#263238", 0, 2.5, 0, 8, { e: "#fff59d", ei: 0.3 });
+  C(g, 0.02, 0.32, 0.25, "#263238", 0, 2.85, 0, 8);
+  B(g, 0.9, 0.5, 0.6, "#fafafa", 1, 0.15, 0.5);
+  roof(g, 1.1, 0.8, 0.25, "#b0bec5", 1, 0.65, 0.5);
+  palm(g, -1, 0.8, 1.1, 0.15);
+  palm(g, -1.2, -0.7, 1.3, 0.15);
+};
+M.kenting = (g) => {
+  const sand = C(g, 1.8, 1.9, 0.12, "#f3dfa2", 0, 0, 0, 16);
+  water(g, 1.3, 0.9, 0.9, 0.05, "#26c6da");
+  const r = S(g, 0.55, "#8d7b68", 1, 0.7, 1, void 0, 7, 6);
+  r.scale.set(0.8, 1.4, 1.1);
+  palm(g, -1.1, -0.6, 1.5, 0.12);
+  palm(g, -0.4, -1.2, 1.2, 0.12);
+  palm(g, -1.3, 0.5, 1.1, 0.12);
+  C(g, 0.02, 0.02, 0.8, "#ffffff", 0.1, 0.12, -0.1, 4);
+  C(g, 0.02, 0.5, 0.18, "#ff7043", 0.1, 0.85, -0.1, 8);
+};
+M.dragontiger = (g) => {
+  water(g, 1.8, 0, 0, 0.03, "#4fc3f7");
+  for (const [x, c] of [[-0.6, "#43a047"], [0.6, "#fbc02d"]]) {
+    let y = 0.1;
+    for (let i = 0; i < 7; i++) {
+      const r = 0.38 - i * 0.03;
+      C(g, r * 0.85, r * 0.9, 0.28, "#fdd835", x, y, -0.4, 6);
+      C(g, 0.05, r * 1.35, 0.14, "#c62828", x, y + 0.28, -0.4, 6);
+      y += 0.38;
+    }
+    C(g, 0.02, 0.06, 0.35, "#d4af37", x, y, -0.4, 5);
+    const head = S(g, 0.3, c, x, 0.3, 0.25, void 0, 7, 5);
+    head.scale.set(0.8, 0.8, 1.3);
+  }
+  for (let k = 0; k < 5; k++) B(g, 0.25, 0.06, 0.45, "#c62828", k % 2 ? 0.15 : -0.15, 0.08, 0.6 + k * 0.25);
+};
+M.pier2 = (g) => {
+  B(g, 3.3, 0.1, 3.3, "#9e9e9e");
+  for (let i = 0; i < 2; i++) {
+    B(g, 1.2, 0.8, 1.4, "#a1887f", -0.9 + i * 1.6, 0.1, -0.9);
+    roof(g, 1.3, 1.5, 0.35, "#5d4037", -0.9 + i * 1.6, 0.9, -0.9);
+  }
+  const cs = ["#e53935", "#1e88e5", "#fdd835", "#43a047", "#fb8c00", "#8e24aa"];
+  let k = 0;
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) B(g, 0.85, 0.38, 0.4, cs[k++ % 6], -0.95 + c * 0.95, 0.1 + r * 0.38, 0.6 + (r ? 0.1 : 0));
+  B(g, 0.12, 2.2, 0.12, "#f57c00", 1.3, 0.1, 1.2);
+  B(g, 1.4, 0.12, 0.12, "#f57c00", 0.8, 2.2, 1.2);
+};
+M.t85 = (g) => {
+  const tex = windowsTex("#2f4a6d");
+  const gm = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.4, roughness: 0.4 });
+  B(g, 2.8, 0.3, 1.8, "#90a4ae");
+  B(g, 0.75, 3.2, 1.2, gm, -0.8, 0.3, 0);
+  B(g, 0.75, 3.2, 1.2, gm, 0.8, 0.3, 0);
+  B(g, 2.35, 0.9, 1.2, gm, 0, 3, 0);
+  B(g, 0.8, 2.2, 0.9, gm, 0, 3.9, 0);
+  frustum(g, 0.4, 0.8, 0.5, "#455a64", 0, 6.1, 0);
+  C(g, 0.03, 0.05, 1, "#cfd8dc", 0, 6.6, 0, 6, { m: 0.8 });
+  S(g, 0.06, "#ff5252", 0, 7.65, 0, { e: "#ff1744" });
+};
+M.anping = (g) => {
+  B(g, 3.2, 0.15, 3.2, "#c8b28a");
+  for (const [w, d, x, z] of [[3, 0.25, 0, -1.4], [3, 0.25, 0, 1.4], [0.25, 3, -1.4, 0], [0.25, 3, 1.4, 0]]) B(g, w, 0.6, d, "#a0452e", x, 0.15, z);
+  for (const [x, z] of [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]]) B(g, 0.5, 0.8, 0.5, "#8d3b27", x, 0.15, z);
+  B(g, 0.9, 1.6, 0.9, "#fafafa", 0, 0.15, 0);
+  B(g, 1.05, 0.1, 1.05, "#e0e0e0", 0, 1.75, 0);
+  roof(g, 1, 1, 0.7, "#c62828", 0, 1.85, 0);
+  C(g, 0.06, 0.08, 0.6, "#37474f", 0.9, 0.5, 1, 6).rotation.x = Math.PI / 2;
+};
+M.chihkan = (g) => {
+  B(g, 3.3, 0.45, 2.2, "#b5523b");
+  for (const x of [-0.85, 0.85]) {
+    B(g, 1.2, 0.8, 1.2, "#d84315", x, 0.45, 0);
+    roof(g, 1.75, 1.75, 0.35, "#37474f", x, 1.25, 0);
+    B(g, 0.85, 0.5, 0.85, "#d84315", x, 1.45, 0);
+    roof(g, 1.35, 1.35, 0.4, "#37474f", x, 1.95, 0);
+    C(g, 0.02, 0.05, 0.25, "#d4af37", x, 2.35, 0, 5);
+  }
+  roundTree(g, -1.4, 1, 0.3, "#2e7d32", 0.45);
+  roundTree(g, 1.4, 1, 0.3, "#2e7d32", 0.45);
+};
+M.phbridge = (g) => {
+  C(g, 0.8, 0.9, 0.3, "#c2b280", -1.5, -0.1, 0, 8);
+  C(g, 0.8, 0.9, 0.3, "#c2b280", 1.5, -0.1, 0, 8);
+  B(g, 3.4, 0.12, 0.45, "#eeeeee", 0, 0.75, 0);
+  for (let k = -2; k <= 2; k++) arch(g, 0.3, 0.06, "#e0e0e0", k * 0.62, 0.05, 0);
+  for (let k = -3; k <= 3; k++) C(g, 0.04, 0.04, 0.2, "#e53935", k * 0.5, 0.87, 0.2, 4);
+};
+M.twoheart = (g) => {
+  C(g, 1.4, 1.6, 0.25, "#bfae8a", -0.2, -0.15, -1.3, 10);
+  for (const [x, z, s] of [[-0.55, 0.3, 0.6], [0.7, 0.5, 0.45]]) {
+    const pts = [];
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40 * Math.PI * 2;
+      const hx = 16 * Math.pow(Math.sin(t), 3), hz = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+      pts.push(new THREE.Vector3(x + hx * s * 0.06, 0.08, z + hz * s * 0.06));
+    }
+    const curve = new THREE.CatmullRomCurve3(pts, true);
+    put(g, new THREE.TubeGeometry(curve, 60, 0.08, 4, true), "#7b7b7b", 0, 0, 0);
+    water(g, s * 0.75, x, z + 0.05, 0.05, "#80deea");
+  }
+};
+M.alishan = (g) => {
+  C(g, 1.7, 1.8, 0.2, "#33691e", 0, 0, 0, 10);
+  C(g, 0.35, 0.5, 2.6, "#6d4c41", -0.5, 0.2, -0.3, 7);
+  put(g, new THREE.ConeGeometry(0.9, 1.6, 7), "#1b5e20", -0.5, 2.9, -0.3);
+  for (const [x, z] of [[0.8, -1], [1.1, 0.2], [-1.3, 0.7], [0.3, -1.3]]) tree(g, x, z, 1.4, "#2e7d32", 0.2);
+  B(g, 2.8, 0.04, 0.12, "#424242", 0.1, 0.2, 1.1);
+  B(g, 0.7, 0.45, 0.4, "#c62828", -0.6, 0.24, 1.1);
+  B(g, 0.7, 0.08, 0.42, "#fbc02d", -0.6, 0.45, 1.1);
+  B(g, 0.7, 0.45, 0.4, "#c62828", 0.2, 0.24, 1.1);
+  B(g, 0.7, 0.08, 0.42, "#fbc02d", 0.2, 0.45, 1.1);
+  for (let i = 0; i < 4; i++) {
+    const c = S(g, 0.4, "#ffffff", -1.3 + i * 0.9, 1.6, -1.4, { op: 0.6 }, 6, 4);
+    c.scale.set(1.6, 0.4, 1);
+    c.castShadow = false;
+  }
+};
+M.sunmoon = (g) => {
+  C(g, 1.75, 1.85, 0.16, "#558b2f", 0, 0, 0, 14);
+  water(g, 1.3, 0.2, 0.3, 0.17, "#1e88e5");
+  C(g, 0.18, 0.22, 0.1, "#7cb342", 0.5, 0.17, 0.4, 8);
+  roundTree(g, 0.5, 0.4, 0.12, "#2e7d32", 0.2);
+  put(g, new THREE.ConeGeometry(0.8, 1.2, 6), "#2e7d32", -1.1, 0.75, -1);
+  let y = 1.3;
+  for (let i = 0; i < 6; i++) {
+    C(g, 0.11, 0.13, 0.14, "#fff3e0", -1.1, y, -1, 6);
+    C(g, 0.02, 0.2, 0.08, "#bf360c", -1.1, y + 0.14, -1, 6);
+    y += 0.22;
+  }
+  B(g, 0.35, 0.08, 0.15, "#ffffff", -0.2, 0.2, 0.6);
+  B(g, 0.35, 0.08, 0.15, "#ffffff", 0.9, 0.2, -0.3);
+};
+M.lukang = (g) => {
+  B(g, 3.3, 0.1, 3.3, "#b0a596");
+  for (let k = 0; k < 3; k++) {
+    hall(g, 0.85, 1.1, 0.7, "#b5523b", "#4e342e", -1.1 + k * 1.1, 0.1, -0.9, 0.3);
+    lantern(g, -1.1 + k * 1.1, 0.6, -0.3);
+  }
+  B(g, 2.2, 0.9, 0.7, "#c62828", 0, 0.1, 0.8);
+  roof(g, 2.6, 1, 0.4, "#bf360c", 0, 1, 0.8);
+  B(g, 0.6, 0.6, 0.05, "#4e342e", 0, 0.1, 1.16);
+  C(g, 0.06, 0.06, 0.3, "#fbc02d", -0.9, 1.4, 0.8, 5);
+  C(g, 0.06, 0.06, 0.3, "#fbc02d", 0.9, 1.4, 0.8, 5);
+};
+M.opera = (g) => {
+  B(g, 3.2, 0.12, 3, "#cfd8dc");
+  const w = mat("#fafafa", { r: 0.4 });
+  B(g, 2.6, 1.9, 2, w, 0, 0.12, 0);
+  for (const [x, y] of [[-0.75, 0.9], [0.1, 0.65], [0.85, 1.05]]) {
+    const hole = put(g, new THREE.CylinderGeometry(0.38, 0.38, 0.06, 14), mat("#37474f", { r: 0.3, m: 0.4 }), x, y + 0.12, 1.01);
+    hole.rotation.x = Math.PI / 2;
+    hole.scale.set(1, 1, 1.5);
+  }
+  for (const [z, y] of [[-0.4, 0.8], [0.5, 1.1]]) {
+    const hole = put(g, new THREE.CylinderGeometry(0.35, 0.35, 0.06, 14), mat("#37474f", { r: 0.3, m: 0.4 }), 1.31, y + 0.12, z);
+    hole.rotation.z = Math.PI / 2;
+    hole.scale.set(1.4, 1, 1);
+  }
+  B(g, 2.7, 0.1, 2.1, "#eceff1", 0, 2.02, 0);
+  roundTree(g, -1.4, 1.3, 0.25);
+  roundTree(g, 1.4, 1.3, 0.25);
+};
+M.gaomei = (g) => {
+  const wet = C(g, 1.8, 1.85, 0.08, "#90a4ae", 0, 0, 0, 16);
+  water(g, 1.7, 0, 0, 0.09, "#b3e5fc");
+  for (let k = 0; k < 6; k++) B(g, 0.3, 0.05, 0.6, "#8d6e63", -1.2 + k * 0.42, 0.12, 0.9 - k % 2 * 0.3);
+  const blades = [];
+  for (const [x, z, h] of [[-0.9, -0.8, 2.6], [0.3, -1.1, 2.9], [1.2, -0.3, 2.5]]) {
+    C(g, 0.04, 0.08, h, "#ffffff", x, 0.1, z, 6);
+    const hub = new THREE.Group();
+    hub.position.set(x, h + 0.1, z + 0.08);
+    g.add(hub);
+    for (let i = 0; i < 3; i++) {
+      const b = B(hub, 0.07, 0.85, 0.02, "#ffffff", 0, 0, 0);
+      b.geometry.translate(0, 0.42, 0);
+      b.position.y = 0;
+      b.rotation.z = i / 3 * Math.PI * 2;
+    }
+    S(hub, 0.07, "#eeeeee");
+    blades.push(hub);
+  }
+  anim(g, (t, dt) => blades.forEach((b, i) => {
+    b.rotation.z += dt * (1.6 + i * 0.3);
+  }));
+};
+M.neiwan = (g) => {
+  C(g, 1.7, 1.8, 0.15, "#689f38", 0, 0, 0, 10);
+  put(g, new THREE.ConeGeometry(1, 1.6, 6), "#33691e", -1, 0.9, -1);
+  hall(g, 1.1, 0.7, 0.6, "#a1887f", "#5d4037", 0.6, 0.15, -0.8, 0.3);
+  B(g, 3, 0.04, 0.12, "#424242", 0, 0.15, 0.3);
+  B(g, 0.9, 0.5, 0.45, "#fdd835", -0.5, 0.19, 0.3);
+  B(g, 0.9, 0.12, 0.47, "#1565c0", -0.5, 0.45, 0.3);
+  B(g, 0.9, 0.5, 0.45, "#fdd835", 0.45, 0.19, 0.3);
+  B(g, 0.9, 0.12, 0.47, "#1565c0", 0.45, 0.45, 0.3);
+  for (const x of [-1.2, 1.2]) B(g, 0.1, 0.9, 0.1, "#795548", x, 0.15, 1.2);
+  B(g, 2.4, 0.05, 0.3, "#a1887f", 0, 0.55, 1.2);
+};
+M.daxi = (g) => {
+  B(g, 3.3, 0.1, 3, "#b0a596");
+  const cs = ["#f8bbd0", "#ffe0b2", "#d7ccc8", "#ffccbc"];
+  for (let k = 0; k < 4; k++) {
+    const x = -1.2 + k * 0.8;
+    B(g, 0.75, 1.1, 1.4, cs[k], x, 0.1, -0.3);
+    B(g, 0.75, 0.45, 0.12, cs[k], x, 1.2, 0.35);
+    S(g, 0.15, "#ffffff", x, 1.55, 0.36, void 0, 6, 4).scale.z = 0.4;
+    for (const dx of [-0.2, 0.2]) {
+      const w = B(g, 0.16, 0.32, 0.03, "#5d4037", x + dx, 0.6, 0.41);
+    }
+    B(g, 0.28, 0.45, 0.03, "#4e342e", x, 0.1, 0.41);
+  }
+};
+M.tamsui = (g) => {
+  water(g, 1.8, 0, 0, 0.03, "#29b6f6");
+  B(g, 3.4, 0.1, 0.45, "#ffffff", 0, 0.5, 0);
+  const py = B(g, 0.14, 2.6, 0.14, "#ffffff", 0, 0.5, 0);
+  py.rotation.z = -0.25;
+  py.position.x = -0.35;
+  const top = new THREE.Vector3(0, 2.95, 0);
+  for (let k = 1; k <= 4; k++) for (const sgn of [-1, 1]) {
+    const end = new THREE.Vector3(sgn * k * 0.38, 0.6, 0);
+    const curve = new THREE.LineCurve3(top, end);
+    put(g, new THREE.TubeGeometry(curve, 1, 0.012, 3), "#eeeeee", 0, 0, 0);
+  }
+  C(g, 1, 1.1, 0.25, "#bcaaa4", 1.3, -0.1, -1.1, 8);
+  B(g, 0.6, 0.15, 0.25, "#ffffff", -1, 0.05, 1);
+  C(g, 0.01, 0.01, 0.5, "#795548", -1, 0.2, 1, 4);
+};
+M.start = (g) => {
+  B(g, 3, 0.15, 2.6, "#bdbdbd");
+  B(g, 2.4, 1.2, 1.9, "#efe0c2", 0, 0.15, 0);
+  for (let k = -2; k <= 2; k++) B(g, 0.22, 0.8, 0.03, "#5d4037", k * 0.45, 0.25, 0.96);
+  frustum(g, 1.7, 2.7, 0.6, "#a86b32", 0, 1.35, 0);
+  B(g, 1.2, 0.35, 0.9, "#efe0c2", 0, 1.95, 0);
+  frustum(g, 0.7, 1.4, 0.35, "#a86b32", 0, 2.3, 0);
+};
+M.chance = (g) => {
+  B(g, 1.6, 0.12, 1.6, "#ffe082");
+  const q = new THREE.Group();
+  q.position.y = 1.4;
+  g.add(q);
+  const pts = [];
+  for (let i = 0; i <= 20; i++) {
+    const t = -Math.PI * 0.9 + i / 20 * Math.PI * 1.4;
+    pts.push(new THREE.Vector3(Math.cos(-t) * 0.4, 0.35 + Math.sin(-t) * 0.4, 0));
+  }
+  pts.push(new THREE.Vector3(0, -0.25, 0));
+  put(q, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 30, 0.12, 6), mat("#ffb300", { m: 0.5, r: 0.3, e: "#ff8f00", ei: 0.3 }), 0, 0, 0);
+  S(q, 0.14, mat("#ffb300", { m: 0.5, r: 0.3, e: "#ff8f00", ei: 0.3 }), 0, -0.55, 0);
+  anim(g, (t) => {
+    q.rotation.y = t * 1.5;
+    q.position.y = 1.4 + Math.sin(t * 2) * 0.12;
+  });
+};
+M.news = (g) => {
+  B(g, 0.15, 1.4, 0.15, "#616161", -0.8, 0, 0);
+  B(g, 0.15, 1.4, 0.15, "#616161", 0.8, 0, 0);
+  const cv = document.createElement("canvas");
+  cv.width = 256;
+  cv.height = 128;
+  const x = cv.getContext("2d");
+  x.fillStyle = "#c62828";
+  x.fillRect(0, 0, 256, 128);
+  x.fillStyle = "#fff";
+  x.font = "bold 60px sans-serif";
+  x.textAlign = "center";
+  x.fillText("新聞快報", 128, 64);
+  x.font = "24px sans-serif";
+  x.fillText("BREAKING NEWS", 128, 104);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  B(g, 2, 1.1, 0.15, "#212121", 0, 1.2, 0);
+  const sc = put(g, new THREE.PlaneGeometry(1.85, 0.95), new THREE.MeshBasicMaterial({ map: tex }), 0, 1.75, 0.08);
+  sc.castShadow = false;
+};
+M.shop = (g) => {
+  B(g, 2.2, 1.1, 1.6, "#fafafa");
+  B(g, 2.22, 0.12, 1.62, "#43a047", 0, 0.75);
+  B(g, 2.22, 0.08, 1.62, "#fb8c00", 0, 0.87);
+  B(g, 2.22, 0.08, 1.62, "#e53935", 0, 0.95);
+  B(g, 1.6, 0.6, 0.03, "#90caf9", 0, 0.1, 0.81, { m: 0.5, r: 0.2 });
+  const aw = B(g, 2.3, 0.06, 0.6, "#e53935", 0, 1, 1.05);
+  aw.rotation.x = 0.35;
+  B(g, 0.8, 0.35, 0.08, "#ffeb3b", 0, 1.15, 0.82, { e: "#fdd835", ei: 0.5 });
+};
+M.temple = (g) => {
+  B(g, 2.4, 0.2, 1.8, "#9e9e9e");
+  B(g, 1.8, 0.9, 1.2, "#c62828", 0, 0.2, 0);
+  roof(g, 2.5, 1.8, 0.5, "#e65100", 0, 1.1, 0);
+  B(g, 2.2, 0.08, 0.1, "#2e7d32", 0, 1.55, 0);
+  for (const s of [-1, 1]) {
+    const t = put(g, new THREE.ConeGeometry(0.08, 0.4, 4), "#2e7d32", s * 1.15, 1.7, 0);
+    t.rotation.z = -s * 0.9;
+  }
+  C(g, 0.18, 0.22, 0.35, "#8d6e63", 0, 0.2, 1.2, 8);
+  for (let k = -1; k <= 1; k++) C(g, 0.01, 0.01, 0.25, "#ff7043", k * 0.06, 0.55, 1.2, 3, { e: "#ff5722" });
+  lantern(g, -0.6, 0.85, 0.66);
+  lantern(g, 0.6, 0.85, 0.66);
+};
+M.hospital = (g) => {
+  B(g, 2.4, 1.6, 1.6, "#ffffff");
+  B(g, 2.42, 0.1, 1.62, "#4fc3f7", 0, 0.5);
+  B(g, 2.42, 0.1, 1.62, "#4fc3f7", 0, 1);
+  B(g, 0.6, 0.18, 0.18, "#e53935", 0, 1.9, 0, { e: "#c62828", ei: 0.4 });
+  B(g, 0.18, 0.6, 0.18, "#e53935", 0, 1.7, 0, { e: "#c62828", ei: 0.4 });
+  B(g, 0.6, 0.6, 0.03, "#90caf9", 0, 0, 0.81);
+};
+M.police = (g) => {
+  B(g, 2.3, 1.3, 1.6, "#eceff1");
+  B(g, 2.32, 0.3, 1.62, "#1565c0", 0, 1);
+  B(g, 0.7, 0.6, 0.03, "#455a64", 0, 0, 0.81);
+  B(g, 0.9, 0.35, 0.45, "#ffffff", 1.3, 0, 1.2);
+  B(g, 0.5, 0.25, 0.42, "#1565c0", 1.3, 0.35, 1.2);
+  const r = S(g, 0.09, "#ff1744", 1.18, 0.65, 1.2, { e: "#ff1744" }, 6, 4), b = S(g, 0.09, "#2979ff", 1.42, 0.65, 1.2, { e: "#2979ff" }, 6, 4);
+  anim(g, (t) => {
+    const on = Math.floor(t * 4) % 2;
+    r.material.emissiveIntensity = on ? 1.5 : 0.1;
+    b.material.emissiveIntensity = on ? 0.1 : 1.5;
+  });
+};
+M.lottery = (g) => {
+  C(g, 0.5, 0.7, 0.6, "#6a1b9a", 0, 0, 0, 8);
+  S(g, 0.75, mat("#e1f5fe", { op: 0.35, r: 0.1 }), 0, 1.35, 0, void 0, 14, 10).castShadow = false;
+  const balls = new THREE.Group();
+  balls.position.y = 1.35;
+  g.add(balls);
+  const cs = ["#e53935", "#fdd835", "#43a047", "#1e88e5", "#ffffff", "#fb8c00"];
+  for (let i = 0; i < 12; i++) S(balls, 0.12, cs[i % 6], (Math.random() - 0.5) * 0.9, (Math.random() - 0.5) * 0.7, (Math.random() - 0.5) * 0.9, void 0, 6, 5);
+  anim(g, (t) => {
+    balls.rotation.y = t * 2;
+    balls.rotation.x = Math.sin(t) * 0.5;
+  });
+};
+M.bank = (g) => {
+  B(g, 2.6, 0.3, 1.8, "#e0e0e0");
+  for (let k = -2; k <= 2; k++) C(g, 0.12, 0.12, 1.2, "#fafafa", k * 0.5, 0.3, 0.6, 8);
+  B(g, 2.4, 1.2, 1, "#eeeeee", 0, 0.3, -0.25);
+  B(g, 2.6, 0.18, 1.8, "#fafafa", 0, 1.5);
+  const sh = new THREE.Shape();
+  sh.moveTo(-1.3, 0);
+  sh.lineTo(1.3, 0);
+  sh.lineTo(0, 0.55);
+  sh.lineTo(-1.3, 0);
+  put(g, new THREE.ExtrudeGeometry(sh, { depth: 1.8, bevelEnabled: false }), "#fafafa", 0, 1.68, -0.9);
+  S(g, 0.2, "#d4af37", 0, 1.95, 0.92, { m: 0.8, r: 0.3 }).scale.z = 0.3;
+};
+function stall(g, x, z, c, rot = 0) {
+  const t = new THREE.Group();
+  t.position.set(x, 0, z);
+  t.rotation.y = rot;
+  g.add(t);
+  B(t, 0.6, 0.45, 0.45, "#eeeeee");
+  B(t, 0.75, 0.05, 0.6, c, 0, 0.75);
+  for (const dx of [-0.32, 0.32]) B(t, 0.04, 0.3, 0.04, "#9e9e9e", dx, 0.45, 0.25);
+  S(t, 0.07, "#ffeb3b", 0, 0.68, 0.25, { e: "#ffc107", ei: 0.8 }, 5, 4);
+}
+function nightMarket(g, sign, signC) {
+  B(g, 3.3, 0.1, 3.3, "#616161");
+  const cs = ["#e53935", "#fb8c00", "#1e88e5", "#43a047", "#8e24aa", "#fdd835"];
+  for (let k = 0; k < 4; k++) {
+    stall(g, -1.1 + k * 0.75, -0.7, cs[k], 0);
+    stall(g, -1.1 + k * 0.75, 0.75, cs[(k + 2) % 6], Math.PI);
+  }
+  B(g, 0.1, 1.6, 0.1, "#5d4037", -1.5, 0.1, 0);
+  B(g, 0.1, 1.6, 0.1, "#5d4037", 1.5, 0.1, 0);
+  B(g, 3.2, 0.45, 0.1, signC, 0, 1.6, 0, { e: signC, ei: 0.35 });
+  for (let k = 0; k < 7; k++) lantern(g, -1.4 + k * 0.47, 1.5, 0.12);
+}
+function temple2(g, wall, roofc, ridge = "#2e7d32") {
+  B(g, 3, 0.2, 2.6, "#9e9e9e");
+  B(g, 2.2, 1, 1.4, wall, 0, 0.2, -0.3);
+  roof(g, 2.9, 2, 0.55, roofc, 0, 1.2, -0.3);
+  B(g, 2.6, 0.08, 0.1, ridge, 0, 1.68, -0.3);
+  for (const sx of [-1, 1]) {
+    const t = put(g, new THREE.ConeGeometry(0.08, 0.5, 4), ridge, sx * 1.3, 1.85, -0.3);
+    t.rotation.z = -sx * 0.9;
+  }
+  B(g, 2.6, 0.7, 0.2, wall, 0, 0.2, 0.9);
+  roof(g, 2.9, 0.6, 0.3, roofc, 0, 0.9, 0.9);
+  B(g, 0.6, 0.55, 0.05, "#4e342e", 0, 0.2, 1.01);
+  C(g, 0.2, 0.25, 0.35, "#8d6e63", 0, 0.2, 0.3, 8);
+  lantern(g, -0.6, 0.8, 1.05);
+  lantern(g, 0.6, 0.8, 1.05);
+}
+M.shilin = (g) => nightMarket(g, "士林", "#e53935");
+M.fengjia = (g) => nightMarket(g, "逢甲", "#fb8c00");
+M.miaokou = (g) => {
+  nightMarket(g, "廟口", "#fdd835");
+  hall(g, 1.2, 0.8, 0.6, "#c62828", "#e65100", 0, 0.1, -1.4, 0.35);
+};
+M.ximen = (g) => {
+  B(g, 3.3, 0.1, 3.3, "#9e9e9e");
+  C(g, 0.75, 0.75, 1.1, "#b5523b", -0.5, 0.1, -0.4, 8);
+  C(g, 0.2, 0.85, 0.5, "#5d4037", -0.5, 1.2, -0.4, 8);
+  B(g, 1.2, 0.9, 1, "#b5523b", -0.5, 0.1, 0.6);
+  roof(g, 1.4, 1.2, 0.3, "#5d4037", -0.5, 1, 0.6);
+  for (let k = 0; k < 3; k++) {
+    const c = ["#ec407a", "#29b6f6", "#ffca28"][k];
+    B(g, 0.7, 1.6 + k * 0.4, 0.7, "#eceff1", 1, 0.1, -1 + k * 0.9);
+    B(g, 0.72, 0.4, 0.05, c, 1, 1 + k * 0.3, -0.64 + k * 0.9, { e: c, ei: 0.6 });
+  }
+};
+M.longshan = (g) => temple2(g, "#c62828", "#bf360c");
+M.chenghuang = (g) => temple2(g, "#b71c1c", "#4e342e", "#fbc02d");
+M.confucius = (g) => {
+  B(g, 3.2, 0.15, 3.2, "#bdbdbd");
+  for (const [w, d, x, z] of [[3, 0.2, 0, -1.4], [3, 0.2, 0, 1.4], [0.2, 3, -1.4, 0], [0.2, 3, 1.4, 0]]) B(g, w, 0.55, d, "#c62828", x, 0.15, z);
+  B(g, 1.8, 0.9, 1.2, "#c62828", 0, 0.15, -0.2);
+  roof(g, 2.4, 1.7, 0.45, "#fbc02d", 0, 1.05, -0.2);
+  roof(g, 1.6, 1.1, 0.35, "#fbc02d", 0, 1.45, -0.2);
+  roundTree(g, -0.9, 0.9, 0.3, "#2e7d32", 0.15);
+  roundTree(g, 0.9, 0.9, 0.3, "#2e7d32", 0.15);
+};
+M.lantern = (g) => {
+  C(g, 1.7, 1.8, 0.15, "#558b2f", 0, 0, 0, 12);
+  B(g, 3, 0.04, 0.5, "#5d4037", 0, 0.15, 0.9);
+  for (let k = -5; k <= 5; k++) B(g, 0.06, 0.05, 0.6, "#795548", k * 0.27, 0.15, 0.9);
+  hall(g, 1, 0.7, 0.6, "#a1887f", "#424242", -0.7, 0.15, -0.6, 0.3);
+  const ls = [];
+  for (let i = 0; i < 7; i++) {
+    const l = new THREE.Group();
+    const c = ["#ff7043", "#ffca28", "#ef5350", "#ab47bc", "#66bb6a"][i % 5];
+    put(l, new THREE.CylinderGeometry(0.22, 0.15, 0.45, 8), mat(c, { e: c, ei: 0.7, op: 0.92 }), 0, 0, 0);
+    l.position.set((Math.random() - 0.5) * 2.4, 1 + Math.random() * 2, (Math.random() - 0.5) * 2);
+    l.userData.ph = Math.random();
+    g.add(l);
+    ls.push(l);
+  }
+  anim(g, (t) => ls.forEach((l) => {
+    const f = (t * 0.12 + l.userData.ph) % 1;
+    l.position.y = 0.6 + f * 3.4;
+    l.scale.setScalar(1 - f * 0.5);
+  }));
+};
+M.lanyang = (g) => {
+  B(g, 3.2, 0.12, 3.2, "#9e9e9e");
+  water(g, 1, 0.8, 0.9, 0.13, "#4fc3f7");
+  const sh = new THREE.Shape();
+  sh.moveTo(-1.2, 0);
+  sh.lineTo(1, 0);
+  sh.lineTo(1, 0.5);
+  sh.lineTo(-1.2, 2.2);
+  sh.lineTo(-1.2, 0);
+  put(g, new THREE.ExtrudeGeometry(sh, { depth: 1.6, bevelEnabled: false }), mat("#b0bec5", { r: 0.5 }), 0, 0.12, -1.4);
+  for (let k = 0; k < 5; k++) B(g, 0.05, 1.6 - k * 0.3, 0.02, "#455a64", -1 + k * 0.45, 0.12, 0.21);
+};
+M.balloon = (g) => {
+  C(g, 1.7, 1.8, 0.15, "#9ccc65", 0, 0, 0, 12);
+  const bs = [];
+  [["#e53935", -0.7, 2.4, 0], ["#fdd835", 0.6, 2.9, -0.5], ["#1e88e5", 0.3, 1.8, 0.8], ["#8e24aa", -0.4, 3.4, -0.9]].forEach(([c, x, y, z], i) => {
+    const b = new THREE.Group();
+    b.position.set(x, y, z);
+    g.add(b);
+    const e = S(b, 0.5, c, 0, 0, 0, void 0, 10, 8);
+    e.scale.y = 1.2;
+    for (let k = 0; k < 4; k++) B(b, 0.02, 0.6, 0.02, "#795548", Math.cos(k * 1.57) * 0.15, -0.95, Math.sin(k * 1.57) * 0.15);
+    B(b, 0.3, 0.25, 0.3, "#8d6e63", 0, -0.95, 0);
+    b.userData.y0 = y;
+    b.userData.ph = i;
+    bs.push(b);
+  });
+  anim(g, (t) => bs.forEach((b) => {
+    b.position.y = b.userData.y0 + Math.sin(t * 0.8 + b.userData.ph) * 0.25;
+  }));
+};
+M.lanyu = (g) => {
+  islet(g, 1.8, "#388e3c", 0.35);
+  put(g, new THREE.ConeGeometry(1, 1.4, 6), "#2e7d32", -0.5, 0.85, -0.6);
+  for (const [x, z, r] of [[0.7, 0.9, 0.3], [-0.2, 1.2, -0.2]]) {
+    const b = new THREE.Group();
+    b.position.set(x, 0.3, z);
+    b.rotation.y = r;
+    g.add(b);
+    const hull = S(b, 0.4, "#fafafa", 0, 0.1, 0, void 0, 10, 6);
+    hull.scale.set(2, 0.55, 0.6);
+    B(b, 1.4, 0.06, 0.25, "#c62828", 0, 0.18, 0);
+    for (const sx of [-1, 1]) {
+      const p = B(b, 0.06, 0.45, 0.06, "#fafafa", sx * 0.75, 0.05, 0);
+      p.rotation.z = sx * 0.35;
+    }
+  }
+};
+M.xiaoliuqiu = (g) => {
+  islet(g, 1.7, "#7cb342", 0.3);
+  water(g, 0.9, 0.9, 0.9, 0.05, "#4dd0e1");
+  C(g, 0.18, 0.28, 0.7, "#8d7b68", 0.9, 0, 0.9, 7);
+  const top = S(g, 0.55, "#7d6b58", 0.9, 0.95, 0.9, void 0, 8, 6);
+  top.scale.y = 0.65;
+  tree(g, 0.9, 0.9, 0.6, "#558b2f", 1.2);
+  const t = S(g, 0.2, "#5d8a4a", -0.6, 0.15, 1.2, void 0, 8, 5);
+  t.scale.set(1.3, 0.5, 1);
+};
+M.formosa = (g) => {
+  B(g, 3, 0.15, 3, "#cfd8dc");
+  const cols = ["#e53935", "#fb8c00", "#fdd835", "#43a047", "#1e88e5", "#8e24aa"];
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * Math.PI * 2;
+    const seg = put(g, new THREE.SphereGeometry(1.3, 4, 6, a, Math.PI / 6, 0, Math.PI / 2), mat(cols[i % 6], { e: cols[i % 6], ei: 0.45, ds: true, op: 0.9 }), 0, 0.15, 0);
+    seg.castShadow = false;
+  }
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2 + 0.4;
+    C(g, 0.08, 0.1, 1, "#eceff1", Math.cos(a) * 1.25, 0.15, Math.sin(a) * 1.25, 6);
+  }
+};
+M.chimei = (g) => {
+  B(g, 3.3, 0.12, 3.3, "#c8e6c9");
+  water(g, 0.6, 0, 1.1, 0.13, "#4fc3f7");
+  C(g, 0.1, 0.15, 0.5, "#fafafa", 0, 0.12, 1.1, 6);
+  S(g, 0.12, "#d4af37", 0, 0.72, 1.1, { m: 0.8 });
+  B(g, 2.8, 1, 1.2, "#fafafa", 0, 0.12, -0.6);
+  for (let k = -3; k <= 3; k++) C(g, 0.07, 0.07, 0.85, "#eeeeee", k * 0.36, 0.12, 0.05, 6);
+  B(g, 2.9, 0.12, 1.3, "#f5f5f5", 0, 1.12, -0.6);
+  C(g, 0.45, 0.45, 0.35, "#fafafa", 0, 1.24, -0.6, 12);
+  const d = S(g, 0.45, "#cfd8dc", 0, 1.59, -0.6, { m: 0.5, r: 0.3 }, 12, 8);
+  d.scale.y = 0.9;
+  S(g, 0.08, "#d4af37", 0, 2.05, -0.6, { m: 0.8 });
+};
+M.jibei = (g) => {
+  const sand = C(g, 0.9, 1.1, 0.3, "#fff3c4", -0.6, -0.15, -0.6, 10);
+  const spit = B(g, 0.5, 0.18, 2.4, "#fff3c4", 0.3, -0.06, 0.4);
+  spit.rotation.y = 0.5;
+  water(g, 1.8, 0, 0, 0.02, "#4dd0e1");
+  palm(g, -0.8, -0.8, 1.1, 0.15);
+  B(g, 0.5, 0.12, 0.2, "#ff7043", 1.1, 0.02, -0.4);
+  B(g, 0.4, 0.1, 0.18, "#ffee58", -0.2, 0.02, 1.3);
+};
+M.cingjing = (g) => {
+  const hill = C(g, 1.75, 1.85, 0.3, "#9ccc65", 0, 0, 0, 12);
+  for (let k = 0; k < 6; k++) {
+    const x = -1 + k % 3 * 0.9, z = -0.4 + Math.floor(k / 3) * 0.9;
+    const b = S(g, 0.22, "#fafafa", x, 0.5, z, void 0, 7, 5);
+    b.scale.set(1.3, 0.9, 0.9);
+    S(g, 0.1, "#424242", x + 0.28, 0.58, z, void 0, 5, 4);
+    for (const dx of [-0.12, 0.12]) C(g, 0.03, 0.03, 0.2, "#424242", x + dx, 0.3, z, 4);
+  }
+  B(g, 0.08, 0.5, 2.6, "#8d6e63", 1.4, 0.3, 0);
+  hall(g, 0.8, 0.6, 0.5, "#fffde7", "#c62828", -1, 0.3, -1.2, 0.3);
+};
+M.hehuan = (g) => {
+  C(g, 1.75, 1.85, 0.2, "#6d8b6a", 0, 0, 0, 12);
+  put(g, new THREE.ConeGeometry(1.4, 2.6, 7), "#7b8b6f", -0.2, 1.5, -0.3);
+  put(g, new THREE.ConeGeometry(0.62, 1, 7), "#ffffff", -0.2, 2.3, -0.3);
+  put(g, new THREE.ConeGeometry(0.8, 1.6, 6), "#8a9a7a", 1, 1, 0.5);
+  put(g, new THREE.ConeGeometry(0.35, 0.55, 6), "#ffffff", 1, 1.55, 0.5);
+  B(g, 0.3, 0.5, 0.08, "#5d4037", -0.9, 0.2, 1);
+  B(g, 0.6, 0.25, 0.08, "#fafafa", -0.9, 0.55, 1);
+};
+M.buddha = (g) => {
+  C(g, 1.6, 1.8, 0.25, "#7cb342", 0, 0, 0, 12);
+  C(g, 0.9, 1, 0.45, "#78909c", 0, 0.25, 0, 10);
+  const body = S(g, 0.8, "#37474f", 0, 1.2, 0, { m: 0.3 }, 10, 8);
+  body.scale.set(1, 1.1, 0.8);
+  S(g, 0.42, "#37474f", 0, 2.25, 0, { m: 0.3 }, 10, 8);
+  S(g, 0.2, "#37474f", 0, 2.65, 0, { m: 0.3 }, 6, 5);
+  const lap = S(g, 0.6, "#455a64", 0, 0.8, 0.35, void 0, 8, 5);
+  lap.scale.set(1.3, 0.4, 0.8);
+};
+M.roundhouse = (g) => {
+  C(g, 1.75, 1.8, 0.1, "#9e9e9e", 0, 0, 0, 16);
+  C(g, 0.55, 0.55, 0.08, "#616161", 0, 0.1, 0.8, 16);
+  B(g, 1.1, 0.06, 0.15, "#424242", 0, 0.18, 0.8);
+  for (let k = 0; k < 7; k++) {
+    const a = Math.PI + 0.25 + k * 0.38;
+    const x = Math.cos(a) * 1.25, z = Math.sin(a) * 1.25 + 0.6;
+    const b = B(g, 0.38, 0.55, 0.7, "#a1887f", x, 0.1, z);
+    b.rotation.y = -a + Math.PI / 2;
+    const r = roof(g, 0.45, 0.8, 0.2, "#5d4037", x, 0.65, z);
+    r.rotation.y = -a + Math.PI / 2 + Math.PI / 4;
+  }
+  B(g, 0.35, 0.35, 0.8, "#212121", 0.1, 0.18, 0.8);
+  C(g, 0.06, 0.08, 0.3, "#212121", 0.1, 0.5, 1.05, 6);
+};
+M.rainbow = (g) => {
+  B(g, 3.2, 0.1, 3.2, "#e0e0e0");
+  const cs = ["#e53935", "#fb8c00", "#fdd835", "#43a047", "#1e88e5", "#8e24aa"];
+  for (let k = 0; k < 6; k++) {
+    const x = -1.1 + k % 3 * 1.1, z = k < 3 ? -0.7 : 0.7;
+    B(g, 0.9, 0.7, 0.9, "#fff8e1", x, 0.1, z);
+    B(g, 0.92, 0.25, 0.92, cs[k], x, 0.3, z);
+    S(g, 0.12, cs[(k + 3) % 6], x, 0.6, z + 0.46, void 0, 6, 4);
+    roof(g, 1, 1, 0.25, "#795548", x, 0.8, z);
+  }
+};
+M.shengxing = (g) => {
+  C(g, 1.7, 1.8, 0.15, "#689f38", 0, 0, 0, 12);
+  B(g, 1.6, 0.75, 0.9, "#8d6e63", -0.2, 0.15, -0.5);
+  roof(g, 2, 1.2, 0.5, "#4e342e", -0.2, 0.9, -0.5);
+  B(g, 3, 0.04, 0.12, "#424242", 0, 0.15, 0.6);
+  B(g, 0.8, 0.5, 0.42, "#1565c0", -0.6, 0.19, 0.6);
+  B(g, 0.8, 0.5, 0.42, "#fafafa", 0.3, 0.19, 0.6);
+  put(g, new THREE.ConeGeometry(0.7, 1.2, 6), "#33691e", 1.1, 0.75, -0.9);
+};
+M.longteng = (g) => {
+  C(g, 1.7, 1.8, 0.15, "#7cb342", 0, 0, 0, 12);
+  for (let k = 0; k < 4; k++) {
+    const x = -1.2 + k * 0.8, h = [1.5, 1.8, 1.3, 1.6][k];
+    B(g, 0.32, h, 0.5, "#b5523b", x, 0.15, 0);
+    if (k < 3 && k !== 1) {
+      const a = put(g, new THREE.TorusGeometry(0.4, 0.13, 5, 10, Math.PI), "#a0452e", x + 0.4, 0.15 + h - 0.45, 0);
+      a.scale.z = 2.5;
+    }
+  }
+  tree(g, 1.2, 1, 0.8, "#2e7d32", 0.15);
+  tree(g, -1.1, -1.1, 0.9, "#2e7d32", 0.15);
+};
+M.fortsd = (g) => {
+  C(g, 1.7, 1.8, 0.2, "#8bc34a", 0, 0, 0, 12);
+  B(g, 1.5, 1.2, 1.5, "#c62828", -0.2, 0.2, -0.2);
+  for (let k = 0; k < 4; k++) B(g, 0.28, 0.2, 0.28, "#b71c1c", -0.8 + k * 0.4, 1.4, 0.43);
+  B(g, 1.1, 0.7, 0.9, "#fafafa", 0.5, 0.2, 0.9);
+  roof(g, 1.3, 1.1, 0.35, "#c62828", 0.5, 0.9, 0.9);
+  C(g, 0.02, 0.02, 0.7, "#9e9e9e", -0.2, 1.4, -0.2, 4);
+  B(g, 0.35, 0.22, 0.02, "#1e88e5", -0.02, 1.85, -0.2);
+};
+function buildLandmark(id) {
+  const g = new THREE.Group();
+  (M[id] || M.chance)(g);
+  return g;
+}
+function buildHouses(level, color) {
+  const g = new THREE.Group();
+  if (level <= 0) return g;
+  if (level === 5) {
+    const tex = windowsTex(color);
+    const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0.2 });
+    B(g, 0.8, 2.6, 0.8, m, 0, 0, 0);
+    frustum(g, 0.3, 0.75, 0.4, "#eeeeee", 0, 2.6, 0);
+    C(g, 0.02, 0.03, 0.5, "#cfd8dc", 0, 3, 0, 4);
+    return g;
+  }
+  const xs = [[0], [-0.45, 0.45], [-0.75, 0, 0.75], [-0.9, -0.3, 0.3, 0.9]][level - 1];
+  for (const x of xs) {
+    const h = 0.38 + level * 0.12;
+    B(g, 0.5, h, 0.5, "#fff8e1", x, 0, 0);
+    roof(g, 0.66, 0.66, 0.32, color, x, h, 0);
+  }
+  return g;
+}
+function limb(parent, r, len, c, x, y, z) {
+  const pivot = new THREE.Group();
+  pivot.position.set(x, y, z);
+  parent.add(pivot);
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 3, 8), mat(c));
+  m.position.y = -len / 2 - r * 0.5;
+  m.castShadow = true;
+  pivot.add(m);
+  return pivot;
+}
+var ANIMALS = {
+  leopard: { fur: "#d9a066", belly: "#fff3e0", ear: "cat", spots: "#5d4037", tail: "long" },
+  magpie: { fur: "#1e5bd8", belly: "#cfe3ff", ear: "none", headC: "#111111", beak: "#e53935", tail: "bird", leg: "#e53935" },
+  deer: { fur: "#a0522d", belly: "#fff8e1", ear: "deer", spots: "#fffde7", antler: 1, tail: "short" },
+  pheasant: { fur: "#283593", belly: "#1a237e", ear: "none", headC: "#1a237e", beak: "#eceff1", face: "#e53935", tail: "pheasant", leg: "#9e9e9e" },
+  pangolin: { fur: "#8d6e63", belly: "#d7ccc8", ear: "none", scales: "#6d4c41", snout: 1, tail: "scaly" },
+  monkey: { fur: "#8d7b6a", belly: "#d7ccc8", ear: "round", face: "#f8bbd0", tail: "long" }
+};
+function buildAnimal(charId, color) {
+  const a = ANIMALS[charId];
+  const root = new THREE.Group();
+  C(root, 0.42, 0.46, 0.06, "#ffffff", 0, 0, 0, 16, { e: color, ei: 0.35 });
+  const body = new THREE.Group();
+  body.position.y = 0.06;
+  root.add(body);
+  const legC = a.leg || a.fur;
+  const legL = limb(body, a.leg ? 0.04 : 0.09, 0.26, legC, -0.13, 0.42, 0), legR = limb(body, a.leg ? 0.04 : 0.09, 0.26, legC, 0.13, 0.42, 0);
+  for (const l of [legL, legR]) {
+    const f = S(l, 0.1, a.leg ? a.leg : a.fur, 0, -0.42, 0.05, void 0, 6, 4);
+    f.scale.set(1, 0.5, 1.5);
+  }
+  const torso = new THREE.Group();
+  torso.position.y = 0.42;
+  body.add(torso);
+  const tb = S(torso, 0.3, a.fur, 0, 0.18, 0, void 0, 12, 9);
+  tb.scale.set(1, 1.15, 0.95);
+  const bl = S(torso, 0.2, a.belly, 0, 0.15, 0.15, void 0, 10, 8);
+  bl.scale.set(1, 1.2, 0.6);
+  let armL, armR;
+  if (a.tail === "bird" || a.tail === "pheasant") {
+    armL = new THREE.Group();
+    armL.position.set(-0.27, 0.35, 0);
+    torso.add(armL);
+    armR = new THREE.Group();
+    armR.position.set(0.27, 0.35, 0);
+    torso.add(armR);
+    for (const [w, sx] of [[armL, -1], [armR, 1]]) {
+      const wing = S(w, 0.2, a.fur, sx * 0.04, -0.18, 0, void 0, 8, 6);
+      wing.scale.set(0.35, 1.1, 0.8);
+    }
+  } else {
+    armL = limb(torso, 0.07, 0.2, a.fur, -0.27, 0.36, 0);
+    armR = limb(torso, 0.07, 0.2, a.fur, 0.27, 0.36, 0);
+    for (const q of [armL, armR]) S(q, 0.08, a.face || a.belly, 0, -0.36, 0, void 0, 6, 5);
+  }
+  armL.rotation.z = 0.15;
+  armR.rotation.z = -0.15;
+  const head = new THREE.Group();
+  head.position.y = 0.72;
+  torso.add(head);
+  const hc = a.headC || a.fur;
+  const hs = S(head, 0.3, hc, 0, 0, 0, void 0, 12, 10);
+  hs.scale.set(1.05, 0.95, 1);
+  if (a.face) {
+    const fc = S(head, 0.2, a.face, 0, -0.02, 0.15, void 0, 10, 8);
+    fc.scale.set(1.1, 1, 0.6);
+  } else if (!a.headC) {
+    const m = S(head, 0.15, a.belly, 0, -0.08, 0.2, void 0, 8, 6);
+    m.scale.set(1.2, 0.8, 0.7);
+  }
+  for (const sx of [-1, 1]) {
+    S(head, 0.06, "#ffffff", sx * 0.11, 0.05, 0.25, void 0, 8, 6);
+    S(head, 0.038, "#111", sx * 0.11, 0.05, 0.29, void 0, 6, 5);
+    S(head, 0.014, "#fff", sx * 0.1, 0.07, 0.32, void 0, 4, 3);
+  }
+  for (const sx of [-1, 1]) S(head, 0.05, "#ff8a80", sx * 0.19, -0.07, 0.22, void 0, 5, 4).scale.z = 0.3;
+  if (a.beak) {
+    const bk = put(head, new THREE.ConeGeometry(0.07, 0.2, 6), a.beak, 0, -0.04, 0.33);
+    bk.rotation.x = Math.PI / 2;
+  } else if (a.snout) {
+    const sn = put(head, new THREE.CylinderGeometry(0.05, 0.11, 0.28, 8), a.fur, 0, -0.06, 0.32);
+    sn.rotation.x = Math.PI / 2;
+    S(head, 0.04, "#3e2723", 0, -0.06, 0.46);
+  } else S(head, 0.035, "#3e2723", 0, -0.05, 0.31);
+  if (a.ear === "cat") for (const sx of [-1, 1]) {
+    const e = put(head, new THREE.ConeGeometry(0.1, 0.2, 4), a.fur, sx * 0.17, 0.27, 0);
+    e.rotation.z = -sx * 0.25;
+  }
+  if (a.ear === "round" || a.ear === "deer") for (const sx of [-1, 1]) {
+    const e = S(head, a.ear === "deer" ? 0.1 : 0.09, a.fur, sx * (a.ear === "deer" ? 0.3 : 0.29), a.ear === "deer" ? 0.12 : 0.02, 0, void 0, 6, 5);
+    e.scale.set(a.ear === "deer" ? 1.6 : 0.6, a.ear === "deer" ? 0.6 : 1, 0.5);
+  }
+  if (charId === "leopard") {
+    B(head, 0.035, 0.18, 0.02, "#fffde7", -0.05, 0.12, 0.27).rotation.x = -0.6;
+    B(head, 0.035, 0.18, 0.02, "#fffde7", 0.05, 0.12, 0.27).rotation.x = -0.6;
+    for (let i = 0; i < 6; i++) S(torso, 0.04, a.spots, Math.cos(i) * 0.26, 0.05 + i % 3 * 0.12, Math.sin(i) * 0.2 - 0.05, void 0, 5, 4);
+  }
+  if (charId === "deer") {
+    for (let i = 0; i < 7; i++) S(torso, 0.035, a.spots, Math.cos(i * 1.7) * 0.25, 0.08 + i % 3 * 0.1, -0.1 - Math.abs(Math.sin(i)) * 0.15, void 0, 5, 4);
+    for (const sx of [-1, 1]) {
+      const an = new THREE.Group();
+      an.position.set(sx * 0.12, 0.25, 0);
+      head.add(an);
+      const st = C(an, 0.02, 0.03, 0.3, "#d7ccc8", 0, 0, 0, 5);
+      st.rotation.z = -sx * 0.3;
+      const br = C(an, 0.015, 0.02, 0.15, "#d7ccc8", sx * 0.06, 0.12, 0, 5);
+      br.rotation.z = sx * 0.6;
+    }
+  }
+  if (charId === "magpie") {
+    const c = S(head, 0.06, "#e53935", 0.13, 0.12, 0.2, void 0, 5, 4);
+    c.scale.set(0.5, 0.5, 0.5);
+  }
+  if (charId === "pheasant") {
+    for (const sx of [-1, 1]) S(head, 0.07, a.face, sx * 0.12, 0.05, 0.2, void 0, 6, 5).scale.z = 0.4;
+  }
+  if (a.scales) for (let r = 0; r < 3; r++) for (let k = -1; k <= 1; k++) {
+    const sc = put(torso, new THREE.ConeGeometry(0.12, 0.14, 4), a.scales, k * 0.17, 0.35 - r * 0.15, -0.2 - r * 0.02);
+    sc.rotation.x = -2.2;
+  }
+  if (a.scales) for (let k = -1; k <= 1; k++) {
+    const sc = put(head, new THREE.ConeGeometry(0.1, 0.12, 4), a.scales, k * 0.13, 0.2, -0.12);
+    sc.rotation.x = -2;
+  }
+  const tail = new THREE.Group();
+  tail.position.set(0, 0, -0.25);
+  torso.add(tail);
+  if (a.tail === "long") {
+    const tl = C(tail, 0.04, 0.06, 0.6, a.fur, 0, 0, 0, 6);
+    tl.rotation.x = -0.9;
+    if (charId === "leopard") for (let i = 0; i < 3; i++) C(tail, 0.065, 0.065, 0.05, a.spots, 0, 0.12 + i * 0.13, -0.1 - i * 0.12, 6).rotation.x = -0.9;
+  }
+  if (a.tail === "short") S(tail, 0.07, "#ffffff", 0, 0.12, 0);
+  if (a.tail === "bird") {
+    for (const sx of [-1, 1]) {
+      const f = B(tail, 0.12, 0.05, 0.85, a.fur, sx * 0.05, 0, -0.4);
+      f.rotation.x = -0.35;
+      B(tail, 0.12, 0.051, 0.15, "#ffffff", sx * 0.05, -0.15, -0.8).rotation.x = -0.35;
+    }
+  }
+  if (a.tail === "pheasant") {
+    for (let i = 0; i < 6; i++) {
+      const f = B(tail, 0.1, 0.04, 0.16, i % 2 ? "#eceff1" : "#212121", 0, 0.02 + i * 0.05, -0.08 - i * 0.15);
+      f.rotation.x = -0.35;
+    }
+  }
+  if (a.tail === "scaly") {
+    for (let i = 0; i < 4; i++) {
+      const f = put(tail, new THREE.ConeGeometry(0.12 - i * 0.02, 0.18, 4), a.scales, 0, -0.1 - i * 0.03, -0.05 - i * 0.14);
+      f.rotation.x = -1.9;
+    }
+  }
+  root.userData = { body, legL, legR, armL, armR, head, torso, tail, walk: 0 };
+  return root;
+}
+function buildToken(charId, color) {
+  if (ANIMALS[charId]) return buildAnimal(charId, color);
+  const root = new THREE.Group();
+  C(root, 0.42, 0.46, 0.06, "#ffffff", 0, 0, 0, 16, { e: color, ei: 0.35 });
+  const body = new THREE.Group();
+  body.position.y = 0.06;
+  root.add(body);
+  const bear = charId === "bear";
+  const skin = bear ? "#212121" : "#f5cba7";
+  const shirt = bear ? "#212121" : color;
+  const pants = { boss: "#263238", ama: "#5d4037", chef: "#eeeeee", boba: "#3949ab", surf: "#1565c0", bear: "#212121" }[charId] || "#37474f";
+  const legL = limb(body, 0.085, 0.3, pants, -0.12, 0.45, 0), legR = limb(body, 0.085, 0.3, pants, 0.12, 0.45, 0);
+  for (const l of [legL, legR]) {
+    const sh = S(l, 0.1, bear ? "#3e2723" : "#3e2723", 0, -0.48, 0.04, void 0, 6, 4);
+    sh.scale.set(1, 0.6, 1.4);
+  }
+  const torso = new THREE.Group();
+  torso.position.y = 0.45;
+  body.add(torso);
+  const tor = C(torso, 0.2, 0.25, 0.48, shirt, 0, 0, 0, 10);
+  if (charId === "ama" || charId === "boba") C(torso, 0.25, 0.36, 0.3, charId === "ama" ? "#7b1fa2" : "#fdd835", 0, -0.05, 0, 10);
+  const armL = limb(torso, 0.065, 0.3, shirt, -0.27, 0.42, 0), armR = limb(torso, 0.065, 0.3, shirt, 0.27, 0.42, 0);
+  armL.rotation.z = 0.15;
+  armR.rotation.z = -0.15;
+  for (const a of [armL, armR]) S(a, 0.075, skin, 0, -0.47, 0, void 0, 6, 5);
+  const head = new THREE.Group();
+  head.position.y = 0.78;
+  torso.add(head);
+  S(head, bear ? 0.32 : 0.29, skin, 0, 0, 0, void 0, 12, 10);
+  if (bear) {
+    S(head, 0.11, "#212121", -0.23, 0.24, 0);
+    S(head, 0.11, "#212121", 0.23, 0.24, 0);
+    S(head, 0.06, "#5d4037", -0.23, 0.24, 0.05);
+    S(head, 0.06, "#5d4037", 0.23, 0.24, 0.05);
+    S(head, 0.14, "#c8a27a", 0, -0.06, 0.24, void 0, 8, 6).scale.z = 0.6;
+    S(head, 0.045, "#000", 0, -0.02, 0.33);
+    S(head, 0.04, "#fff", -0.11, 0.07, 0.27);
+    S(head, 0.04, "#fff", 0.11, 0.07, 0.27);
+    S(head, 0.02, "#000", -0.11, 0.07, 0.3);
+    S(head, 0.02, "#000", 0.11, 0.07, 0.3);
+    const v = B(torso, 0.34, 0.1, 0.05, "#fafafa", 0, 0.22, 0.22);
+  } else {
+    S(head, 0.045, "#fff", -0.1, 0.03, 0.25);
+    S(head, 0.045, "#fff", 0.1, 0.03, 0.25);
+    S(head, 0.028, "#222", -0.1, 0.03, 0.285);
+    S(head, 0.028, "#222", 0.1, 0.03, 0.285);
+    S(head, 0.05, "#ef9a9a", -0.17, -0.07, 0.22, void 0, 5, 4).scale.z = 0.3;
+    S(head, 0.05, "#ef9a9a", 0.17, -0.07, 0.22, void 0, 5, 4).scale.z = 0.3;
+    const mouth = S(head, 0.045, "#c62828", 0, -0.12, 0.26, void 0, 6, 4);
+    mouth.scale.set(1.2, 0.5, 0.5);
+  }
+  if (charId === "boss") {
+    S(head, 0.3, "#212121", 0, 0.06, -0.03, void 0, 10, 6).scale.set(1, 0.7, 1);
+    C(head, 0.34, 0.34, 0.03, "#111", 0, 0.2, 0, 14);
+    C(head, 0.2, 0.21, 0.33, "#111", 0, 0.21, 0, 12);
+    C(head, 0.21, 0.21, 0.05, "#c62828", 0, 0.24, 0, 12);
+    B(torso, 0.18, 0.08, 0.04, "#fdd835", 0, 0.28, 0.22);
+    B(torso, 0.05, 0.3, 0.02, "#fafafa", 0, 0, 0.245);
+    const cane = C(armR, 0.02, 0.02, 0.6, "#d4af37", 0, -1, 0.08, 5);
+  } else if (charId === "ama") {
+    S(head, 0.3, "#bdbdbd", 0, 0.06, -0.04, void 0, 10, 6).scale.y = 0.75;
+    S(head, 0.15, "#bdbdbd", 0, 0.2, -0.25);
+    C(head, 0.12, 0.12, 0.02, "#5d4037", -0.1, 0.03, 0.27, 10).rotation.x = Math.PI / 2;
+    C(head, 0.12, 0.12, 0.02, "#5d4037", 0.1, 0.03, 0.27, 10).rotation.x = Math.PI / 2;
+    const bag = S(armL, 0.13, "#e91e63", 0, -0.55, 0.05, void 0, 7, 5);
+    bag.scale.set(1, 0.8, 0.5);
+  } else if (charId === "chef") {
+    C(head, 0.21, 0.19, 0.25, "#ffffff", 0, 0.2, 0, 12);
+    S(head, 0.25, "#ffffff", 0, 0.5, 0, void 0, 9, 6).scale.y = 0.7;
+    C(torso, 0.26, 0.26, 0.04, "#ffffff", 0, 0.38, 0, 10);
+    B(torso, 0.3, 0.32, 0.03, "#ffffff", 0, 0.02, 0.24);
+    const sp = B(armR, 0.05, 0.4, 0.05, "#9e9e9e", 0, -0.8, 0.05);
+    C(armR, 0.12, 0.12, 0.03, "#616161", 0, -0.98, 0.05, 10);
+  } else if (charId === "boba") {
+    S(head, 0.3, "#3e2723", 0, 0.05, -0.05, void 0, 10, 6).scale.y = 0.8;
+    S(head, 0.13, "#3e2723", -0.25, 0.22, 0);
+    S(head, 0.13, "#3e2723", 0.25, 0.22, 0);
+    S(head, 0.05, "#e91e63", -0.17, 0.27, 0.05);
+    S(head, 0.05, "#e91e63", 0.17, 0.27, 0.05);
+    C(armR, 0.08, 0.065, 0.24, "#d7b48a", 0, -0.68, 0.06, 8, { op: 0.92 });
+    C(armR, 0.012, 0.012, 0.18, "#e91e63", 0.02, -0.47, 0.06, 4);
+    for (let i = 0; i < 4; i++) S(armR, 0.02, "#3e2723", (i - 1.5) * 0.03, -0.64, 0.12, void 0, 4, 3);
+  } else if (charId === "surf") {
+    S(head, 0.3, "#ffb300", 0, 0.06, -0.04, void 0, 10, 6).scale.y = 0.75;
+    const cap = S(head, 0.3, "#1565c0", 0, 0.12, 0, void 0, 10, 6);
+    cap.scale.y = 0.5;
+    B(head, 0.3, 0.03, 0.22, "#1565c0", 0, 0.15, -0.3);
+    const bd = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 1, 3, 10), mat("#ff7043"));
+    bd.scale.z = 0.22;
+    bd.position.set(0, 0.25, -0.3);
+    bd.rotation.z = 0.15;
+    bd.castShadow = true;
+    torso.add(bd);
+    B(torso, 0.04, 0.9, 0.02, "#ffffff", 0.04, -0.2, -0.34).rotation.z = 0.15;
+  }
+  root.userData = { body, legL, legR, armL, armR, head, torso, walk: 0 };
+  return root;
+}
+function animateToken(tok, mode, t, dt) {
+  const u = tok.userData;
+  if (!u.body) return;
+  const k = Math.min(1, dt * 10);
+  let lL = 0, lR = 0, aL = 0.15, aR = -0.15, aLx = 0, aRx = 0, by = 0, hy = 0, tz = 0, tx = 0;
+  if (mode === "walk") {
+    u.walk += dt * 13;
+    const w = Math.sin(u.walk);
+    lL = w * 0.8;
+    lR = -w * 0.8;
+    aLx = -w * 0.9;
+    aRx = w * 0.9;
+    by = Math.abs(Math.cos(u.walk)) * 0.06;
+    tx = 0.12;
+  } else if (mode === "wave") {
+    aR = -2.6 + Math.sin(t * 9) * 0.35;
+    by = Math.abs(Math.sin(t * 3)) * 0.05;
+    hy = Math.sin(t * 2) * 0.25;
+  } else if (mode === "cheer") {
+    aL = 2.7;
+    aR = -2.7;
+    by = Math.abs(Math.sin(t * 8)) * 0.35;
+  } else if (mode === "sad") {
+    aL = 0.05;
+    aR = -0.05;
+    tx = 0.35;
+    hy = 0;
+  } else if (mode === "sick") {
+    tz = 1.35;
+    aL = 1.2;
+    aR = -1.2;
+  } else {
+    by = Math.sin(t * 2.2 + tok.id) * 0.02;
+    hy = Math.sin(t * 0.7 + tok.id) * 0.35;
+    aL = 0.15 + Math.sin(t * 2.2) * 0.04;
+    aR = -aL;
+  }
+  const L = (o, p, v) => {
+    o[p] += (v - o[p]) * k;
+  };
+  if (u.tail) u.tail.rotation.y = Math.sin(t * (mode === "walk" ? 10 : 3)) * 0.35;
+  L(u.legL.rotation, "x", lL);
+  L(u.legR.rotation, "x", lR);
+  L(u.armL.rotation, "z", aL);
+  L(u.armR.rotation, "z", aR);
+  L(u.armL.rotation, "x", aLx);
+  L(u.armR.rotation, "x", aRx);
+  L(u.body.position, "y", 0.06 + by);
+  L(u.head.rotation, "y", hy);
+  L(u.body.rotation, "z", tz);
+  L(u.torso.rotation, "x", tx);
+}
+
+// src/world.js
+var COAST = [
+  [121.53, 25.3],
+  [121.65, 25.24],
+  [121.74, 25.15],
+  [121.92, 25.05],
+  [122, 25.01],
+  [121.87, 24.86],
+  [121.83, 24.7],
+  [121.86, 24.58],
+  [121.8, 24.4],
+  [121.7, 24.18],
+  [121.62, 24],
+  [121.55, 23.75],
+  [121.48, 23.45],
+  [121.4, 23.15],
+  [121.28, 22.95],
+  [121.15, 22.75],
+  [121, 22.55],
+  [120.9, 22.33],
+  [120.85, 22.1],
+  [120.87, 21.9],
+  [120.74, 21.94],
+  [120.7, 22.1],
+  [120.62, 22.3],
+  [120.45, 22.48],
+  [120.28, 22.58],
+  [120.22, 22.8],
+  [120.15, 23],
+  [120.12, 23.2],
+  [120.14, 23.4],
+  [120.16, 23.65],
+  [120.25, 23.85],
+  [120.4, 24.05],
+  [120.52, 24.25],
+  [120.63, 24.45],
+  [120.72, 24.62],
+  [120.88, 24.82],
+  [121, 24.98],
+  [121.15, 25.08],
+  [121.4, 25.17],
+  [121.48, 25.26]
+];
+var SC = 31;
+var proj = ([lon, lat]) => new THREE2.Vector2((lon - 121) * 0.915 * 1.5 * SC, -(lat - 23.6) * SC);
+var POLY = COAST.map(proj);
+var SPINE = [[121.6, 24.95], [121.35, 24.35], [121.1, 23.7], [120.92, 23], [120.8, 22.3]].map(proj);
+function segDist(px, pz, a, b) {
+  const dx = b.x - a.x, dz = b.y - a.y;
+  const l = dx * dx + dz * dz;
+  let t = l ? ((px - a.x) * dx + (pz - a.y) * dz) / l : 0;
+  t = Math.max(0, Math.min(1, t));
+  const x = a.x + dx * t - px, z = a.y + dz * t - pz;
+  return Math.sqrt(x * x + z * z);
+}
+function inside(px, pz, poly) {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if (a.y > pz !== b.y > pz && px < (b.x - a.x) * (pz - a.y) / (b.y - a.y) + a.x) c = !c;
+  }
+  return c;
+}
+function sdist(px, pz) {
+  let d = 1e9;
+  for (let i = 0; i < POLY.length; i++) d = Math.min(d, segDist(px, pz, POLY[i], POLY[(i + 1) % POLY.length]));
+  return inside(px, pz, POLY) ? d : -d;
+}
+function hash(x, z) {
+  const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+function vnoise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+  const a = hash(xi, zi), b = hash(xi + 1, zi), c = hash(xi, zi + 1), d = hash(xi + 1, zi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+var smooth = (a, b, x) => {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+function heightAt(x, z) {
+  const d = sdist(x, z);
+  if (d < 0) return Math.max(-2.5, -0.35 + d * 0.18);
+  let h = 0.3 + 0.15 * smooth(0, 1.2, d);
+  let ds = 1e9;
+  for (let i = 0; i < SPINE.length - 1; i++) ds = Math.min(ds, segDist(x, z, SPINE[i], SPINE[i + 1]));
+  const n = vnoise(x * 0.18, z * 0.18) * 0.65 + vnoise(x * 0.5, z * 0.5) * 0.35;
+  const m = smooth(8, 20, d) * (8 * Math.exp(-(ds * ds) / 170) + 1.8) * (0.65 + n * 0.6);
+  return h + m;
+}
+function buildPath() {
+  const n = POLY.length, pts = [];
+  for (let i = 0; i < n; i++) {
+    const p = POLY[i], a = POLY[(i - 1 + n) % n], b = POLY[(i + 1) % n];
+    const t = new THREE2.Vector2().subVectors(b, a).normalize();
+    let nm = new THREE2.Vector2(-t.y, t.x);
+    const test = p.clone().addScaledVector(nm, 0.5);
+    if (!inside(test.x, test.y, POLY)) nm.negate();
+    pts.push(p.clone().addScaledVector(nm, 2.7));
+  }
+  let poly = pts;
+  for (let it = 0; it < 3; it++) {
+    const q = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      q.push(a.clone().lerp(b, 0.25), a.clone().lerp(b, 0.75));
+    }
+    poly = q;
+  }
+  const L = [0];
+  for (let i = 1; i <= poly.length; i++) L.push(L[i - 1] + poly[i - 1].distanceTo(poly[i % poly.length]));
+  const total = L[poly.length];
+  const start = proj([121.6, 25.17]);
+  let si = 0, sd = 1e9;
+  poly.forEach((p, i) => {
+    const d = p.distanceTo(start);
+    if (d < sd) {
+      sd = d;
+      si = i;
+    }
+  });
+  const out = [];
+  for (let k = 0; k < N_TILES; k++) {
+    let target = (L[si] + k / N_TILES * total) % total;
+    let j = 0;
+    while (L[j + 1] < target) j++;
+    const f = (target - L[j]) / (L[j + 1] - L[j]);
+    out.push(poly[j].clone().lerp(poly[(j + 1) % poly.length], f));
+  }
+  return { pts: out, spacing: total / N_TILES };
+}
+function tileTexture(i) {
+  const t = TILES[i];
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = 256;
+  const x = cv.getContext("2d");
+  const gc = t.g ? GROUPS[t.g].color : "#f9a825";
+  x.fillStyle = t.type === "prop" ? "#fffaf0" : "#fff3c4";
+  x.fillRect(0, 0, 256, 256);
+  x.textAlign = "center";
+  x.textBaseline = "middle";
+  if (t.type === "prop") {
+    x.fillStyle = gc;
+    x.fillRect(0, 0, 256, 64);
+    x.fillStyle = "#fff";
+    x.font = 'bold 34px "Noto Sans TC",sans-serif';
+    x.fillText(GROUPS[t.g].name, 128, 34);
+    x.fillStyle = "#222";
+    let fs = 54;
+    x.font = `bold ${fs}px "Noto Sans TC",sans-serif`;
+    while (x.measureText(t.name).width > 236 && fs > 24) {
+      fs -= 3;
+      x.font = `bold ${fs}px "Noto Sans TC",sans-serif`;
+    }
+    x.fillText(t.name, 128, 138);
+    x.fillStyle = "#555";
+    x.font = "bold 34px sans-serif";
+    x.fillText("$" + t.price.toLocaleString(), 128, 210);
+  } else {
+    x.font = "90px sans-serif";
+    x.fillText(t.icon || "⭐", 128, 100);
+    x.fillStyle = "#222";
+    let fs = 50;
+    x.font = `bold ${fs}px "Noto Sans TC",sans-serif`;
+    while (x.measureText(t.name).width > 236 && fs > 24) {
+      fs -= 3;
+      x.font = `bold ${fs}px "Noto Sans TC",sans-serif`;
+    }
+    x.fillText(t.name, 128, 200);
+  }
+  x.strokeStyle = gc;
+  x.lineWidth = 10;
+  x.strokeRect(5, 5, 246, 246);
+  const tex = new THREE2.CanvasTexture(cv);
+  tex.colorSpace = THREE2.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+function textSprite(text, color = "#fff", bg = "rgba(0,0,0,0.55)", size = 44, k = 0.012) {
+  const cv = document.createElement("canvas");
+  const x = cv.getContext("2d");
+  x.font = `bold ${size}px "Noto Sans TC",sans-serif`;
+  const w = Math.ceil(x.measureText(text).width) + 28;
+  cv.width = w;
+  cv.height = size + 22;
+  x.font = `bold ${size}px "Noto Sans TC",sans-serif`;
+  x.textAlign = "center";
+  x.textBaseline = "middle";
+  if (bg) {
+    x.fillStyle = bg;
+    const r = 14;
+    x.beginPath();
+    x.roundRect(0, 0, w, cv.height, r);
+    x.fill();
+  }
+  x.lineWidth = 6;
+  x.strokeStyle = "rgba(0,0,0,0.6)";
+  x.strokeText(text, w / 2, cv.height / 2 + 2);
+  x.fillStyle = color;
+  x.fillText(text, w / 2, cv.height / 2 + 2);
+  const tex = new THREE2.CanvasTexture(cv);
+  tex.colorSpace = THREE2.SRGBColorSpace;
+  const sp = new THREE2.Sprite(new THREE2.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sp.scale.set(w * k, cv.height * k, 1);
+  sp.renderOrder = 10;
+  return sp;
+}
+var World = class {
+  constructor(canvas, opts = {}) {
+    this.opts = opts;
+    const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+    this.renderer = new THREE2.WebGLRenderer({ canvas, antialias: !mobile || devicePixelRatio < 2, powerPreference: "high-performance" });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE2.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE2.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    const sc = this.scene = new THREE2.Scene();
+    sc.background = new THREE2.Color("#8fd0f2");
+    sc.fog = new THREE2.Fog("#8fd0f2", 160, 320);
+    this.camera = new THREE2.PerspectiveCamera(45, 1, 0.5, 600);
+    this.camera.position.set(0, 148, 34);
+    this.controls = new OrbitControls(this.camera, canvas);
+    this.controls.enableDamping = true;
+    this.controls.maxPolarAngle = Math.PI * 0.46;
+    this.controls.minDistance = 8;
+    this.controls.maxDistance = 200;
+    this.controls.target.set(0, 0, 1);
+    this.controls.addEventListener("start", () => {
+      this.userMoved = performance.now();
+    });
+    sc.add(new THREE2.HemisphereLight("#dff4ff", "#4b6b3a", 0.9));
+    const sun = this.sun = new THREE2.DirectionalLight("#fff4e0", 2);
+    sun.position.set(-40, 80, 30);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
+    Object.assign(sun.shadow.camera, { left: -75, right: 75, top: 80, bottom: -80, near: 1, far: 220 });
+    sun.shadow.bias = -8e-4;
+    sun.shadow.normalBias = 0.03;
+    sc.add(sun);
+    sc.add(sun.target);
+    this.buildTerrain();
+    const { pts, spacing } = buildPath();
+    this.path = pts;
+    this.spacing = spacing;
+    this.buildTiles();
+    this.tokens = {};
+    this.tokenState = {};
+    this.marks = {};
+    this.floaters = [];
+    this.follow = true;
+    this.followId = null;
+    this.hl = null;
+    this.cheer = {};
+    this.cheerMode = {};
+    this.clock = new THREE2.Clock();
+    this.ray = new THREE2.Raycaster();
+    this.mouse = new THREE2.Vector2();
+    let downAt = null;
+    canvas.addEventListener("pointerdown", (e) => {
+      downAt = [e.clientX, e.clientY];
+    });
+    canvas.addEventListener("pointerup", (e) => {
+      if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 8) return;
+      const r = canvas.getBoundingClientRect();
+      this.mouse.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      this.ray.setFromCamera(this.mouse, this.camera);
+      const hits = this.ray.intersectObjects(this.pickables, true);
+      if (hits.length) {
+        let o = hits[0].object;
+        while (o && o.userData.tile == null) o = o.parent;
+        if (o) this.opts.onTileClick?.(o.userData.tile);
+      }
+    });
+    this.resize();
+    addEventListener("resize", () => this.resize());
+    this.renderer.setAnimationLoop(() => this.frame());
+  }
+  resize() {
+    const c = this.renderer.domElement, w = c.clientWidth || innerWidth, h = c.clientHeight || innerHeight;
+    this.renderer.setSize(w, h, false);
+    this.camera.aspect = w / h;
+    this.camera.fov = w < h ? 60 : 45;
+    this.camera.updateProjectionMatrix();
+  }
+  buildTerrain() {
+    const W = 165, H = 180, SX = 200, SZ = 220;
+    const geo = new THREE2.PlaneGeometry(W, H, SX, SZ);
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(-2, 0, 2);
+    const pos = geo.attributes.position, col = new Float32Array(pos.count * 3), c = new THREE2.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i), h = heightAt(x, z);
+      pos.setY(i, h);
+      if (h < -0.1) c.set(h < -1.2 ? "#2a7fb0" : "#57c4c8");
+      else if (h < 0.55) c.set("#e9dca4").lerp(new THREE2.Color("#8cc56a"), smooth(0.3, 0.5, h));
+      else if (h < 3) c.set("#6fb35a").lerp(new THREE2.Color("#3f8a3e"), smooth(0.5, 3, h));
+      else if (h < 7) c.set("#3f8a3e").lerp(new THREE2.Color("#5f6f4d"), smooth(3, 7, h));
+      else c.set("#7a7a6e").lerp(new THREE2.Color("#f2f2f2"), smooth(9, 12, h));
+      col.set([c.r, c.g, c.b], i * 3);
+    }
+    geo.setAttribute("color", new THREE2.BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    const land2 = new THREE2.Mesh(geo, new THREE2.MeshStandardMaterial({ vertexColors: true, flatShading: false, roughness: 0.95 }));
+    land2.receiveShadow = true;
+    this.scene.add(land2);
+    const sea = new THREE2.Mesh(new THREE2.PlaneGeometry(600, 600), new THREE2.MeshStandardMaterial({ color: "#1f8fd1", transparent: true, opacity: 0.72, roughness: 0.15, metalness: 0.2 }));
+    sea.rotation.x = -Math.PI / 2;
+    sea.position.y = 0;
+    sea.receiveShadow = true;
+    this.scene.add(sea);
+    this.sea = sea;
+    const deep = new THREE2.Mesh(new THREE2.PlaneGeometry(600, 600), mat("#2a7fb0"));
+    deep.rotation.x = -Math.PI / 2;
+    deep.position.y = -2.6;
+    this.scene.add(deep);
+    this.clouds = [];
+    for (let i = 0; i < 9; i++) {
+      const g = new THREE2.Group();
+      for (let k = 0; k < 4; k++) {
+        const s = S(g, 2 + Math.random() * 1.5, "#ffffff", k * 2.2 - 3, Math.random(), Math.random() * 1.5, { op: 0.85 }, 7, 5);
+        s.castShadow = false;
+        s.scale.y = 0.55;
+      }
+      g.position.set((Math.random() - 0.5) * 200, 34 + Math.random() * 8, -60 - Math.random() * 60);
+      this.scene.add(g);
+      this.clouds.push(g);
+    }
+  }
+  buildTiles() {
+    this.tileObjs = [];
+    this.pickables = [];
+    this.lmSpots = [];
+    const n = this.path.length, size = Math.min(3.5, this.spacing * 0.9);
+    this.tileSize = size;
+    for (let i = 0; i < n; i++) {
+      const p = this.path[i], a = this.path[(i - 1 + n) % n], b = this.path[(i + 1) % n];
+      const tan = new THREE2.Vector2().subVectors(b, a).normalize();
+      let best = null, bd = 1e9;
+      for (let k = 0; k < SPINE.length - 1; k++) {
+        const A = SPINE[k], Bq = SPINE[k + 1], d = new THREE2.Vector2().subVectors(Bq, A);
+        let f = d.dot(new THREE2.Vector2().subVectors(p, A)) / d.lengthSq();
+        f = Math.max(0, Math.min(1, f));
+        const q = A.clone().addScaledVector(d, f), dd = q.distanceTo(p);
+        if (dd < bd) {
+          bd = dd;
+          best = q;
+        }
+      }
+      let nm = new THREE2.Vector2().subVectors(best, p).normalize();
+      const perp = new THREE2.Vector2(-tan.y, tan.x);
+      if (perp.dot(nm) < 0) perp.negate();
+      nm = nm.multiplyScalar(0.5).addScaledVector(perp, 0.5).normalize();
+      const y = Math.max(0.35, heightAt(p.x, p.y)) + 0.18;
+      const g = new THREE2.Group();
+      g.position.set(p.x, y, p.y);
+      g.userData.tile = i;
+      const ang = Math.atan2(tan.x, tan.y);
+      const base = new THREE2.Mesh(new THREE2.BoxGeometry(size + 0.25, 0.32, size + 0.25), new THREE2.MeshStandardMaterial({ color: "#cbbf9f", roughness: 0.6 }));
+      base.rotation.y = ang;
+      base.position.y = -0.1;
+      base.receiveShadow = true;
+      base.castShadow = true;
+      g.add(base);
+      const top = new THREE2.Mesh(new THREE2.BoxGeometry(size, 0.2, size), [mat("#fff8e7"), mat("#fff8e7"), new THREE2.MeshStandardMaterial({ map: tileTexture(i), roughness: 0.6 }), mat("#fff8e7"), mat("#fff8e7"), mat("#fff8e7")]);
+      top.position.y = 0.06;
+      top.receiveShadow = true;
+      g.add(top);
+      this.scene.add(g);
+      this.pickables.push(g);
+      const t = TILES[i];
+      const lm = buildLandmark(t.type === "prop" ? t.model : t.type);
+      let lp;
+      if (t.sea) {
+        lp = new THREE2.Vector2(p.x - nm.x * 6.2, p.y - nm.y * 6.2);
+        lm.position.set(lp.x, 0, lp.y);
+      } else {
+        let off = 5;
+        lp = new THREE2.Vector2(p.x + nm.x * off, p.y + nm.y * off);
+        const bad = (q) => this.lmSpots.some((r) => r.distanceTo(q) < 4.2) || this.path.some((r) => r.distanceTo(q) < 3.9);
+        for (let tries = 0; tries < 16 && bad(lp); tries++) {
+          off += 1;
+          lp.set(p.x + nm.x * off, p.y + nm.y * off);
+        }
+        lm.position.set(lp.x, heightAt(lp.x, lp.y) - 0.05, lp.y);
+      }
+      this.lmSpots.push(lp.clone());
+      lm.rotation.y = Math.atan2(-nm.x, -nm.y);
+      lm.scale.setScalar(1.15);
+      lm.userData.tile = i;
+      this.scene.add(lm);
+      this.pickables.push(lm);
+      if (!t.sea && t.type === "prop") {
+        const pad = C(new THREE2.Group(), 1.9, 2.1, 0.5, "#7fb862", 0, -0.45, 0, 12);
+        pad.position.copy(lm.position).y -= 0.4;
+        this.scene.add(pad);
+      }
+      const lot = new THREE2.Group();
+      const lotP = new THREE2.Vector2(p.x + nm.x * (size / 2 + 0.75), p.y + nm.y * (size / 2 + 0.75));
+      lot.position.set(lotP.x, Math.max(0.35, heightAt(lotP.x, lotP.y)), lotP.y);
+      lot.rotation.y = ang;
+      this.scene.add(lot);
+      const ring = new THREE2.Mesh(new THREE2.RingGeometry(size * 0.62, size * 0.74, 32), new THREE2.MeshBasicMaterial({ color: "#ffeb3b", transparent: true, opacity: 0, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.2;
+      g.add(ring);
+      this.tileObjs.push({ g, base, lm, lot, ring, nm, tan, ang, level: -1, owner: void 0, pos: new THREE2.Vector3(p.x, y + 0.17, p.y) });
+    }
+  }
+  tilePos(i) {
+    return this.tileObjs[i].pos;
+  }
+  // 依狀態更新場景
+  setState(s, offset) {
+    this.state = s;
+    this.offset = offset || 0;
+    const colors = {};
+    s.players.forEach((p) => {
+      colors[p.id] = (CHARS.find((c) => c.id === p.char) || CHARS[0]).color;
+    });
+    this.colors = colors;
+    s.tiles.forEach((t, i) => {
+      if (!t) return;
+      const o = this.tileObjs[i];
+      if (o.owner !== t.o) {
+        o.owner = t.o;
+        o.base.material.color.set(t.o ? colors[t.o] : "#cbbf9f");
+        o.level = -1;
+      }
+      if (o.level !== t.l) {
+        o.level = t.l;
+        o.lot.clear();
+        if (t.o && t.l > 0) o.lot.add(buildHouses(t.l, colors[t.o]));
+        else if (t.o) {
+          const f = new THREE2.Group();
+          C(f, 0.03, 0.03, 1.1, "#eeeeee", 0, 0, 0, 4);
+          B(f, 0.55, 0.35, 0.03, colors[t.o], 0.28, 0.72, 0);
+          o.lot.add(f);
+        }
+      }
+    });
+    for (const k of Object.keys(this.marks)) if (!s.marks[k]) {
+      this.scene.remove(this.marks[k]);
+      delete this.marks[k];
+    }
+    for (const [k, v] of Object.entries(s.marks)) {
+      if (this.marks[k] && this.marks[k].userData.kind === v) continue;
+      if (this.marks[k]) this.scene.remove(this.marks[k]);
+      const g = new THREE2.Group();
+      g.userData.kind = v;
+      if (v === "block") {
+        C(g, 0.06, 0.4, 0.9, "#ff6d00", 0, 0, 0, 10);
+        C(g, 0.21, 0.27, 0.12, "#ffffff", 0, 0.35, 0, 10);
+        B(g, 0.9, 0.06, 0.9, "#ff6d00", 0, 0, 0);
+      } else {
+        const m = S(g, 0.4, "#263238", 0, 0, 0, void 0, 10, 6);
+        m.scale.y = 0.45;
+        S(g, 0.09, "#ff1744", 0, 0.2, 0, { e: "#ff1744" });
+      }
+      const tp = this.tileObjs[k].pos;
+      const off = this.tileObjs[k].tan;
+      g.position.set(tp.x + off.x * 1.1, tp.y, tp.z + off.y * 1.1);
+      this.scene.add(g);
+      this.marks[k] = g;
+    }
+    s.players.forEach((p, idx) => {
+      if (!this.tokens[p.id]) {
+        const t = buildToken(p.char, colors[p.id]);
+        t.scale.setScalar(1.7);
+        const lab = textSprite(p.name, colors[p.id], "rgba(0,0,0,0.55)", 40, 75e-4);
+        lab.position.y = 1.65;
+        t.add(lab);
+        t.userData.label = lab;
+        const tp = this.tilePos(p.pos);
+        t.position.copy(tp);
+        this.scene.add(t);
+        this.tokens[p.id] = t;
+      }
+      this.tokens[p.id].visible = !p.out;
+    });
+    if (!this.arrow) {
+      this.arrow = new THREE2.Mesh(new THREE2.ConeGeometry(0.28, 0.6, 4), mat("#ffeb3b", { e: "#ffc107", ei: 0.7 }));
+      this.arrow.rotation.x = Math.PI;
+      this.scene.add(this.arrow);
+    }
+    const cp = s.players[s.turn];
+    this.followId = cp ? cp.id : null;
+  }
+  setHighlight(list) {
+    this.hl = list ? new Set(list) : null;
+    this.tileObjs.forEach((o, i) => {
+      o.ring.material.opacity = this.hl && this.hl.has(i) ? 0.9 : 0;
+    });
+  }
+  focusTile(i) {
+    this.focusAt = this.tilePos(i).clone();
+    this.focusUntil = performance.now() + 4e3;
+  }
+  setFollow(v) {
+    this.follow = v;
+    if (!v) this.overview();
+  }
+  overview() {
+    this.follow = false;
+    this.camTo = { target: new THREE2.Vector3(0, 0, 1), pos: new THREE2.Vector3(0, 148, 34) };
+  }
+  zoomIn() {
+    this.follow = true;
+    const t = this.tokens[this.followId];
+    if (!t) return;
+    this.camTo = { target: t.position.clone(), pos: t.position.clone().add(new THREE2.Vector3(0, 21, 20)) };
+  }
+  setAvatar(pid, img) {
+    const t = this.tokens[pid];
+    if (!t || t.userData.avImg === img) return;
+    t.userData.avImg = img;
+    if (t.userData.av) t.remove(t.userData.av);
+    const im = new Image();
+    im.onload = () => {
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = 128;
+      const x = cv.getContext("2d");
+      x.beginPath();
+      x.arc(64, 64, 60, 0, Math.PI * 2);
+      x.closePath();
+      x.save();
+      x.clip();
+      x.drawImage(im, 0, 0, 128, 128);
+      x.restore();
+      x.lineWidth = 8;
+      x.strokeStyle = this.colors[pid] || "#fff";
+      x.beginPath();
+      x.arc(64, 64, 60, 0, Math.PI * 2);
+      x.stroke();
+      const tex = new THREE2.CanvasTexture(cv);
+      tex.colorSpace = THREE2.SRGBColorSpace;
+      const sp = new THREE2.Sprite(new THREE2.SpriteMaterial({ map: tex, depthTest: false }));
+      sp.renderOrder = 11;
+      sp.scale.set(0.7, 0.7, 1);
+      sp.position.y = 2.15;
+      t.add(sp);
+      t.userData.av = sp;
+    };
+    im.src = img;
+  }
+  react(pid, mode, ms = 1600) {
+    this.cheer[pid] = performance.now() + ms;
+    this.cheerMode[pid] = mode;
+  }
+  floatText(pid, text, color) {
+    const t = this.tokens[pid];
+    if (!t) return;
+    const sp = textSprite(text, color, null, 54);
+    sp.position.copy(t.position).y += 2.4;
+    this.scene.add(sp);
+    this.floaters.push({ sp, t0: performance.now() });
+  }
+  burst(tile, color = "#ffcc00", n = 24) {
+    const p = this.tilePos(tile);
+    for (let i = 0; i < n; i++) {
+      const m = new THREE2.Mesh(new THREE2.BoxGeometry(0.18, 0.18, 0.18), mat(color, { e: color, ei: 0.6 }));
+      m.position.copy(p).y += 0.5;
+      this.scene.add(m);
+      const v = new THREE2.Vector3((Math.random() - 0.5) * 6, 4 + Math.random() * 5, (Math.random() - 0.5) * 6);
+      this.floaters.push({ m, v, t0: performance.now() });
+    }
+  }
+  tokenTarget(p, idxOnTile, countOnTile) {
+    const o = this.tileObjs[p.pos], base = o.pos.clone();
+    if (countOnTile > 1) {
+      const a = idxOnTile / countOnTile * Math.PI * 2;
+      base.x += Math.cos(a) * 0.85;
+      base.z += Math.sin(a) * 0.85;
+    }
+    return base;
+  }
+  frame() {
+    const dt = Math.min(0.05, this.clock.getDelta()), t = this.clock.elapsedTime;
+    const s = this.state;
+    this.scene.traverse((o) => {
+      if (o.userData.tick) o.userData.tick(t, dt);
+    });
+    this.clouds.forEach((c, i) => {
+      c.position.x += dt * (0.6 + i * 0.05);
+      if (c.position.x > 90) c.position.x = -90;
+    });
+    if (s) {
+      const now = Date.now() - this.offset;
+      const occ = {};
+      s.players.forEach((p) => {
+        if (!p.out) (occ[p.pos] = occ[p.pos] || []).push(p.id);
+      });
+      s.players.forEach((p) => {
+        const tok = this.tokens[p.id];
+        if (!tok) return;
+        let target, jump = 0, face = null;
+        const an = s.anim;
+        if (an && an.pid === p.id && s.step === "move") {
+          const el = now - an.t0 - (an.dice ? 900 : 200);
+          const path = an.path;
+          if (el < 0) target = this.tilePos(path[0]).clone();
+          else {
+            const k = Math.floor(el / 340), f = el % 340 / 340;
+            if (k >= path.length - 1) target = this.tilePos(path[path.length - 1]).clone();
+            else {
+              const A = this.tilePos(path[k]), Bp = this.tilePos(path[k + 1]);
+              target = A.clone().lerp(Bp, f);
+              jump = Math.sin(f * Math.PI) * 0.9;
+              face = Bp.clone().sub(A);
+            }
+          }
+          tok.position.copy(target);
+          tok.position.y += jump;
+        } else {
+          const list = occ[p.pos] || [p.id];
+          target = this.tokenTarget(p, list.indexOf(p.id), list.length);
+          const d = tok.position.distanceTo(target);
+          if (d > 6) tok.position.copy(target);
+          else tok.position.lerp(target, Math.min(1, dt * 8));
+        }
+        const moving = !!face || tok.userData.lastPos && tok.userData.lastPos.distanceTo(tok.position) > dt * 1.5;
+        tok.userData.lastPos = (tok.userData.lastPos || new THREE2.Vector3()).copy(tok.position);
+        if (face && face.lengthSq() > 1e-3) tok.rotation.y = Math.atan2(face.x, face.z);
+        else {
+          let ty = 0;
+          let d = ty - tok.rotation.y;
+          d = Math.atan2(Math.sin(d), Math.cos(d));
+          tok.rotation.y += d * Math.min(1, dt * 3);
+        }
+        const sick = p.st.hosp || p.st.jail || p.st.sleep;
+        const cheerUntil = this.cheer[p.id] || 0;
+        let mode = "idle";
+        if (p.out) mode = "sad";
+        else if (moving) mode = "walk";
+        else if (performance.now() < cheerUntil) mode = this.cheerMode[p.id] || "cheer";
+        else if (sick) mode = "sick";
+        else if (s.players[s.turn] === p && (s.step === "pre" || s.step === "decide")) mode = "wave";
+        animateToken(tok, mode, t, dt);
+      });
+      const ct = this.tokens[this.followId];
+      if (ct && this.arrow) {
+        this.arrow.visible = s.phase === "play";
+        this.arrow.position.copy(ct.position).y += 3.9 + Math.sin(t * 4) * 0.2;
+        this.arrow.rotation.y = t * 2;
+      }
+      const userIdle = !this.userMoved || performance.now() - this.userMoved > 2500;
+      let want = null;
+      if (this.focusAt && performance.now() < this.focusUntil) want = this.focusAt;
+      else if (this.follow && ct) want = ct.position;
+      if (want && userIdle && !this.camTo) {
+        const delta = want.clone().sub(this.controls.target).multiplyScalar(Math.min(1, dt * 2.5));
+        delta.y = 0;
+        this.controls.target.add(delta);
+        this.camera.position.add(delta);
+      }
+    }
+    if (this.camTo) {
+      const k = Math.min(1, dt * 3);
+      this.controls.target.lerp(this.camTo.target, k);
+      this.camera.position.lerp(this.camTo.pos, k);
+      if (this.camera.position.distanceTo(this.camTo.pos) < 0.3) this.camTo = null;
+    }
+    const nowp = performance.now();
+    this.floaters = this.floaters.filter((f) => {
+      const age = (nowp - f.t0) / 1e3;
+      if (f.sp) {
+        f.sp.position.y += dt * 1.2;
+        f.sp.material.opacity = Math.max(0, 1 - age / 1.8);
+        if (age > 1.8) {
+          this.scene.remove(f.sp);
+          return false;
+        }
+      }
+      if (f.m) {
+        f.v.y -= dt * 14;
+        f.m.position.addScaledVector(f.v, dt);
+        f.m.rotation.x += dt * 5;
+        if (age > 1.4) {
+          this.scene.remove(f.m);
+          return false;
+        }
+      }
+      return true;
+    });
+    if (this.hl) {
+      const a = 0.55 + Math.sin(t * 6) * 0.35;
+      this.tileObjs.forEach((o, i) => {
+        if (this.hl.has(i)) o.ring.material.opacity = a;
+      });
+    }
+    this.controls.update();
+    this.renderer.render(this.scene, this.camera);
+  }
+};
+
+// src/net.js
+var BROKERS = [
+  "wss://broker.emqx.io:8084/mqtt",
+  "wss://broker.hivemq.com:8884/mqtt",
+  "wss://test.mosquitto.org:8081/mqtt"
+];
+var BASE = "twrichman3d/v1/";
+var MqttNet = class {
+  constructor(room, brokerIdx, myId2) {
+    this.room = room;
+    this.bi = brokerIdx;
+    this.myId = myId2;
+    this.h = {};
+    this.status = "idle";
+  }
+  on(k, f) {
+    this.h[k] = f;
+  }
+  connect(timeout = 8e3) {
+    return new Promise((res, rej) => {
+      if (!window.mqtt) return rej(new Error("連線元件載入失敗"));
+      const c = this.c = window.mqtt.connect(BROKERS[this.bi], {
+        clientId: "tr3d_" + this.myId + "_" + Math.random().toString(36).slice(2, 7),
+        clean: true,
+        keepalive: 25,
+        reconnectPeriod: 2e3,
+        connectTimeout: timeout
+      });
+      let first = true;
+      const to = setTimeout(() => {
+        if (first) {
+          first = false;
+          try {
+            c.end(true);
+          } catch (e) {
+          }
+          rej(new Error("連線逾時"));
+        }
+      }, timeout + 500);
+      c.on("connect", () => {
+        this.status = "ok";
+        this.h.status?.("ok");
+        c.subscribe(BASE + this.room + "/#", { qos: 1 }, () => {
+          if (first) {
+            first = false;
+            clearTimeout(to);
+            res();
+          }
+          this.h.ready?.();
+        });
+      });
+      c.on("reconnect", () => {
+        this.status = "reconnecting";
+        this.h.status?.("reconnecting");
+      });
+      c.on("offline", () => {
+        this.status = "offline";
+        this.h.status?.("offline");
+      });
+      c.on("error", (e) => {
+        if (first) {
+          first = false;
+          clearTimeout(to);
+          rej(e);
+        }
+      });
+      c.on("message", (topic, payload) => {
+        const k = topic.slice((BASE + this.room + "/").length);
+        let m;
+        try {
+          m = JSON.parse(new TextDecoder().decode(payload));
+        } catch (e) {
+          return;
+        }
+        if (k.startsWith("av/")) this.h.av?.(m);
+        else this.h[k]?.(m);
+      });
+    });
+  }
+  pub(k, obj, retain = false) {
+    if (!this.c) return;
+    this.c.publish(BASE + this.room + "/" + k, JSON.stringify(obj), { qos: k === "hi" ? 0 : 1, retain });
+  }
+  close() {
+    try {
+      this.c && this.c.end(true);
+    } catch (e) {
+    }
+  }
+};
+var LocalNet = class {
+  constructor(room) {
+    this.room = room;
+    this.h = {};
+    this.status = "ok";
+  }
+  on(k, f) {
+    this.h[k] = f;
+  }
+  connect() {
+    this.bc = new BroadcastChannel("tr3d-" + this.room);
+    this.bc.onmessage = (e) => {
+      const { k, m } = e.data;
+      if (k.startsWith("av/")) this.h.av?.(m);
+      else this.h[k]?.(m);
+    };
+    setTimeout(() => this.h.ready?.(), 50);
+    return Promise.resolve();
+  }
+  pub(k, obj) {
+    this.bc.postMessage({ k, m: obj });
+  }
+  close() {
+    this.bc && this.bc.close();
+  }
+};
+
+// src/main.js
+var $ = (s) => document.querySelector(s);
+var esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+var LS = {
+  get(k, d) {
+    try {
+      const v = localStorage.getItem(k);
+      return v == null ? d : JSON.parse(v);
+    } catch (e) {
+      return d;
+    }
+  },
+  set(k, v) {
+    try {
+      localStorage.setItem(k, JSON.stringify(v));
+    } catch (e) {
+    }
+  }
+};
+var SS = {
+  get(k) {
+    try {
+      return sessionStorage.getItem(k);
+    } catch (e) {
+      return null;
+    }
+  },
+  set(k, v) {
+    try {
+      sessionStorage.setItem(k, v);
+    } catch (e) {
+    }
+  }
+};
+var rid = (n) => Array.from({ length: n }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join("");
+var charOf = (id) => CHARS.find((c) => c.id === id) || CHARS[0];
+var Q = new URLSearchParams(location.search);
+var myId = SS.get("tr3d-sid") || "u" + rid(8).toLowerCase();
+SS.set("tr3d-sid", myId);
+var G = {
+  s: null,
+  net: null,
+  room: Q.get("r"),
+  bi: +(Q.get("b") || 0),
+  localMode: Q.get("local") === "1",
+  solo: false,
+  isHost: false,
+  offset: 0,
+  seen: {},
+  hostSeenAt: 0,
+  lastStateAt: 0,
+  seenFx: -1,
+  hostStart: 0,
+  dirty: false,
+  ui: { mode: null },
+  sound: LS.get("tr3d-snd", true),
+  lastAnim: 0
+};
+var hnow = () => Date.now() - G.offset;
+var world;
+try {
+  world = new World($("#cv"), { onTileClick: (i) => onTileClick(i) });
+} catch (e) {
+  $("#loading").textContent = "你的裝置不支援 3D（WebGL），請換個瀏覽器試試。";
+  throw e;
+}
+$("#loading").classList.add("hidden");
+var actx;
+function beep(type) {
+  if (!G.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const t = actx.currentTime;
+    const tone = (f, d, w = "sine", v = 0.12, dl = 0) => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = w;
+      o.frequency.value = f;
+      g.gain.setValueAtTime(v, t + dl);
+      g.gain.exponentialRampToValueAtTime(1e-3, t + dl + d);
+      o.connect(g).connect(actx.destination);
+      o.start(t + dl);
+      o.stop(t + dl + d);
+    };
+    if (type === "coin") {
+      tone(988, 0.08, "square", 0.06);
+      tone(1319, 0.25, "square", 0.06, 0.08);
+    } else if (type === "pay") {
+      tone(330, 0.15, "triangle", 0.12);
+      tone(262, 0.25, "triangle", 0.12, 0.12);
+    } else if (type === "dice") {
+      for (let i = 0; i < 6; i++) tone(200 + Math.random() * 300, 0.04, "square", 0.04, i * 0.08);
+    } else if (type === "build") {
+      tone(523, 0.1, "triangle");
+      tone(659, 0.1, "triangle", 0.12, 0.1);
+      tone(784, 0.2, "triangle", 0.12, 0.2);
+    } else if (type === "boom") {
+      tone(90, 0.5, "sawtooth", 0.2);
+      tone(60, 0.6, "square", 0.12, 0.05);
+    } else if (type === "turn") {
+      tone(880, 0.12, "sine", 0.1);
+      tone(1175, 0.2, "sine", 0.1, 0.12);
+    } else if (type === "notice") {
+      tone(660, 0.1, "sine");
+      tone(880, 0.18, "sine", 0.12, 0.1);
+    } else if (type === "step") {
+      tone(600 + Math.random() * 100, 0.05, "sine", 0.05);
+    }
+  } catch (e) {
+  }
+}
+var pickChar = LS.get("tr3d-char", "boss");
+G.avatars = {};
+var myAvatar = LS.get("tr3d-avatar", null);
+function renderAvatarBtn() {
+  $("#avPrev").innerHTML = myAvatar ? `<img src="${myAvatar}" style="width:40px;height:40px;border-radius:50%;object-fit:cover">` : "（未設定）";
+}
+$("#avFile").onchange = (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const im = new Image();
+  const url = URL.createObjectURL(f);
+  im.onload = () => {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 96;
+    const x = cv.getContext("2d");
+    const m = Math.min(im.width, im.height);
+    x.drawImage(im, (im.width - m) / 2, (im.height - m) / 2, m, m, 0, 0, 96, 96);
+    myAvatar = cv.toDataURL("image/jpeg", 0.8);
+    LS.set("tr3d-avatar", myAvatar);
+    renderAvatarBtn();
+    URL.revokeObjectURL(url);
+    if (G.net) pubAvatar();
+  };
+  im.src = url;
+};
+$("#avClear").onclick = () => {
+  myAvatar = null;
+  LS.set("tr3d-avatar", null);
+  renderAvatarBtn();
+};
+renderAvatarBtn();
+function pubAvatar() {
+  if (G.net && myAvatar) G.net.pub("av/" + myId, { id: myId, img: myAvatar }, true);
+  if (myAvatar) G.avatars[myId] = myAvatar;
+}
+function avHtml(id, emoji) {
+  const a = G.avatars[id];
+  return a ? `<img src="${a}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : emoji;
+}
+$("#nameIn").value = LS.get("tr3d-name", "");
+function renderCharPick(taken = []) {
+  $("#charPick").innerHTML = CHARS.map((c) => `<div class="char ${c.id === pickChar ? "sel" : ""} ${taken.includes(c.id) ? "taken" : ""}" data-c="${c.id}">
+    <div class="e">${c.emoji}</div><div class="n" style="color:${c.color}">${c.name}</div></div>`).join("") + (() => {
+    const c = charOf(pickChar);
+    return `<div class="skillbox" style="border-color:${c.color}"><b style="color:${c.color}">${c.emoji} ${c.name}</b>　<span class="note">${c.bio}</span>${c.sk.map((k) => `<div>⭐ <b>${k[1]}</b>：${k[2]}</div>`).join("")}</div>`;
+  })();
+  $("#charPick").querySelectorAll(".char").forEach((el) => el.onclick = () => {
+    pickChar = el.dataset.c;
+    LS.set("tr3d-char", pickChar);
+    renderCharPick(taken);
+  });
+}
+renderCharPick();
+function myName() {
+  const n = $("#nameIn").value.trim().slice(0, 8) || charOf(pickChar).name;
+  LS.set("tr3d-name", $("#nameIn").value.trim());
+  return n;
+}
+function show(id) {
+  for (const k of ["#home", "#lobby", "#hud"]) $(k).classList.toggle("hidden", k !== id);
+}
+if (G.room) {
+  $("#joinBtn").classList.remove("hidden");
+  $("#joinBtn").textContent = `🚪 加入房間 ${G.room}`;
+  $("#createBtn").classList.add("hidden");
+}
+show("#home");
+world.overview();
+$("#soloBtn").onclick = () => {
+  G.solo = true;
+  G.isHost = true;
+  G.room = "SOLO";
+  if (myAvatar) G.avatars[myId] = myAvatar;
+  G.s = lobbyState();
+  G.s.seats.push({ id: myId, name: myName(), char: pickChar, ctl: myId });
+  addBot();
+  addBot();
+  addBot();
+  enterLobby();
+};
+$("#createBtn").onclick = async () => {
+  const name = myName();
+  $("#createBtn").disabled = true;
+  $("#homeMsg").textContent = "正在建立房間…";
+  G.room = rid(6);
+  let ok = false;
+  for (let b = 0; b < BROKERS.length && !ok && !G.localMode; b++) {
+    G.bi = b;
+    $("#homeMsg").textContent = `正在連線伺服器 ${b + 1}…`;
+    try {
+      await connectNet();
+      ok = true;
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+  if (G.localMode) {
+    await connectNet();
+    ok = true;
+  }
+  $("#createBtn").disabled = false;
+  if (!ok) {
+    $("#homeMsg").textContent = "❌ 連不上連線伺服器，請檢查網路後再試，或先玩單機。";
+    return;
+  }
+  G.isHost = true;
+  G.s = lobbyState();
+  G.s.seats.push({ id: myId, name, char: pickChar, ctl: myId });
+  history.replaceState(null, "", shareUrl());
+  LS.set("tr3d-seat-" + G.room, myId);
+  publish(true);
+  enterLobby();
+};
+$("#joinBtn").onclick = async () => {
+  myName();
+  $("#joinBtn").disabled = true;
+  $("#homeMsg").textContent = "正在連線…";
+  try {
+    await connectNet();
+  } catch (e) {
+    $("#joinBtn").disabled = false;
+    $("#homeMsg").textContent = "❌ 連線失敗，請重新整理再試一次。";
+    return;
+  }
+  $("#homeMsg").textContent = "正在取得房間資料…";
+  G.joinWanted = true;
+  G.net.pub("hi", { from: myId, t: "hello" });
+  setTimeout(() => {
+    if (!G.s) {
+      $("#homeMsg").textContent = "⌛ 找不到房間，可能房主已離開或網址錯誤。";
+      $("#joinBtn").disabled = false;
+    }
+  }, 9e3);
+};
+function shareUrl() {
+  const u = new URL(location.href);
+  u.search = "";
+  u.searchParams.set("r", G.room);
+  u.searchParams.set("b", G.bi);
+  if (G.localMode) u.searchParams.set("local", "1");
+  return u.toString();
+}
+function lobbyState() {
+  return { phase: "lobby", v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 3e4, maxRounds: 30, dice: 2 }, fx: [], fxn: 0, log: [] };
+}
+async function connectNet() {
+  if (G.net) G.net.close();
+  const net = G.localMode ? new LocalNet(G.room) : new MqttNet(G.room, G.bi, myId);
+  net.on("st", (m) => onStateMsg(m));
+  net.on("act", (m) => {
+    if (G.isHost) onAction(m);
+  });
+  net.on("hi", (m) => onHi(m));
+  net.on("av", (m) => {
+    if (m && m.id && typeof m.img === "string" && m.img.startsWith("data:image/") && m.img.length < 6e4) {
+      G.avatars[m.id] = m.img;
+      world.setAvatar(m.id, m.img);
+      renderPlayers();
+      renderLobby();
+    }
+  });
+  net.on("status", (st) => {
+    renderNet();
+    if (st === "ok" && G.s) net.pub("hi", { from: myId, t: "hello" });
+  });
+  await net.connect();
+  G.net = net;
+  G.connectedAt = Date.now();
+  setTimeout(pubAvatar, 300);
+  renderNet();
+}
+function renderNet() {
+  const st = G.solo ? "單機" : !G.net ? "" : G.net.status === "ok" ? "🟢 已連線" : G.net.status === "reconnecting" ? "🟡 重新連線中…" : "🔴 斷線";
+  $("#net").textContent = st + (G.isHost && !G.solo ? "・房主" : "");
+}
+setInterval(() => {
+  if (G.net && G.s) G.net.pub("hi", { from: myId, t: "ping" });
+  if (G.s) checkHostAlive();
+  renderPlayers();
+}, 4e3);
+function onHi(m) {
+  if (!m || !m.from) return;
+  G.seen[m.from] = Date.now();
+  if (G.s && m.from === G.s.host) G.hostSeenAt = Date.now();
+  if (m.t === "hello" && G.localMode && myAvatar) pubAvatar();
+  if (m.t === "hello" && m.from !== myId && G.net && !G.probe && Date.now() - (G.lastPong || 0) > 800) {
+    G.lastPong = Date.now();
+    G.net.pub("hi", { from: myId, t: "ping" });
+  }
+  if (G.isHost && m.t === "hello") publish(true);
+}
+var canJudge = () => G.connectedAt && Date.now() - G.connectedAt > (G.localMode ? 4500 : 6500);
+var online = (id) => id === myId || G.solo || G.seen[id] && Date.now() - G.seen[id] < 13e3 || G.isHost && Date.now() - G.hostStart < 15e3;
+function onStateMsg(m) {
+  if (!m || !m.s || G.probe) return;
+  const s = m.s;
+  if (G.s && s.room !== G.s.room) return;
+  if (G.s && s.v < G.s.v && s.host === G.s.host) return;
+  if (G.isHost && s.host === myId && G.s && s.v <= G.s.v) return;
+  G.lastStateAt = Date.now();
+  G.hostSeenAt = Date.now();
+  G.offset = Date.now() - m.now;
+  if (G.isHost && s.host !== myId) {
+    G.isHost = false;
+    toast("房主已交給 " + (nameOf(s, s.host) || "其他玩家"));
+  }
+  if (!G.isHost && s.host === myId && G.s == null) {
+    G.isHost = true;
+    G.hostStart = Date.now();
+  }
+  applyState(s);
+}
+function nameOf(s, id) {
+  const a = (s.players || s.seats || []).find((p) => p.id === id || p.ctl === id);
+  return a && a.name;
+}
+function checkHostAlive() {
+  const s = G.s;
+  if (!s || G.isHost || G.solo || s.phase !== "play") return;
+  if (Date.now() - G.lastStateAt < 22e3 || Date.now() - (G.hostSeenAt || 0) < 22e3) return;
+  const cands = s.players.filter((p) => !p.bot && !p.out && p.ctl !== s.host && online(p.ctl)).map((p) => p.ctl);
+  if (!cands.includes(myId)) cands.push(myId);
+  cands.sort();
+  if (cands[0] === myId) {
+    G.isHost = true;
+    G.hostStart = Date.now();
+    s.host = myId;
+    s.v += 1e3;
+    toast("原房主斷線，由你接手主持遊戲");
+    publish(true);
+  }
+}
+function onAction(m) {
+  const s = G.s;
+  if (!s || !m || !m.a) return;
+  G.seen[m.from] = Date.now();
+  const a = m.a;
+  if (s.phase === "lobby") {
+    if (a.type === "join") {
+      let seat = s.seats.find((x) => x.id === m.from);
+      const taken = s.seats.filter((x) => x.id !== m.from).map((x) => x.char);
+      let ch = CHARS.find((c) => c.id === a.char) ? a.char : "boss";
+      if (taken.includes(ch)) ch = (CHARS.find((c) => !taken.includes(c.id)) || CHARS[0]).id;
+      const name = String(a.name || "玩家").slice(0, 8);
+      if (seat) {
+        seat.name = name;
+        seat.char = ch;
+      } else if (s.seats.length < 6) s.seats.push({ id: m.from, name, char: ch, ctl: m.from });
+      else return;
+      publish();
+      return;
+    }
+    if (a.type === "leave") {
+      s.seats = s.seats.filter((x) => x.id !== m.from);
+      publish();
+      return;
+    }
+    return;
+  }
+  if (s.phase === "play" || s.phase === "over") {
+    if (a.type === "emote") {
+      act(s, m.pid, a, hnow());
+      publish();
+      return;
+    }
+    const p = pl(s, m.pid);
+    if (!p || p.ctl !== m.from) return;
+    const err = act(s, m.pid, a, Date.now());
+    if (!err) publish();
+    else if (G.net) G.net.pub("hi", { from: myId, t: "err", to: m.from, msg: err });
+  }
+}
+function send(pid, a) {
+  if (G.isHost) {
+    if (G.s.phase === "lobby") return;
+    const err = act(G.s, pid, a, Date.now());
+    if (err) toast(err);
+    else publish();
+  } else if (G.net) G.net.pub("act", { from: myId, pid, a });
+}
+var pubTimer = null;
+function publish(now = false) {
+  if (!G.isHost || !G.s) return;
+  G.s.v++;
+  if (now) doPublish();
+  else if (!pubTimer) pubTimer = setTimeout(doPublish, 60);
+  applyState(G.s);
+}
+function doPublish() {
+  clearTimeout(pubTimer);
+  pubTimer = null;
+  if (!G.s) return;
+  if (G.net) G.net.pub("st", { s: G.s, now: Date.now() }, true);
+  if (!G.solo) LS.set("tr3d-save-" + G.room, { s: G.s, t: Date.now() });
+  else LS.set("tr3d-solo", { s: G.s, t: Date.now() });
+}
+setInterval(() => {
+  if (!G.isHost || !G.s || G.s.phase !== "play") return;
+  const isAuto = (p) => p.bot || !online(p.ctl);
+  let changed = false, n = 0;
+  while (tick(G.s, Date.now(), isAuto) && n++ < 5) changed = true;
+  if (changed) publish();
+}, 100);
+setInterval(() => {
+  if (G.isHost && G.s && !G.solo) doPublish();
+}, 6e3);
+function applyState(s) {
+  const first = !G.s || G.s !== s && G.seenFx < 0;
+  G.s = s;
+  if (s.phase === "lobby") {
+    if (G.joinWanted && !s.seats.find((x) => x.id === myId)) {
+      G.net.pub("act", { from: myId, a: { type: "join", name: myName(), char: pickChar } });
+      LS.set("tr3d-seat-" + G.room, myId);
+    }
+    G.joinWanted = false;
+    if (!s.seats.find((x) => x.ctl === myId) && !G.isHost && !G.joinedOnce) {
+      const tk = s.seats.map((x) => x.char).join();
+      if (G.takenKey !== tk) {
+        G.takenKey = tk;
+        renderCharPick(s.seats.map((x) => x.char));
+      }
+      $("#homeMsg").textContent = `房間 ${s.room}：目前 ${s.seats.length}/6 人，按「加入房間」入座`;
+      return;
+    }
+    G.joinedOnce = true;
+    if ($("#lobby").classList.contains("hidden")) enterLobby();
+    renderLobby();
+    return;
+  }
+  if (G.seenFx < 0) G.seenFx = s.fxn;
+  if (!s.players.find((p) => p.ctl === myId) && !G.claimAsked) tryClaimSeat(s);
+  world.setState(s, G.offset);
+  for (const [id, img] of Object.entries(G.avatars)) world.setAvatar(id, img);
+  if ($("#hud").classList.contains("hidden")) enterGame();
+  for (const f of s.fx) if (f.n > G.seenFx) {
+    G.seenFx = f.n;
+    playFx(s, f);
+  }
+  renderHud();
+}
+function tryClaimSeat(s) {
+  if (!G.solo && !canJudge()) {
+    if (!G.claimTimer) G.claimTimer = setTimeout(() => {
+      G.claimTimer = null;
+      if (G.s && G.s.players && !G.s.players.find((p2) => p2.ctl === myId)) tryClaimSeat(G.s);
+    }, 2e3);
+    return;
+  }
+  const saved = LS.get("tr3d-seat-" + s.room, null);
+  const p = saved && s.players.find((x) => x.ctl === saved && !x.bot);
+  if (p && !online(p.ctl)) {
+    myId = saved;
+    SS.set("tr3d-sid", myId);
+    if (s.host === myId) {
+      G.isHost = true;
+      G.hostStart = Date.now();
+    }
+    toast("已重新回到座位：" + p.name);
+    return;
+  }
+  G.claimAsked = true;
+  const offl = s.players.filter((x) => !x.bot && !x.out && !online(x.ctl));
+  if (!offl.length) {
+    toast("遊戲已開始，你目前是觀戰模式");
+    return;
+  }
+  openSheet(`<h3>遊戲進行中</h3><p class="note">如果你是斷線的玩家，點選你的名字回到座位；否則可以觀戰。</p>
+    ${offl.map((x) => `<button class="ghost" style="width:100%;margin:4px 0" data-claim="${esc(x.ctl)}">${charOf(x.char).emoji} 我是 ${esc(x.name)}</button>`).join("")}
+    <button class="blue" style="width:100%;margin-top:6px" data-close>只觀戰</button>`);
+  $("#sheet").querySelectorAll("[data-claim]").forEach((b) => b.onclick = () => {
+    myId = b.dataset.claim;
+    SS.set("tr3d-sid", myId);
+    LS.set("tr3d-seat-" + s.room, myId);
+    G.net && G.net.pub("hi", { from: myId, t: "ping" });
+    closeSheet();
+    renderHud();
+  });
+}
+function enterLobby() {
+  show("#lobby");
+  if (G.solo) {
+    $("#roomBox").classList.add("hidden");
+  } else {
+    $("#roomBox").classList.remove("hidden");
+    $("#roomCode").textContent = G.room;
+    $("#shareUrl").value = shareUrl();
+    try {
+      const qr = qrcode(0, "M");
+      qr.addData(shareUrl());
+      qr.make();
+      $("#qr").innerHTML = qr.createImgTag(4, 8);
+    } catch (e) {
+      $("#qr").innerHTML = "";
+    }
+  }
+  renderLobby();
+}
+function renderLobby() {
+  const s = G.s;
+  if (!s || s.phase !== "lobby") return;
+  $("#seatCount").textContent = `(${s.seats.length}/6)`;
+  $("#seats").innerHTML = s.seats.map((x, i) => {
+    const c = charOf(x.char);
+    const tag = x.bot ? "電腦" : x.ctl === s.host ? "房主" : x.ctl === myId ? "你" : x.ctl !== x.id ? "本機" : "";
+    const off = !x.bot && !online(x.ctl) ? ' <small style="color:#e53935">離線</small>' : "";
+    return `<div class="seat"><div class="e" style="background:${c.color}33">${avHtml(x.id, c.emoji)}</div>
+      <div class="nm" style="color:${c.color}">${esc(x.name)} <small>${tag}</small>${off}<br><small>${c.sk.map((k) => k[1]).join("・")}</small></div>
+      ${G.isHost && x.id !== myId ? `<button class="ghost" data-kick="${i}">移除</button>` : ""}</div>`;
+  }).join("");
+  $("#seats").querySelectorAll("[data-kick]").forEach((b) => b.onclick = () => {
+    s.seats.splice(+b.dataset.kick, 1);
+    publish();
+  });
+  $("#hostCtl").classList.toggle("hidden", !G.isHost);
+  if (G.isHost) {
+    $("#setCash").value = s.settings.startCash;
+    $("#setRounds").value = s.settings.maxRounds;
+    $("#setDice").value = s.settings.dice;
+    $("#startBtn").disabled = s.seats.length < 2;
+    $("#addBot").disabled = $("#addLocal").disabled = s.seats.length >= 6;
+  }
+  $("#lobbyMsg").textContent = G.isHost ? s.seats.length < 2 ? "至少需要 2 位玩家（可加電腦）" : "人到齊就按開始！" : "等待房主開始遊戲…";
+}
+function freeChar(s) {
+  const t = s.seats.map((x) => x.char);
+  return (CHARS.find((c) => !t.includes(c.id)) || CHARS[0]).id;
+}
+function addBot() {
+  const s = G.s;
+  if (s.seats.length >= 6) return;
+  const ch = freeChar(s);
+  const nm = charOf(ch).name;
+  s.seats.push({ id: "bot-" + rid(4), name: nm + "(電腦)", char: ch, bot: true, ctl: myId });
+}
+$("#addBot").onclick = () => {
+  addBot();
+  publish();
+};
+$("#addLocal").onclick = () => {
+  const s = G.s;
+  if (s.seats.length >= 6) return;
+  const ch = freeChar(s);
+  s.seats.push({ id: myId + "-" + rid(3), name: charOf(ch).name, char: ch, ctl: myId });
+  publish();
+};
+for (const [id, k] of [["#setCash", "startCash"], ["#setRounds", "maxRounds"], ["#setDice", "dice"]]) $(id).onchange = (e) => {
+  G.s.settings[k] = +e.target.value;
+  publish();
+};
+$("#copyBtn").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($("#shareUrl").value);
+    toast("已複製網址");
+  } catch (e) {
+    $("#shareUrl").select();
+    toast("請長按網址複製");
+  }
+};
+$("#leaveBtn").onclick = () => {
+  if (G.net && !G.isHost) G.net.pub("act", { from: myId, a: { type: "leave" } });
+  location.href = location.pathname;
+};
+$("#startBtn").onclick = () => {
+  const s = G.s;
+  const g = createGame(s.seats, s.settings, Date.now());
+  g.players.forEach((p, i) => {
+    p.ctl = s.seats[i].ctl;
+  });
+  g.host = myId;
+  g.room = s.room;
+  g.v = s.v + 1;
+  g.seats = s.seats;
+  G.s = g;
+  G.hostStart = Date.now();
+  G.seenFx = -1;
+  publish(true);
+};
+function enterGame() {
+  show("#hud");
+  closeSheet();
+  world.zoomIn();
+  $("#emotes").innerHTML = EMOTES.map((e) => `<button data-e="${e}">${e}</button>`).join("");
+  $("#emotes").querySelectorAll("button").forEach((b) => b.onclick = () => {
+    const me = myPlayer();
+    if (me) send(me.id, { type: "emote", e: b.dataset.e });
+    $("#emotes").classList.add("hidden");
+  });
+  wakeLock();
+}
+var wl = null;
+async function wakeLock() {
+  try {
+    if ("wakeLock" in navigator && !wl) {
+      wl = await navigator.wakeLock.request("screen");
+      wl.addEventListener("release", () => {
+        wl = null;
+      });
+    }
+  } catch (e) {
+  }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && G.s && G.s.phase === "play") {
+    wakeLock();
+    if (G.net) G.net.pub("hi", { from: myId, t: "hello" });
+  }
+});
+var myPlayers = () => G.s && G.s.players ? G.s.players.filter((p) => p.ctl === myId && !p.bot) : [];
+function myPlayer() {
+  const s = G.s;
+  if (!s || !s.players) return null;
+  const c = cur(s);
+  if (c && c.ctl === myId && !c.bot) return c;
+  return myPlayers()[0] || null;
+}
+var isMyTurn = () => {
+  const s = G.s;
+  const c = s && s.players && cur(s);
+  return !!(c && c.ctl === myId && !c.bot && s.phase === "play");
+};
+function renderPlayers() {
+  const s = G.s;
+  if (!s || !s.players) return;
+  $("#players").innerHTML = s.players.map((p, i) => {
+    const c = charOf(p.char);
+    const ic = [p.god ? GODS[p.god.id].icon : "", p.st.hosp ? "🏥" : "", p.st.jail ? "🚓" : "", p.st.sleep ? "😴" : "", p.st.turtle ? "🐢" : "", p.dir < 0 ? "🔄" : ""].join("");
+    const off = !p.bot && !online(p.ctl) && s.phase === "play" ? '<span class="off">離線・託管</span>' : "";
+    return `<div class="pc ${i === s.turn && s.phase === "play" ? "cur" : ""} ${p.out ? "out" : ""}" data-p="${esc(p.id)}">
+      <div class="av" style="background:${c.color}33">${avHtml(p.ctl === p.id || p.bot ? p.id : "", c.emoji)}</div>
+      <div><div class="nm" style="color:${c.color}">${esc(p.name)}${p.ctl === myId && !p.bot ? "（你）" : ""}</div>
+      <div class="cash">${p.out ? "破產" : money(p.cash)}</div><div class="ic">${ic}</div></div>${off}</div>`;
+  }).join("");
+  $("#players").querySelectorAll(".pc").forEach((el) => el.onclick = () => showPlayer(el.dataset.p));
+}
+function renderHud() {
+  const s = G.s;
+  if (!s || !s.players) return;
+  renderPlayers();
+  $("#roundinfo").textContent = `第 ${s.round}${s.settings.maxRounds ? "/" + s.settings.maxRounds : ""} 回合`;
+  const feed = s.log.slice(-4);
+  $("#feed").innerHTML = feed.map((l) => `<div>${esc(l)}</div>`).join("");
+  renderNet();
+  if (s.phase === "over") {
+    renderOver();
+    return;
+  }
+  const c = cur(s), mine = isMyTurn();
+  const acts = $("#acts");
+  let st = "";
+  if (s.step === "pre") st = mine ? `輪到你了！${c.name}` : `${c.name} 的回合…`;
+  else if (s.step === "move") st = `${c.name} 移動中…`;
+  else if (s.step === "decide") st = mine ? "請做決定" : `${c.name} 思考中…`;
+  else st = `${c.name}`;
+  $("#status").textContent = st;
+  const key = s.v + ":" + mine + ":" + s.step + ":" + G.ui.mode;
+  if (acts.dataset.k !== key) {
+    acts.dataset.k = key;
+    if (mine && s.step === "pre") {
+      acts.innerHTML = `<button class="ghost" id="aCard">🃏 道具 ${c.cards.length}</button><button class="pri" id="rollBtn">🎲 擲骰子</button><button class="ghost" id="aStock">📈 股市</button>`;
+      $("#rollBtn").onclick = () => {
+        if (G.ui.target) cancelTarget();
+        beep("dice");
+        send(c.id, { type: "roll" });
+      };
+      $("#aCard").onclick = () => openCards();
+      $("#aStock").onclick = () => openStock();
+    } else {
+      const me = myPlayer();
+      acts.innerHTML = me ? `<button class="ghost" id="aMine">👤 我的資產</button>` : '<span style="color:#fff;font-size:13px">觀戰中</span>';
+      if (me) $("#aMine").onclick = () => showPlayer(me.id);
+    }
+  }
+  if (mine && s.step === "decide" && s.pending) {
+    const pk = s.v + s.pending.type;
+    if (G.ui.decideKey !== s.pending.type + ":" + s.turn + ":" + s.round || G.ui.mode !== "decide") {
+      G.ui.decideKey = s.pending.type + ":" + s.turn + ":" + s.round;
+      openDecide();
+    } else if (s.pending.type === "shop" || s.pending.type === "bank") openDecide(true);
+  } else if (G.ui.mode === "decide") {
+    G.ui.decideKey = null;
+    closeSheet();
+  }
+  updateTimer();
+  if (s.anim && s.anim.dice && s.anim.t0 !== G.lastAnim && s.step === "move") {
+    G.lastAnim = s.anim.t0;
+    showDice(s.anim);
+  }
+}
+setInterval(updateTimer, 250);
+function updateTimer() {
+  const s = G.s;
+  const el = $("#timer");
+  if (!s || !s.players || s.phase !== "play" || !(s.step === "pre" || s.step === "decide") || !isMyTurn()) {
+    el.style.visibility = "hidden";
+    return;
+  }
+  el.style.visibility = "visible";
+  const tot = s.step === "pre" ? PRE_T : DEC_T;
+  const left = Math.max(0, s.deadline - hnow());
+  el.firstElementChild.style.width = left / tot * 100 + "%";
+  el.firstElementChild.style.background = left < 8e3 ? "#ff5252" : "#ffeb3b";
+}
+var PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+var dieHtml = (v) => `<div class="die ${v === 1 ? "one" : ""}">${Array.from({ length: 9 }, (_, i) => `<i class="${PIPS[v].includes(i) ? "on" : ""}"></i>`).join("")}</div>`;
+function showDice(an) {
+  const el = $("#dice");
+  el.classList.remove("hidden");
+  const start = Date.now();
+  const spin = () => {
+    const el2 = Date.now() - start;
+    if (el2 < 750) {
+      el.innerHTML = an.dice.map(() => dieHtml(1 + Math.floor(Math.random() * 6))).join("");
+      el.querySelectorAll(".die").forEach((d) => d.classList.add("spin"));
+      requestAnimationFrame(spin);
+    } else {
+      el.innerHTML = an.dice.map((v) => dieHtml(v)).join("");
+      setTimeout(() => el.classList.add("hidden"), 900);
+    }
+  };
+  beep("dice");
+  spin();
+  const n = an.path.length - 1;
+  for (let k = 0; k < n; k++) setTimeout(() => beep("step"), 900 + k * 340);
+}
+var noticeT;
+function playFx(s, f) {
+  const p = f.pid && pl(s, f.pid);
+  switch (f.k) {
+    case "money":
+      if (!f.d) break;
+      if (Math.abs(f.d) >= 1e3) world.react(f.pid, f.d > 0 ? "cheer" : "sad", 1500);
+      world.floatText(f.pid, (f.d > 0 ? "+" : "") + money(f.d), f.d > 0 ? "#9cff57" : "#ff6b6b");
+      beep(f.d > 0 ? "coin" : "pay");
+      break;
+    case "notice":
+      showNotice(f.title, f.text, f.kind);
+      break;
+    case "card":
+      world.floatText(f.pid, CARDS[f.card].icon + CARDS[f.card].name, "#ffe082");
+      break;
+    case "buy":
+      world.burst(f.tile, world.colors[f.pid] || "#ffcc00", 18);
+      world.react(f.pid, "cheer", 1400);
+      beep("build");
+      break;
+    case "build":
+      world.burst(f.tile, "#ffd54f", 20);
+      beep("build");
+      break;
+    case "boom":
+      world.burst(f.tile, f.m === "block" ? "#ff9800" : "#ff1744", 34);
+      beep("boom");
+      break;
+    case "emote":
+      world.floatText(f.pid, f.e, "#ffffff");
+      world.react(f.pid, "wave", 1500);
+      break;
+    case "bankrupt":
+      showNotice("💸 破產", `${p ? p.name : ""} 破產出局了！`, "evil");
+      break;
+    case "mark":
+      world.burst(f.tile, "#ff9800", 10);
+      break;
+  }
+}
+function showNotice(title, text, kind) {
+  const n = $("#notice");
+  n.querySelector(".nb").className = "nb k-" + (kind || "chance");
+  n.querySelector(".nt").textContent = title;
+  n.querySelector(".nx").textContent = text;
+  n.classList.add("show");
+  beep("notice");
+  clearTimeout(noticeT);
+  noticeT = setTimeout(() => n.classList.remove("show"), 2300);
+}
+var toastT;
+function toast(t) {
+  const el = $("#toast");
+  el.textContent = t;
+  el.style.opacity = 1;
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.style.opacity = 0, 2200);
+}
+function openSheet(html, mode = "info", center = false) {
+  G.ui.mode = mode;
+  $("#sheet").innerHTML = html;
+  $("#modal").classList.toggle("center", center);
+  $("#modal").classList.remove("hidden");
+  $("#sheet").querySelectorAll("[data-close]").forEach((b) => b.onclick = () => closeSheet());
+}
+function closeSheet() {
+  $("#modal").classList.add("hidden");
+  G.ui.mode = null;
+}
+$("#modal").addEventListener("click", (e) => {
+  if (e.target.id === "modal" && G.ui.mode !== "decide") closeSheet();
+});
+function tileInfoHtml(i) {
+  const s = G.s, t = TILES[i];
+  let h = `<h3>${t.icon || ""} ${esc(t.name)}</h3><p class="note">${esc(t.desc || "")}</p>`;
+  if (t.type === "prop" && s.tiles) {
+    const st = s.tiles[i], o = st.o && pl(s, st.o);
+    h += `<div class="kv"><b>區域</b><span style="color:${GROUPS[t.g].color};font-weight:900">${GROUPS[t.g].name}</span>
+      <b>地主</b><span>${o ? esc(o.name) : "（無）"}</span><b>建築</b><span>${LEVEL_NAMES[st.l]}</span>
+      <b>地價</b><span>${money(price(s, i))}</span><b>加蓋費</b><span>${money(upCost(s, i))}／層</span>
+      <b>目前過路費</b><span style="color:#e53935;font-weight:900">${o ? money(toll(s, i)) : "—"}</span></div>
+      <p class="note">過路費：空地 ${money(price(s, i) * TOLL_MUL[0])} → 摩天大樓 ${money(price(s, i) * TOLL_MUL[5])}。擁有整個區域時過路費 ×1.5。</p>`;
+  }
+  return h;
+}
+function onTileClick(i) {
+  if (G.ui.target && G.ui.target.kind === "tile") {
+    if (G.ui.target.list.includes(i)) finishTarget(i);
+    else toast("這格不能選");
+    return;
+  }
+  if (!G.s || G.ui.mode === "decide") return;
+  openSheet(tileInfoHtml(i) + '<button class="ghost" data-close style="width:100%">關閉</button>');
+}
+function showPlayer(id) {
+  const s = G.s, p = pl(s, id);
+  if (!p) return;
+  const c = charOf(p.char);
+  const props = s.tiles.map((t, i) => t && t.o === id ? i : -1).filter((i) => i >= 0);
+  openSheet(`<button class="x" data-close>✕</button><h3>${c.emoji} <span style="color:${c.color}">${esc(p.name)}</span></h3>
+    <div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span><b>股票</b><span>${money(stockValue(s, p))}</span>
+    <b>點券</b><span>${p.points}</span><b>總資產</b><span style="font-weight:900">${money(assets(s, p))}</span>
+    <b>神明</b><span>${p.god ? `${GODS[p.god.id].icon}${GODS[p.god.id].name}（剩 ${p.god.t} 回合）` : "—"}</span>
+    <b>道具卡</b><span>${p.ctl === myId || G.s.phase === "over" ? p.cards.map((k) => CARDS[k].icon + CARDS[k].name).join("、") || "—" : p.cards.length + " 張"}</span></div>
+    <div class="lab">角色技能</div><div class="note">${c.sk.map((k) => `⭐ <b>${k[1]}</b>：${k[2]}`).join("<br>")}</div>
+    <div class="lab">土地（${props.length}）</div>
+    <div class="note">${props.map((i) => `${esc(TILES[i].name)}・${LEVEL_NAMES[s.tiles[i].l]}`).join("<br>") || "還沒有土地"}</div>`);
+}
+function openDecide(refresh = false) {
+  const s = G.s, p = cur(s), pd = s.pending;
+  if (!pd) return;
+  let h = "";
+  const id = p.id;
+  if (pd.type === "buy") {
+    const i = pd.tile;
+    h = tileInfoHtml(i) + `<p>要花 <b>${money(price(s, i))}</b> 買下嗎？（你有 ${money(p.cash)}）</p>
+      <div class="choice"><button class="green" data-a="yes">🏠 買下</button><button class="ghost" data-a="no">不買</button></div>`;
+  } else if (pd.type === "upgrade") {
+    const i = pd.tile, st = s.tiles[i], c1 = upCostFor(s, i, p);
+    const two = st.l <= 3 && p.cash >= c1 * 2;
+    h = tileInfoHtml(i) + `<p>要加蓋成 <b>${LEVEL_NAMES[st.l + 1]}</b> 嗎？每層 <b>${c1 ? money(c1) : "免費（福神）"}</b>（你有 ${money(p.cash)}）</p>
+      <div class="choice"><button class="green" data-a="yes">🏗️ 蓋一層</button>${two ? `<button class="green" data-n2>🏗️🏗️ 蓋兩層（${money(c1 * 2)}）</button>` : ""}<button class="ghost" data-a="no">不用</button></div>`;
+  } else if (pd.type === "shop") {
+    h = `<h3>🏪 道具店</h3><p>你的點券：<b>${p.points}</b>　道具卡 ${p.cards.length}/${cardLimit(p)}</p><div class="cards">` + Object.entries(CARDS).map(([k, c]) => `<div class="card"><div class="t">${c.icon} ${c.name}</div><div class="d">${c.desc}</div>
+      <button class="${p.points >= cardCost(p, k) ? "pri" : "ghost"}" data-buy="${k}" ${p.points < cardCost(p, k) || p.cards.length >= cardLimit(p) ? "disabled" : ""}>${cardCost(p, k)} 點</button></div>`).join("") + `</div><button class="blue" style="width:100%;margin-top:10px" data-a="done">離開商店</button>`;
+  } else if (pd.type === "lottery") {
+    h = `<h3>🎰 彩券行</h3><p>花 $500 猜一個點數，開出的骰子一樣就贏 <b>$3000</b>！</p>
+      <div class="choice">${[1, 2, 3, 4, 5, 6].map((n) => `<button class="pri" data-pick="${n}">${n}</button>`).join("")}</div>
+      <button class="ghost" style="width:100%;margin-top:8px" data-a="no">不玩</button>`;
+  } else if (pd.type === "bank") {
+    h = `<h3>🏦 銀行</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
+      <p class="note">存款每次經過台北車站有 5% 利息，而且不會被查稅、均富卡拿走。</p>
+      <div class="choice"><button class="green" data-bank="1000">存 $1000</button><button class="green" data-bank="5000">存 $5000</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
+      <div class="choice"><button class="blue" data-bank="-1000">領 $1000</button><button class="blue" data-bank="-5000">領 $5000</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
+      <button class="ghost" style="width:100%;margin-top:10px" data-a="done">完成</button>`;
+  }
+  openSheet(h, "decide");
+  const sh = $("#sheet");
+  sh.querySelectorAll("[data-a]").forEach((b) => b.onclick = () => {
+    send(id, { type: b.dataset.a });
+    closeSheet();
+  });
+  sh.querySelectorAll("[data-n2]").forEach((b) => b.onclick = () => {
+    send(id, { type: "yes", n: 2 });
+    closeSheet();
+  });
+  sh.querySelectorAll("[data-buy]").forEach((b) => b.onclick = () => send(id, { type: "buyCard", card: b.dataset.buy }));
+  sh.querySelectorAll("[data-pick]").forEach((b) => b.onclick = () => {
+    send(id, { type: "pick", num: +b.dataset.pick });
+    closeSheet();
+  });
+  sh.querySelectorAll("[data-bank]").forEach((b) => b.onclick = () => send(id, { type: "bank", amount: +b.dataset.bank }));
+}
+function openCards() {
+  const s = G.s, p = cur(s);
+  if (!p.cards.length) {
+    toast("你沒有道具卡，到道具店用點券買吧");
+    return;
+  }
+  const counts = {};
+  p.cards.forEach((k) => counts[k] = (counts[k] || 0) + 1);
+  openSheet(`<button class="x" data-close>✕</button><h3>🃏 我的道具卡</h3><p class="note">點券：${p.points}（免費卡會在付過路費時自動使用）</p><div class="cards">` + Object.entries(counts).map(([k, n]) => {
+    const c = CARDS[k];
+    return `<div class="card"><div class="t">${c.icon} ${c.name} ×${n}</div><div class="d">${c.desc}</div>
+    ${c.target === "auto" ? '<button class="ghost" disabled>自動</button>' : `<button class="pri" data-use="${k}">使用</button>`}</div>`;
+  }).join("") + "</div>");
+  $("#sheet").querySelectorAll("[data-use]").forEach((b) => b.onclick = () => useCardFlow(b.dataset.use));
+}
+function useCardFlow(k) {
+  const s = G.s, p = cur(s), c = CARDS[k];
+  const tg = cardTargets(s, p, k);
+  if (c.target === "none" || c.target === "here") {
+    if (tg && !tg.length) {
+      toast("現在不能用：" + (c.target === "here" ? "腳下不是別人的地或錢不夠" : ""));
+      return;
+    }
+    closeSheet();
+    send(p.id, { type: "card", card: k });
+    return;
+  }
+  if (c.target === "dice") {
+    const n = s.settings.dice || 1;
+    openSheet(`<h3>🎲 遙控骰子</h3><p>要走幾步？</p><div class="choice">${Array.from({ length: 5 * n + 1 }, (_, i) => i + n).map((v) => `<button class="pri" data-v="${v}">${v}</button>`).join("")}</div>
+      <button class="ghost" style="width:100%;margin-top:8px" data-close>取消</button>`);
+    $("#sheet").querySelectorAll("[data-v]").forEach((b) => b.onclick = () => {
+      closeSheet();
+      send(p.id, { type: "card", card: k, value: +b.dataset.v });
+    });
+    return;
+  }
+  if (c.target === "player") {
+    if (!tg.length) {
+      toast("沒有可以選的玩家");
+      return;
+    }
+    openSheet(`<h3>${c.icon} ${c.name}</h3><p>選擇對象：</p>` + tg.map((id) => {
+      const o = pl(s, id);
+      return `<button class="ghost" style="width:100%;margin:4px 0" data-t="${esc(id)}">${charOf(o.char).emoji} ${esc(o.name)}　${money(o.cash)}・${o.cards.length} 張卡</button>`;
+    }).join("") + `<button class="ghost" style="width:100%;margin-top:6px" data-close>取消</button>`);
+    $("#sheet").querySelectorAll("[data-t]").forEach((b) => b.onclick = () => {
+      closeSheet();
+      send(p.id, { type: "card", card: k, target: b.dataset.t });
+    });
+    return;
+  }
+  if (!tg.length) {
+    toast("沒有可以選的格子");
+    return;
+  }
+  closeSheet();
+  G.ui.target = { kind: "tile", list: tg, card: k, pid: p.id };
+  world.setHighlight(tg);
+  openSheet(`<h3>${c.icon} ${c.name}：選擇格子</h3><p class="note">點地圖上發光的格子，或從下面選：</p><div class="choice">` + tg.map((i) => `<button class="ghost" data-tile="${i}" style="flex:1 1 45%">${esc(TILES[i].name)}${s.tiles[i] && s.tiles[i].o ? "・" + LEVEL_NAMES[s.tiles[i].l] : ""}</button>`).join("") + `</div><button class="ghost" style="width:100%;margin-top:8px" id="tgCancel">取消</button>`, "target");
+  $("#modal").classList.remove("center");
+  $("#sheet").querySelectorAll("[data-tile]").forEach((b) => b.onclick = () => finishTarget(+b.dataset.tile));
+  $("#tgCancel").onclick = () => cancelTarget();
+}
+function finishTarget(i) {
+  const t = G.ui.target;
+  G.ui.target = null;
+  world.setHighlight(null);
+  closeSheet();
+  send(t.pid, { type: "card", card: t.card, tile: i });
+}
+function cancelTarget() {
+  G.ui.target = null;
+  world.setHighlight(null);
+  closeSheet();
+}
+function openStock() {
+  const s = G.s;
+  if (!s || !s.market) return;
+  const me = myPlayer();
+  const can = isMyTurn() && s.step === "pre";
+  const spark = (h) => {
+    const mx = Math.max(...h), mn = Math.min(...h), w = 80, ht = 22;
+    return `<svg width="${w}" height="${ht}"><polyline fill="none" stroke="#1e88e5" stroke-width="2" points="${h.map((v, i) => `${i / Math.max(1, h.length - 1) * w},${ht - (v - mn) / Math.max(0.01, mx - mn) * (ht - 2) - 1}`).join(" ")}"/></svg>`;
+  };
+  openSheet(`<button class="x" data-close>✕</button><h3>📈 寶島股市</h3><p class="note">${can ? `現金 ${money(me.cash)}。擲骰前可以買賣。` : "輪到你、擲骰前才能交易。"}股價每回合變動，新聞會影響股市。</p>` + s.market.map((m, k) => {
+    const prev = m.h.length > 1 ? m.h[m.h.length - 2] : m.p, ch = (m.p - prev) / prev * 100;
+    const hold = me ? me.stocks[k] : 0;
+    return `<div class="stk"><div><b>${STOCKS[k].name}</b> <span class="${ch >= 0 ? "up" : "dn"}">$${m.p.toFixed(1)} ${ch >= 0 ? "▲" : "▼"}${Math.abs(ch).toFixed(1)}%</span><br><small>持有 ${hold} 股（${money(hold * m.p)}）</small></div><div>${spark(m.h)}</div>
+      ${can ? `<div class="bt"><button class="red" data-q="${k},100">買100</button><button class="red" data-q="${k},1000">買1000</button><button class="green" data-q="${k},-100" ${hold < 100 ? "disabled" : ""}>賣100</button><button class="green" data-q="${k},-${hold}" ${!hold ? "disabled" : ""}>全賣</button></div>` : ""}</div>`;
+  }).join(""), "stock");
+  $("#sheet").querySelectorAll("[data-q]").forEach((b) => b.onclick = () => {
+    const [k, q] = b.dataset.q.split(",").map(Number);
+    send(cur(G.s).id, { type: "stock", sid: k, qty: q });
+    setTimeout(() => {
+      if (G.ui.mode === "stock") openStock();
+    }, 400);
+  });
+}
+function renderOver() {
+  const s = G.s;
+  if (G.ui.mode === "over") return;
+  const medal = ["🥇", "🥈", "🥉", "4", "5", "6"];
+  openSheet(`<h3 style="text-align:center;font-size:26px">🏁 遊戲結束</h3>` + s.rank.map((r, i) => {
+    const p = pl(s, r.id), c = charOf(p.char);
+    return `<div class="rank"><span class="m">${medal[i]}</span><span style="font-size:24px">${c.emoji}</span><span style="flex:1;color:${c.color}">${esc(p.name)}</span><span>${p.out ? "破產" : money(r.a)}</span></div>`;
+  }).join("") + (G.isHost ? `<button class="pri" style="width:100%;margin-top:10px" id="againBtn">🔁 再玩一局</button>` : '<p class="note" style="text-align:center">等房主開新的一局…</p>') + `<button class="ghost" style="width:100%;margin-top:6px" data-close>看地圖</button>`, "over", true);
+  const ag = $("#againBtn");
+  if (ag) ag.onclick = () => {
+    const l = lobbyState();
+    l.seats = s.seats || [];
+    l.settings = s.settings;
+    l.v = s.v + 1;
+    G.s = l;
+    G.seenFx = -1;
+    closeSheet();
+    G.ui.mode = null;
+    publish(true);
+    enterLobby();
+  };
+  $("#acts").innerHTML = `<button class="pri" id="rankBtn">🏆 排名</button>`;
+  $("#rankBtn").onclick = () => {
+    G.ui.mode = null;
+    renderOver();
+  };
+  $("#status").textContent = "遊戲結束";
+}
+$("#camBtn").onclick = () => {
+  if (world.follow) {
+    world.overview();
+    toast("全島視角");
+  } else {
+    world.zoomIn();
+    toast("跟隨目前玩家");
+  }
+};
+$("#stockBtn").onclick = () => openStock();
+$("#logBtn").onclick = () => {
+  if (!G.s) return;
+  openSheet(`<button class="x" data-close>✕</button><h3>📜 遊戲紀錄</h3><div class="note" style="font-size:13px;color:#333">${G.s.log.slice().reverse().map(esc).join("<br>")}</div>`);
+};
+$("#emoBtn").onclick = () => $("#emotes").classList.toggle("hidden");
+$("#sndBtn").onclick = () => {
+  G.sound = !G.sound;
+  LS.set("tr3d-snd", G.sound);
+  $("#sndBtn").textContent = G.sound ? "🔊" : "🔇";
+};
+$("#sndBtn").textContent = G.sound ? "🔊" : "🔇";
+$("#helpBtn").onclick = () => openSheet(`<button class="x" data-close>✕</button><h3>❔ 玩法說明</h3><div class="note" style="font-size:14px;color:#333">
+  <p>🎲 輪到你時先可以用道具卡、買賣股票，再擲骰子前進。</p>
+  <p>🏠 停在無人景點可以買下；停在自己的地可以加蓋，最高蓋到摩天大樓。別人停到你的地要付過路費，擁有整個區域過路費 ×1.5。</p>
+  <p>🚉 經過台北車站領薪水 $2000、點券 +10、存款利息 5%。</p>
+  <p>🏪 道具店用點券買卡；⛩️ 廟會請到神明附身 5 回合（財神、福神、土地公、媽祖是好神，衰神、窮神是壞神）。</p>
+  <p>❓ 機會、📰 新聞會發生隨機事件；🏦 銀行可存提款；🎰 彩券行猜點數。</p>
+  <p>💸 付不出錢會自動提款、賣股票、賣地，還不夠就破產。最後只剩一人、或回合結束時總資產最多的人獲勝！</p>
+  <p>📶 斷線的玩家會由電腦暫時託管；重新打開同一個網址就能回到座位。房主斷線太久，會由其他玩家自動接手。</p>
+  <p>👆 點地圖上的格子可以看景點介紹和過路費；兩指縮放、拖曳旋轉視角。</p></div>`);
+(async function boot() {
+  if (G.room) {
+    const saved = LS.get("tr3d-save-" + G.room, null);
+    const seat = LS.get("tr3d-seat-" + G.room, null);
+    if (saved && saved.s && saved.s.host === seat && seat !== myId && Date.now() - saved.t < 6 * 36e5) {
+      $("#homeMsg").textContent = "正在恢復房間…";
+      G.probe = true;
+      try {
+        await connectNet();
+      } catch (e) {
+        $("#homeMsg").textContent = "❌ 連線失敗，請重新整理。";
+        return;
+      }
+      G.net.pub("hi", { from: "probe-" + myId, t: "hello" });
+      await new Promise((r) => setTimeout(r, G.localMode ? 1200 : 3500));
+      G.probe = false;
+      if (G.seen[seat] && Date.now() - G.seen[seat] < 6e3) {
+        $("#homeMsg").textContent = "";
+        G.net.pub("hi", { from: myId, t: "hello" });
+        return;
+      }
+      myId = seat;
+      SS.set("tr3d-sid", myId);
+      G.isHost = true;
+      G.hostStart = Date.now();
+      G.s = saved.s;
+      G.s.v += 500;
+      if (G.s.step === "move") G.s.until = Date.now();
+      if (G.s.phase === "play") {
+        G.s.deadline = Date.now() + PRE_T;
+      }
+      publish(true);
+      if (G.s.phase === "lobby") enterLobby();
+      return;
+    }
+    if (saved && saved.s && saved.s.host === seat && seat === myId) {
+      try {
+        await connectNet();
+      } catch (e) {
+        $("#homeMsg").textContent = "❌ 連線失敗，請重新整理。";
+        return;
+      }
+      G.isHost = true;
+      G.hostStart = Date.now();
+      G.s = saved.s;
+      G.s.v += 500;
+      if (G.s.step === "move") G.s.until = Date.now();
+      if (G.s.phase === "play") G.s.deadline = Date.now() + PRE_T;
+      publish(true);
+      if (G.s.phase === "lobby") enterLobby();
+      return;
+    }
+    if (seat) {
+      try {
+        await connectNet();
+        G.net.pub("hi", { from: myId, t: "hello" });
+      } catch (e) {
+      }
+    }
+  }
+})();
+window.__G = G;
+window.__world = world;
+
+</script>
+</body>
+</html>

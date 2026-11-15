@@ -328,7 +328,7 @@ function land(s, now) {
     default: return done(s, now);
   }
 }
-function ask(s, pending, now) { s.pending = pending; setStep(s, 'decide', now); }
+function ask(s, pending, now) { s.askN = (s.askN || 0) + 1; pending.k = s.askN; s.pending = pending; setStep(s, 'decide', now); }
 
 function landProp(s, p, i, now) {
   const st = s.tiles[i], t = TILES[i];

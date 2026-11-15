@@ -224,6 +224,7 @@ export class World {
     this.buildTerrain();
     const { pts, spacing } = this.geo.path();
     this.path = pts; this.spacing = spacing;
+    this.relaxPath();
     this.buildTiles();
     if (this.geo.city) this.buildCity(this.geo.city);
     try { this.buildScenery(id); } catch (e) { console.warn('scenery', e); }
@@ -422,8 +423,8 @@ export class World {
 
   buildTiles() {
     this.tileObjs = []; this.pickables = []; this.lmSpots = [];
-    const n = this.path.length, size = Math.min(3.5, this.spacing * 0.9);
-    this.tileSize = size;
+    const n = this.path.length, size0 = Math.min(3.5, this.spacing * 0.9), size = size0;
+    this.tileSize = size0;
     // 第一輪：每格的方向與「蓋房子的空地」位置
     const info = [];
     for (let i = 0; i < n; i++) {
@@ -449,12 +450,12 @@ export class World {
     const lots = info.map(x => x.lotP);
     // 第二輪：建格子、空地、景點（景點不可壓到格子與房子）
     for (let i = 0; i < n; i++) {
-      const { p, tan, nm, lotP } = info[i];
+      const { p, tan, nm, lotP } = info[i]; const size = this.tileSizes ? this.tileSizes[i] : size0;
       const y = Math.max(0.35, this.H(p.x, p.y)) + 0.18;
       const g = new THREE.Group(); g.position.set(p.x, y, p.y); g.userData.tile = i;
       const ang = Math.atan2(tan.x, tan.y);
       const base = new THREE.Mesh(new THREE.BoxGeometry(size + 0.25, 0.32, size + 0.25), new THREE.MeshStandardMaterial({ color: '#cbbf9f', roughness: 0.6 }));
-      base.rotation.y = ang; base.position.y = -0.1; base.receiveShadow = true; base.castShadow = true; g.add(base);
+      base.position.y = -0.1; base.receiveShadow = true; base.castShadow = true; g.add(base);
       const top = new THREE.Mesh(new THREE.BoxGeometry(size, 0.2, size), [mat('#fff8e7'), mat('#fff8e7'), new THREE.MeshStandardMaterial({ map: tileTexture(i), roughness: 0.6 }), mat('#fff8e7'), mat('#fff8e7'), mat('#fff8e7')]);
       top.position.y = 0.06; top.receiveShadow = true; g.add(top);   // 文字永遠朝北，從南方視角可讀
       this.scene.add(g); this.pickables.push(g);
@@ -466,8 +467,8 @@ export class World {
       const dir = t.sea ? -1 : 1;
       const score = q => Math.min(...this.lmSpots.map(r => r.distanceTo(q) - R * 2), ...this.path.map(r => r.distanceTo(q) - (size * 0.72 + R)), ...lots.map(r => r.distanceTo(q) - (R + 0.9)));
       let lp = null, bestQ = null, bestS = -1e9, sc = 1.15;
-      search: for (let off = t.sea ? 6.4 : 5.4; off < (t.sea ? 14 : 22); off += 0.7) {
-        for (const sh of [0, 1.5, -1.5, 3, -3, 4.5, -4.5]) {
+      search: for (let off = t.sea ? 6.4 : 5.4; off < (t.sea ? 16 : 30); off += 0.7) {
+        for (const sh of [0, 1.5, -1.5, 3, -3, 4.5, -4.5, 6, -6]) {
           const q = new THREE.Vector2(p.x + dir * nm.x * off, p.y + dir * nm.y * off).addScaledVector(tan, sh);
           if (!t.sea && (this.H(q.x, q.y) > 2.2 || this.H(q.x, q.y) < 0.25)) continue;
           if (t.sea && this.H(q.x, q.y) > -0.2) continue;
@@ -476,7 +477,20 @@ export class World {
           if (sv > bestS) { bestS = sv; bestQ = q; }
         }
       }
-      if (!lp) { lp = bestQ || new THREE.Vector2(p.x + dir * nm.x * 6, p.y + dir * nm.y * 6); sc = Math.max(0.6, 1.15 + bestS / 3); }
+      if (!lp) { // 第二輪：在附近隨機找一塊空地（離格子近的優先）
+        let bd = 1e9;
+        for (let k = 0; k < 900; k++) {
+          const r = 4 + Math.random() * 26, a = Math.random() * Math.PI * 2, q = new THREE.Vector2(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r);
+          const h = this.H(q.x, q.y);
+          if (t.sea ? h > -0.2 : (h > 2.2 || h < 0.25)) continue;
+          if (score(q) >= 0 && r < bd) { bd = r; lp = q; }
+        }
+      }
+      if (!lp) {
+        lp = bestQ || new THREE.Vector2(p.x + dir * nm.x * 6, p.y + dir * nm.y * 6);
+        const dT = Math.min(...this.path.map((r, j) => Math.max(Math.abs(r.x - lp.x), Math.abs(r.y - lp.y)) - (this.tileSizes ? this.tileSizes[j] : size) / 2));
+        sc = Math.max(0.45, Math.min(1.15, (dT - 0.2) / 1.9));
+      }
       lm.position.set(lp.x, t.sea ? 0 : this.H(lp.x, lp.y) - 0.05, lp.y);
       this.lmSpots.push(lp.clone());
       lm.rotation.y = Math.atan2(-nm.x, -nm.y); lm.scale.setScalar(sc);
@@ -489,7 +503,7 @@ export class World {
       }
       if (!t.sea && t.type === 'prop') {
         const pad = C(new THREE.Group(), 1.9, 2.1, 0.5, '#7fb862', 0, -0.45, 0, 12);
-        pad.position.copy(lm.position).y -= 0.4; pad.scale.setScalar(sc / 1.15); this.scene.add(pad);
+        pad.position.copy(lm.position).y -= 0.4; pad.scale.setScalar(sc / 1.15); this.scene.add(pad); lm.userData.pad = pad;
       }
       // 連到景點的小步道
       if (!t.sea) {
@@ -507,8 +521,42 @@ export class World {
       ring.rotation.x = -Math.PI / 2; ring.position.y = 0.2; g.add(ring);
       this.tileObjs.push({ g, base, lm, lot, ring, nm, tan, ang, level: -1, owner: undefined, pos: new THREE.Vector3(p.x, y + 0.17, p.y) });
     }
+    // 最後檢查：景點和任何格子太近就往外推，推不開就縮小
+    const S2 = this.tileSizes;
+    const clr = (x, z) => Math.min(...this.tileObjs.map((o, j) => Math.max(Math.abs(o.pos.x - x), Math.abs(o.pos.z - z)) - (S2 ? S2[j] : size0) / 2));
+    this.tileObjs.forEach((o, i) => {
+      const L = o.lm.position; let c = clr(L.x, L.z), sc = o.lm.scale.x;
+      for (let k = 0; k < 12 && c < 1.9 * sc; k++) {
+        let near = null, nd = 1e9; this.tileObjs.forEach(q => { const d = Math.hypot(q.pos.x - L.x, q.pos.z - L.z); if (d < nd) { nd = d; near = q; } });
+        const dx = L.x - near.pos.x, dz = L.z - near.pos.z, len = Math.hypot(dx, dz) || 1;
+        const nx = L.x + dx / len * 0.5, nz = L.z + dz / len * 0.5, h = this.H(nx, nz);
+        if (!TILES[i].sea && (h < 0.25 || h > 2.6)) break;
+        L.x = nx; L.z = nz; if (!TILES[i].sea) L.y = h - 0.05; c = clr(L.x, L.z);
+      }
+      if (c < 1.9 * sc) o.lm.scale.setScalar(Math.max(0.35, c / 1.9 - 0.03));
+      const pad = o.lm.userData.pad; if (pad) { pad.position.x = L.x; pad.position.z = L.z; pad.scale.setScalar(o.lm.scale.x / 1.15); }
+    });
   }
 
+  // 防止格子互相重疊：把太靠近的格子推開，還是太擠就把那格縮小一點
+  relaxPath() {
+    const P = this.path, n = P.length, orig = P.map(p => p.clone());
+    const base = Math.min(3.5, this.spacing * 0.9), want = base + 0.45;
+    const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+    for (let it = 0; it < 240; it++) {
+      let moved = false;
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+        const c = cheb(P[i], P[j]);
+        if (c < want) {
+          const d = new THREE.Vector2().subVectors(P[j], P[i]); if (d.lengthSq() < 1e-6) d.set(Math.random() - 0.5, Math.random() - 0.5);
+          d.normalize().multiplyScalar((want - c) * 0.3); P[i].sub(d); P[j].add(d); moved = true;
+        }
+      }
+      for (let i = 0; i < n; i++) P[i].lerp(orig[i], 0.04);
+      if (!moved) break;
+    }
+    this.tileSizes = P.map((p, i) => { let m = 99; for (let j = 0; j < n; j++) if (j !== i) m = Math.min(m, cheb(p, P[j])); return Math.max(2.2, Math.min(base, m - 0.4)); });
+  }
   tilePos(i) { return this.tileObjs[i].pos; }
 
   // 依狀態更新場景

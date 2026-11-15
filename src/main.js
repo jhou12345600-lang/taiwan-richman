@@ -515,7 +515,7 @@ function renderPlayers() {
 function renderHud() {
   const s = G.s; if (!s || !s.players) return;
   renderPlayers();
-  $('#roundinfo').textContent = `📅 ${s.month || 1}月${s.day || 1}日・第 ${s.round}${s.settings.maxRounds ? '/' + s.settings.maxRounds : ''} 回合`;
+  $('#roundinfo').textContent = `📅 ${s.month || 1}月${s.day || 1}日・第 ${s.settings.maxRounds ? Math.min(s.round, s.settings.maxRounds) : s.round}${s.settings.maxRounds ? '/' + s.settings.maxRounds : ''} 回合`;
   const feed = s.log.slice(-4);
   $('#feed').innerHTML = feed.map(l => `<div>${esc(l)}</div>`).join('');
   renderNet();
@@ -553,7 +553,8 @@ function renderHud() {
   // 決策視窗
   if (mine && s.step === 'decide' && s.pending) {
     const pk = s.v + s.pending.type;
-    if (G.ui.decideKey !== s.pending.type + ':' + s.turn + ':' + s.round || G.ui.mode !== 'decide') { G.ui.decideKey = s.pending.type + ':' + s.turn + ':' + s.round; openDecide(); }
+    const dk = s.pending.k + ':' + s.pending.type;
+    if (G.ui.decideKey !== dk || G.ui.mode !== 'decide') { G.ui.decideKey = dk; openDecide(); }
     else if (s.pending.type === 'shop' || s.pending.type === 'bank') openDecide(true);
   } else if (G.ui.mode === 'decide') { G.ui.decideKey = null; closeSheet(); }
   if (s.step === 'auction') renderAuction(); else if (G.ui.mode === 'auction') closeSheet();

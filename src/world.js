@@ -226,6 +226,7 @@ export class World {
     this.path = pts; this.spacing = spacing;
     this.buildTiles();
     if (this.geo.city) this.buildCity(this.geo.city);
+    try { this.buildScenery(id); } catch (e) { console.warn('scenery', e); }
     this.tokens = {}; this.marks = {}; this.floaters = []; this.arrow = null; this.inited = false; this.state = null;
     this.overview(); this.camTo = null;
     const v = this.geo.view; this.camera.position.set(v[0], v[1], v[2]); this.controls.target.set(v[3], 0, v[4]);
@@ -240,6 +241,146 @@ export class World {
       const h = 0.6 + Math.random() * 2.4, w = 0.8 + Math.random() * 0.8;
       const g = new THREE.Group(); B(g, w, h, w, cs[placed % 6]); B(g, w * 1.02, 0.08, w * 1.02, '#90a4ae', 0, h);
       g.position.set(x, this.H(x, z), z); g.rotation.y = Math.random(); this.scene.add(g); placed++;
+    }
+  }
+
+  // ---- 當地生活場景：火車、捷運、機車、漁船、海鷗、稻田、鹽田、魚塭…… ----
+  freeSpot(q, r = 2.5, hmin = 0.3, hmax = 1.6) {
+    const h = this.H(q.x, q.y);
+    if (h < hmin || h > hmax) return false;
+    return !this.lmSpots.some(p => p.distanceTo(q) < r + 2.2) && !this.path.some(p => p.distanceTo(q) < r + 2.2) && !this.tileObjs.some(o => o.lot.position.distanceTo(new THREE.Vector3(q.x, o.lot.position.y, q.y)) < r + 0.8);
+  }
+  randSpots(n, r, hmin, hmax, area, tries = 400) {
+    const out = [], G = this.geo, W = G.W * 0.45, H = G.H * 0.45;
+    for (let t = 0; t < tries && out.length < n; t++) {
+      const q = area ? area() : new THREE.Vector2(G.ox + (Math.random() - 0.5) * 2 * W, G.oz + (Math.random() - 0.5) * 2 * H);
+      if (this.freeSpot(q, r, hmin, hmax) && !out.some(o => o.distanceTo(q) < r * 2)) out.push(q);
+    }
+    return out;
+  }
+  mover(obj, pts, speed, closed = true, yfn) {
+    if (!pts || pts.length < 2) return obj;
+    const L = [0]; for (let i = 1; i < pts.length + (closed ? 1 : 0); i++) L.push(L[i - 1] + pts[i - 1].distanceTo(pts[i % pts.length]));
+    const total = L[L.length - 1]; let d = Math.random() * total, dir = 1;
+    obj.userData.tick = (t, dt) => {
+      d += dt * speed * dir;
+      if (closed) d = ((d % total) + total) % total; else if (d > total || d < 0) { dir *= -1; d = Math.max(0, Math.min(total, d)); }
+      let j = 0; while (j < L.length - 2 && L[j + 1] < d) j++;
+      const a = pts[j], b = pts[(j + 1) % pts.length], f = (d - L[j]) / Math.max(1e-6, L[j + 1] - L[j]);
+      const x = a.x + (b.x - a.x) * f, z = a.y + (b.y - a.y) * f;
+      obj.position.set(x, yfn ? yfn(x, z) : obj.position.y, z);
+      obj.rotation.y = Math.atan2((b.x - a.x) * dir, (b.y - a.y) * dir);
+    };
+    this.scene.add(obj);
+    return obj;
+  }
+  train(colors, cars = 3) {
+    const g = new THREE.Group();
+    for (let i = 0; i < cars; i++) {
+      const c = new THREE.Group(); c.position.z = -i * 1.25; g.add(c);
+      B(c, 0.6, 0.55, 1.15, colors[0]); B(c, 0.62, 0.12, 1.17, colors[1], 0, 0.3);
+      for (let k = -1; k <= 1; k++) B(c, 0.63, 0.14, 0.22, '#263238', 0, 0.36, k * 0.35);
+      if (i === 0) { const n = S(c, 0.3, colors[0], 0, 0.27, 0.62, undefined, 8, 6); n.scale.set(1, 0.9, 1.4); }
+    }
+    return g;
+  }
+  scooter(color) {
+    const g = new THREE.Group();
+    B(g, 0.18, 0.18, 0.7, color, 0, 0.12); for (const z of [-0.28, 0.28]) { const w = C(g, 0.11, 0.11, 0.07, '#212121', 0, 0.11, z, 10); w.rotation.z = Math.PI / 2; }
+    B(g, 0.05, 0.4, 0.05, '#9e9e9e', 0, 0.25, 0.3); B(g, 0.3, 0.04, 0.04, '#9e9e9e', 0, 0.62, 0.3);
+    C(g, 0.1, 0.12, 0.35, ['#e53935', '#1e88e5', '#43a047', '#8e24aa'][Math.floor(Math.random() * 4)], 0, 0.3, -0.05, 8);
+    S(g, 0.12, '#fdd835', 0, 0.75, -0.05, undefined, 8, 6);
+    return g;
+  }
+  boat() {
+    const g = new THREE.Group(); const h = S(g, 0.5, ['#fafafa', '#e53935', '#1e88e5', '#ffb300'][Math.floor(Math.random() * 4)], 0, 0.05, 0, undefined, 8, 5); h.scale.set(0.8, 0.45, 2);
+    B(g, 0.5, 0.4, 0.5, '#eceff1', 0, 0.15, -0.2); C(g, 0.03, 0.03, 1.0, '#795548', 0, 0.2, 0.3, 4);
+    for (let i = 0; i < 4; i++) S(g, 0.05, '#ffeb3b', 0, 1.0 - i * 0.18, 0.3 + (i % 2 ? 0.1 : -0.1), { e: '#ffeb3b', ei: 0.8 }, 4, 3);
+    return g;
+  }
+  bird() {
+    const g = new THREE.Group(); S(g, 0.12, '#ffffff', 0, 0, 0, undefined, 6, 4).scale.set(0.8, 0.7, 1.4);
+    const wl = B(g, 0.6, 0.03, 0.18, '#eceff1', -0.32, 0, 0), wr = B(g, 0.6, 0.03, 0.18, '#eceff1', 0.32, 0, 0);
+    const prev = g.userData.tick;
+    g.userData.flap = t => { wl.rotation.z = Math.sin(t * 8) * 0.5; wr.rotation.z = -Math.sin(t * 8) * 0.5; };
+    return g;
+  }
+  ellipsePts(cx, cz, a, b, n = 64) { const pts = []; for (let i = 0; i < n; i++) { const t = (i / n) * Math.PI * 2; pts.push(new THREE.Vector2(cx + Math.cos(t) * a, cz + Math.sin(t) * b)); } return pts; }
+  buildScenery(id) {
+    const H = (x, z) => this.H(x, z);
+    // 共同：機車在路上跑、海鷗、漁船
+    const ring = this.path.map((p, i) => { const o = this.tileObjs[i]; return new THREE.Vector2(p.x - o.nm.x * (this.tileSize * 0.62), p.y - o.nm.y * (this.tileSize * 0.62)); });
+    for (let i = 0; i < 4; i++) this.mover(this.scooter(['#e53935', '#fafafa', '#1e88e5', '#fdd835'][i]), ring, 3 + i * 0.6, true, (x, z) => Math.max(0.35, H(x, z)) + 0.2);
+    for (let i = 0; i < 8; i++) {
+      const b = this.bird(); const cx = (Math.random() - 0.5) * this.geo.W * 0.7, cz = (Math.random() - 0.5) * this.geo.H * 0.7, y = 9 + Math.random() * 5;
+      const pts = this.ellipsePts(cx, cz, 6 + Math.random() * 6, 5 + Math.random() * 5, 32);
+      this.mover(b, pts, 4 + Math.random() * 2, true, () => y);
+      const tk = b.userData.tick; b.userData.tick = (t, dt) => { tk(t, dt); b.userData.flap(t + cx); };
+    }
+    const seaSpots = [];
+    for (let t = 0; t < 600 && seaSpots.length < 7; t++) {
+      const q = new THREE.Vector2(this.geo.ox + (Math.random() - 0.5) * this.geo.W * 0.95, this.geo.oz + (Math.random() - 0.5) * this.geo.H * 0.95);
+      if (H(q.x, q.y) < -1.0 && !this.path.some(p => p.distanceTo(q) < 9) && !this.lmSpots.some(p => p.distanceTo(q) < 8)) seaSpots.push(q);
+    }
+    seaSpots.forEach(q => { const pts = this.ellipsePts(q.x, q.y, 3 + Math.random() * 3, 2 + Math.random() * 3, 24).filter(p => H(p.x, p.y) < -0.5); if (pts.length > 6) this.mover(this.boat(), pts, 0.8 + Math.random() * 0.6, true, () => 0.05); });
+    const paddies = (n, area) => this.randSpots(n, 2.2, 0.3, 1.2, area).forEach(q => {
+      const g = new THREE.Group(); const c = Math.random() < 0.5 ? '#9ccc65' : '#cddc39';
+      B(g, 3.6, 0.06, 2.6, c); for (let k = -2; k <= 2; k++) B(g, 3.6, 0.02, 0.05, '#7cb342', 0, 0.06, k * 0.5);
+      B(g, 0.12, 0.08, 2.6, '#a1887f', 1.8, 0, 0); g.position.set(q.x, H(q.x, q.y) + 0.01, q.y); g.rotation.y = Math.random() * 0.4; this.scene.add(g);
+    });
+    const temples = n => this.randSpots(n, 1.6, 0.3, 2.5).forEach(q => {
+      const g = new THREE.Group(); B(g, 1.1, 0.6, 0.8, '#c62828'); const r = new THREE.Mesh(new THREE.ConeGeometry(0.95, 0.4, 4), mat('#e65100')); r.rotation.y = Math.PI / 4; r.scale.set(1.2, 1, 0.9); r.position.y = 0.8; g.add(r);
+      g.position.set(q.x, H(q.x, q.y), q.y); g.rotation.y = Math.random() * 6; this.scene.add(g);
+    });
+    const turbines = (n, area) => this.randSpots(n, 1.2, 0.25, 1.0, area).forEach(q => {
+      const g = new THREE.Group(); C(g, 0.06, 0.1, 4, '#fafafa', 0, 0, 0, 6); const hub = new THREE.Group(); hub.position.set(0, 4, 0.12); g.add(hub);
+      for (let i = 0; i < 3; i++) { const bl = B(hub, 0.1, 1.5, 0.03, '#fafafa', 0, 0, 0); bl.geometry.translate(0, 0.75, 0); bl.position.y = 0; bl.rotation.z = i * 2.094; }
+      g.position.set(q.x, H(q.x, q.y), q.y); g.userData.tick = (t, dt) => { hub.rotation.z += dt * 1.8; }; this.scene.add(g);
+    });
+    const palms = n => this.randSpots(n, 1.0, 0.3, 2.0).forEach(q => {
+      const g = new THREE.Group(); for (let k = 0; k < 3; k++) { const x = (k - 1) * 0.5; C(g, 0.04, 0.05, 1.8, '#8d6e63', x, 0, 0, 5); S(g, 0.3, '#2e7d32', x, 1.9, 0, undefined, 6, 4).scale.y = 0.5; }
+      g.position.set(q.x, H(q.x, q.y), q.y); this.scene.add(g);
+    });
+    if (id === 'taiwan') {
+      // 高鐵：沿著西部走廊
+      const west = this.path.map((p, i) => ({ p, o: this.tileObjs[i] })).filter(({ p }) => p.x < -6).map(({ p, o }) => new THREE.Vector2(p.x + o.nm.x * 9, p.y + o.nm.y * 9)).sort((a, b) => a.y - b.y);
+      const hsr = west.filter((q, i) => i % 2 === 0);
+      if (hsr.length > 4) {
+        for (let i = 0; i < hsr.length - 1; i++) { const a = hsr[i], b = hsr[i + 1], m = a.clone().lerp(b, 0.5), len = a.distanceTo(b); const tr = B(new THREE.Group(), 0.5, 0.1, len, '#bdbdbd'); tr.position.set(m.x, Math.max(0.4, H(m.x, m.y)) + 0.9, m.y); tr.rotation.y = Math.atan2(b.x - a.x, b.y - a.y); this.scene.add(tr); const pl = C(new THREE.Group(), 0.1, 0.12, 0.9, '#9e9e9e', 0, 0, 0, 6); pl.position.set(a.x, Math.max(0.4, H(a.x, a.y)), a.y); this.scene.add(pl); }
+        this.mover(this.train(['#fafafa', '#ff6f00'], 4), hsr, 9, false, (x, z) => Math.max(0.4, H(x, z)) + 0.95);
+      }
+      paddies(14); temples(8); palms(10);
+      turbines(8, () => { const q = this.path[Math.floor(Math.random() * this.path.length)]; return q.x < -5 ? new THREE.Vector2(q.x - 4 + Math.random() * 2, q.y + (Math.random() - 0.5) * 4) : new THREE.Vector2(999, 999); });
+    }
+    if (id === 'taipei') {
+      const mrt = this.ellipsePts(0, 0, this.geo.a * 0.62, this.geo.b * 0.58, 48);
+      for (let i = 0; i < mrt.length; i++) { const a = mrt[i], b = mrt[(i + 1) % mrt.length], m = a.clone().lerp(b, 0.5); const tr = B(new THREE.Group(), 0.4, 0.08, a.distanceTo(b) + 0.05, '#cfd8dc'); tr.position.set(m.x, H(m.x, m.y) + 1.6, m.y); tr.rotation.y = Math.atan2(b.x - a.x, b.y - a.y); this.scene.add(tr); if (i % 3 === 0) { const pl = C(new THREE.Group(), 0.08, 0.1, 1.6, '#b0bec5', 0, 0, 0, 6); pl.position.set(a.x, H(a.x, a.y), a.y); this.scene.add(pl); } }
+      this.mover(this.train(['#eceff1', '#1e88e5'], 3), mrt, 7, true, (x, z) => H(x, z) + 1.65);
+      this.mover(this.train(['#eceff1', '#8d6e63'], 3), mrt.slice().reverse(), 6, true, (x, z) => H(x, z) + 1.65);
+      const river = []; for (let z = -50; z <= 50; z += 4) river.push(new THREE.Vector2(-47 - Math.sin(z * 0.08) * 3, z));
+      this.mover(this.boat(), river, 1.5, false, () => 0.05); this.mover(this.boat(), river.slice().reverse(), 1.2, false, () => 0.05);
+      temples(4); palms(4);
+    }
+    if (id === 'tainan') {
+      // 七股鹽田、魚塭水車
+      this.randSpots(10, 1.8, 0.3, 0.9, () => new THREE.Vector2(-50 + Math.random() * 12, (Math.random() - 0.5) * 70)).forEach(q => {
+        const g = new THREE.Group(); for (let i = 0; i < 4; i++) B(g, 1.4, 0.04, 1.4, i % 2 ? '#ffffff' : '#b3e5fc', (i % 2) * 1.5 - 0.75, 0, Math.floor(i / 2) * 1.5 - 0.75);
+        g.position.set(q.x, H(q.x, q.y) + 0.02, q.y); this.scene.add(g);
+      });
+      this.randSpots(10, 2.0, 0.3, 1.0).forEach(q => {
+        const g = new THREE.Group(); B(g, 3.2, 0.1, 2.4, '#8d6e63'); B(g, 2.9, 0.05, 2.1, '#4db6ac', 0, 0.08); const wh = new THREE.Group(); wh.position.set(0.6, 0.25, 0); g.add(wh);
+        for (let i = 0; i < 6; i++) { const p = B(wh, 0.04, 0.35, 0.18, '#fdd835', 0, 0, 0); p.geometry.translate(0, 0.17, 0); p.position.y = 0; p.rotation.x = i * 1.047; }
+        g.position.set(q.x, H(q.x, q.y), q.y); g.userData.tick = (t, dt) => { wh.rotation.x += dt * 4; }; this.scene.add(g);
+      });
+      temples(8); paddies(6); palms(6);
+    }
+    if (id === 'islands') {
+      // 渡輪往返各島、珊瑚礁、燈塔
+      const isl = this.geo.isl;
+      for (let i = 1; i < isl.length; i++) { const a = new THREE.Vector2(isl[0][0], isl[0][1]), b = new THREE.Vector2(isl[i][0], isl[i][1]); const pts = []; for (let k = 0; k <= 10; k++) pts.push(a.clone().lerp(b, k / 10)); if (i % 2) this.mover(this.boat(), pts.filter(p => H(p.x, p.y) < -0.4), 2, false, () => 0.05); }
+      for (const [cx, cz, r] of isl.slice(3)) { const g = new THREE.Group(); C(g, 0.3, 0.4, 2.5, '#fafafa', 0, 0, 0, 8); C(g, 0.35, 0.35, 0.4, '#e53935', 0, 2.5, 0, 8, { e: '#ff5252', ei: 0.4 }); g.position.set(cx + r * 0.4, H(cx + r * 0.4, cz), cz); this.scene.add(g); }
+      for (let i = 0; i < 40; i++) { const q = new THREE.Vector2((Math.random() - 0.5) * 140, (Math.random() - 0.5) * 120); if (H(q.x, q.y) > -0.6 || H(q.x, q.y) < -1.3 || this.path.some(p => p.distanceTo(q) < 3)) continue; const c = S(new THREE.Group(), 0.4 + Math.random() * 0.5, ['#ff8a80', '#ffd180', '#ea80fc', '#80d8ff'][i % 4], 0, 0, 0, undefined, 6, 4); c.position.set(q.x, H(q.x, q.y) + 0.2, q.y); this.scene.add(c); }
+      palms(8);
     }
   }
   resize() {

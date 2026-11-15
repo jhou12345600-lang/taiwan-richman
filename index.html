@@ -129,6 +129,8 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
 @keyframes bob{50%{transform:translate(-50%,10px)}}
 .pwa #fsBtn,.pwa #fsHomeBtn{display:none}
 #hud{padding-top:env(safe-area-inset-top)}
+#awayBox{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:28;display:flex;align-items:center;justify-content:center;padding:16px}
+#awayBox .ab{background:#fffdf5;border-radius:20px;padding:20px;width:min(340px,100%);text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4)}
 .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700;z-index:50;background:#0d6aa8}
 </style>
 </head>
@@ -197,6 +199,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
   <div id="players"></div>
   <div id="roundinfo"></div>
   <div id="topbtn">
+    <button id="awayBtn" title="臨時離開">☕</button>
     <button id="fsBtn" title="全螢幕">⛶</button>
     <button id="camBtn" title="視角">🗺️</button>
     <button id="stockBtn" title="股市">📈</button>
@@ -214,6 +217,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
     <div id="acts"></div>
   </div>
 </div>
+<div id="awayBox" class="hidden"><div class="ab"><div style="font-size:44px">☕</div><div style="font-size:20px;font-weight:900;margin:6px 0">你暫時離開中</div><div class="note" style="color:#555">電腦正在幫你代打，座位和資產都保留著</div><button class="pri" id="awayBack" style="width:100%;margin-top:12px;font-size:18px">👋 回來繼續玩</button></div></div>
 <div id="notice"><div class="nb"><div class="nt"></div><div class="nx"></div></div></div>
 <div id="dice" class="hidden"></div>
 <div id="toast"></div>
@@ -628,6 +632,87 @@ var CHARS = [
     color: "#9e9d24",
     bio: "壽山上的台灣獼猴，最會跟遊客「借」東西。",
     sk: [["pick", "順手牽羊", "付過路費後 25% 機率拿回一半"], ["mischief", "調皮", "每回合開始 15% 機率撿到道具卡"]]
+  },
+  {
+    id: "bat",
+    name: "狐蝠",
+    emoji: "🦇",
+    color: "#4e342e",
+    animal: 1,
+    bio: "脖子圍著金色毛圍巾的台灣狐蝠，綠島的夜空霸主。",
+    sk: [["magicfan", "魔法翅膀", "魔法屋只會遇到好事"], ["noblock", "飛越", "路障擋不住牠"]]
+  },
+  {
+    id: "serow",
+    name: "長鬃山羊",
+    emoji: "🐐",
+    color: "#a1887f",
+    animal: 1,
+    bio: "在峭壁上健步如飛的長鬃山羊，台灣特有的攀岩高手。",
+    sk: [["minstep", "攀岩", "擲出的點數小於 3 時，當作走 3 步"], ["agile", "穩健", "住院、拘留時間少 1 回合"]]
+  },
+  {
+    id: "marten",
+    name: "黃喉貂",
+    emoji: "🦡",
+    color: "#ff6f00",
+    animal: 1,
+    bio: "喉嚨一片金黃的黃喉貂，動作快、手腳更快。",
+    sk: [["thief", "神偷", "使用搶奪卡時再多偷 $1000"], ["rob2", "雙手並用", "搶奪卡一次搶兩張"]]
+  },
+  {
+    id: "barbet",
+    name: "五色鳥",
+    emoji: "🦜",
+    color: "#64dd17",
+    animal: 1,
+    bio: "頭上有紅黃藍黑綠五種顏色的五色鳥，叫聲像敲木魚，是股市老手。",
+    sk: [["dividend", "股市老手", "每月 1 日拿到持股市值 8% 的股利"], ["pointsx", "花枝招展", "獲得的點券加倍"]]
+  },
+  {
+    id: "civet",
+    name: "白鼻心",
+    emoji: "🦝",
+    color: "#78909c",
+    animal: 1,
+    bio: "鼻子上一條白線的白鼻心，最愛逛夜市找水果吃。",
+    sk: [["pointsday", "逛夜市", "每回合開始點券 +5"], ["bargain", "殺價", "道具店卡片 7 折"]]
+  },
+  {
+    id: "boar",
+    name: "台灣野豬",
+    emoji: "🐗",
+    color: "#6d4c41",
+    animal: 1,
+    bio: "橫衝直撞的台灣野豬，獠牙一亮誰都讓路。",
+    sk: [["rush", "衝撞", "停在別人的地上 25% 機率直接衝過去，不用付錢"], ["thick", "皮厚", "付過路費與醫藥費 -20%"]]
+  },
+  {
+    id: "squirrel",
+    name: "赤腹松鼠",
+    emoji: "🐿️",
+    color: "#c2185b",
+    animal: 1,
+    bio: "肚子紅紅的赤腹松鼠，最會囤積過冬的糧食。",
+    sk: [["autosave", "囤糧", "每回合自動把 5% 現金存進銀行"], ["interest", "存錢筒", "月底存款利息加倍（20%）"]]
+  },
+  {
+    id: "spoonbill",
+    name: "黑面琵鷺",
+    emoji: "🦢",
+    color: "#00b8d4",
+    animal: 1,
+    bio: "冬天飛來台南七股的黑面琵鷺，用湯匙嘴巴撈小魚。",
+    sk: [["winter", "候鳥", "每月 1 日獲得一張道具卡"], ["range", "展翅", "路障、地雷放置距離翻倍"]]
+  },
+  {
+    id: "frog",
+    name: "台北樹蛙",
+    emoji: "🐸",
+    color: "#00c853",
+    animal: 1,
+    bio: "在雨夜呱呱叫的台北樹蛙，下雨天最開心。",
+    sk: [["rainy", "雨蛙", "颱風、所得稅等壞新聞對牠無效"], ["swift", "跳跳", "每次擲骰多走 1 步"]]
   }
 ];
 var hasSkill = (p, k) => {
@@ -865,6 +950,12 @@ function beginTurn(s, now) {
   s.pending = null;
   s.anim = null;
   s.botUses = 0;
+  if (!p.out && hasSkill(p, "pointsday")) addPts(p, 5);
+  if (!p.out && hasSkill(p, "autosave") && p.cash > 0) {
+    const v = r10(p.cash * 0.05);
+    p.cash -= v;
+    p.deposit += v;
+  }
   if (hasSkill(p, "mischief") && !p.out && Math.random() < 0.15) {
     log(s, `🐒 ${p.name} 調皮地撿到一張卡`);
     giveCard(s, p);
@@ -926,6 +1017,19 @@ function newRound(s) {
       if (it > 0) {
         p.deposit += it;
         fx(s, { k: "money", pid: p.id, d: it });
+      }
+    });
+    alive(s).forEach((p) => {
+      if (hasSkill(p, "dividend")) {
+        const d = r10(stockValue(s, p) * 0.08);
+        if (d > 0) {
+          gain(s, p, d);
+          log(s, `🦜 ${p.name} 領到股利 ${money(d)}`);
+        }
+      }
+      if (hasSkill(p, "winter")) {
+        log(s, `🦢 候鳥 ${p.name} 帶回一張道具卡`);
+        giveCard(s, p);
       }
     });
   }
@@ -1213,6 +1317,11 @@ function landProp(s, p, i, now) {
     log(s, `😮 ${t.name} 的主人 ${o.name} 不在，${p.name} 免付過路費`);
     return done(s, now);
   }
+  if (hasSkill(p, "rush") && Math.random() < 0.25) {
+    log(s, `🐗 ${p.name} 一路衝撞過去，不用付過路費！`);
+    fx(s, { k: "emote", pid: p.id, e: "💨" });
+    return done(s, now, 1400);
+  }
   let amt = toll(s, i);
   if (hasGod(p, "caishen")) {
     log(s, `💰 財神護體，${p.name} 不用付過路費`);
@@ -1457,7 +1566,7 @@ var NEWS2 = [
   }) },
   { t: "政府發放振興券，每人 $2000", f: (s) => alive(s).forEach((p) => gain(s, p, 2e3)) },
   { t: "繳交所得稅，每人繳現金 10%", f: (s) => alive(s).forEach((p) => {
-    if (!hasGod(p, "mazu")) pay(s, p, null, r10(p.cash * 0.1));
+    if (!hasGod(p, "mazu") && !hasSkill(p, "rainy")) pay(s, p, null, r10(p.cash * 0.1));
   }) },
   { t: "國旅補助！每人獲得一張道具卡", f: (s) => alive(s).forEach((p) => giveCard(s, p)) },
   { t: "股市大漲！所有股價上漲 20%", f: (s) => s.market.forEach((m) => {
@@ -1490,7 +1599,7 @@ var NEWS2 = [
   { tg: 1, t: (g) => `颱風過境${GROUPS[g].name}，區內房子各倒一層`, f: (s, g) => {
     TILES.forEach((t, i) => {
       const st = s.tiles[i];
-      if (t.g === g && st.l > 0 && !hasSkill(pl(s, st.o), "armor")) st.l--;
+      if (t.g === g && st.l > 0 && !hasSkill(pl(s, st.o), "armor") && !hasSkill(pl(s, st.o), "rainy")) st.l--;
     });
   } }
 ];
@@ -1566,7 +1675,7 @@ var MAGIC2 = [
   } }
 ];
 function magic(s, p, now) {
-  const m = pick(MAGIC2);
+  const m = hasSkill(p, "magicfan") ? pick([MAGIC2[2], MAGIC2[3], MAGIC2[4], MAGIC2[5]]) : pick(MAGIC2);
   fx(s, { k: "notice", kind: "god", title: "🔮 魔法屋", text: m.t, pid: p.id });
   log(s, `🔮 ${p.name}：${m.t}`);
   const r = m.f(s, p, now);
@@ -1587,6 +1696,14 @@ function act(s, pid, a, now) {
     return null;
   }
   if (s.phase !== "play") return "遊戲未進行";
+  if (a.type === "away") {
+    const q = pl(s, pid);
+    if (!q || q.out) return "無效";
+    q.away = !!a.on;
+    log(s, q.away ? `☕ ${q.name} 暫時離開，由電腦代打` : `👋 ${q.name} 回來了！`);
+    fx(s, { k: "emote", pid, e: q.away ? "☕" : "👋" });
+    return null;
+  }
   if (a.type === "bid") return s.step === "auction" ? bid(s, pid, a.amount, now) : "沒有拍賣";
   const p = cur(s);
   if (!p || p.id !== pid) return "還沒輪到你";
@@ -1741,6 +1858,7 @@ function doRoll(s, p, now) {
   } else dice = Array.from({ length: n }, () => 1 + rnd(6));
   let steps = dice.reduce((a, b) => a + b, 0);
   s.lastDice = steps;
+  if (hasSkill(p, "minstep") && steps < 3) steps = 3;
   if (hasSkill(p, "swift")) steps += 1;
   if (p.st.turtle > 0) {
     p.st.turtle--;
@@ -1855,6 +1973,13 @@ function useCard(s, p, a, now) {
         got.push(CARDS[g].name);
       }
       log(s, `${pre}，從 ${tp.name} 搶走「${got.join("、")}」`);
+      if (hasSkill(p, "thief")) {
+        const m = Math.min(1e3, tp.cash);
+        tp.cash -= m;
+        gain(s, p, m);
+        fx(s, { k: "money", pid: tp.id, d: -m });
+        log(s, `🦡 ${p.name} 順手再偷走 ${money(m)}`);
+      }
       break;
     }
     case "sleep":
@@ -3756,6 +3881,15 @@ function limb(parent, r, len, c, x, y, z) {
   return pivot;
 }
 var ANIMALS = {
+  bat: { fur: "#4e342e", belly: "#6d4c41", ear: "cat", wings: "bat", tail: "none", muzzle: "#5d4037" },
+  serow: { fur: "#4e4a46", belly: "#8d8580", ear: "deer", tail: "short", tailC: "#3e3a36", muzzle: "#bdb5ae" },
+  marten: { fur: "#3e2723", belly: "#ffb300", ear: "small", tail: "long", muzzle: "#d7ccc8" },
+  barbet: { fur: "#43a047", belly: "#7cb342", ear: "none", headC: "#43a047", beak: "#212121", wings: 1, tail: "owl", leg: "#9e9e9e" },
+  civet: { fur: "#78909c", belly: "#cfd8dc", ear: "small", tail: "long", muzzle: "#546e7a" },
+  boar: { fur: "#4e342e", belly: "#5d4037", ear: "cat", tail: "short", tailC: "#3e2723", muzzle: "#4e342e" },
+  squirrel: { fur: "#6d4c41", belly: "#d84315", ear: "cat", tail: "bushy" },
+  spoonbill: { fur: "#fafafa", belly: "#ffffff", ear: "none", headC: "#fafafa", wings: 1, tail: "owl", leg: "#212121" },
+  frog: { fur: "#43a047", belly: "#fff59d", ear: "none", headC: "#43a047", tail: "none", frog: 1 },
   bear: { fur: "#1c1c1c", belly: "#262626", ear: "round", muzzle: "#c8a27a", tail: "short", tailC: "#1c1c1c" },
   cloudleo: { fur: "#cdb48a", belly: "#f3e9d2", ear: "cat", spots: "#4e4030", cloud: 1, tail: "long" },
   otter: { fur: "#6d4c41", belly: "#d7ccc8", ear: "small", tail: "otter", whisker: 1 },
@@ -3777,7 +3911,7 @@ function buildAnimal(charId, color) {
   body.position.y = 0.06;
   root.add(body);
   const legC = a.leg || a.fur;
-  const legL = limb(body, a.leg ? 0.04 : 0.09, 0.26, legC, -0.13, 0.42, 0), legR = limb(body, a.leg ? 0.04 : 0.09, 0.26, legC, 0.13, 0.42, 0);
+  const legL = limb(body, a.leg ? 0.04 : 0.09, 0.26, legC, -0.13, 0.42, -0.06), legR = limb(body, a.leg ? 0.04 : 0.09, 0.26, legC, 0.13, 0.42, -0.06);
   for (const l of [legL, legR]) {
     const f = S(l, 0.1, a.leg ? a.leg : a.fur, 0, -0.42, 0.05, void 0, 6, 4);
     f.scale.set(1, 0.5, 1.5);
@@ -3787,8 +3921,8 @@ function buildAnimal(charId, color) {
   body.add(torso);
   const tb = S(torso, 0.3, a.fur, 0, 0.18, 0, void 0, 12, 9);
   tb.scale.set(1, 1.15, 0.95);
-  const bl = S(torso, 0.2, a.belly, 0, 0.15, 0.15, void 0, 10, 8);
-  bl.scale.set(1, 1.2, 0.6);
+  const bl = S(torso, 0.21, a.belly, 0, 0.13, 0.13, void 0, 12, 9);
+  bl.scale.set(1, 1.25, 0.85);
   let armL, armR;
   if (a.wings) {
     armL = new THREE.Group();
@@ -3798,8 +3932,21 @@ function buildAnimal(charId, color) {
     armR.position.set(0.27, 0.35, 0);
     torso.add(armR);
     for (const [w, sx] of [[armL, -1], [armR, 1]]) {
-      const wing = S(w, 0.2, a.fur, sx * 0.04, -0.18, 0, void 0, 8, 6);
-      wing.scale.set(0.35, 1.1, 0.8);
+      if (a.wings === "bat") {
+        const sh = new THREE.Shape();
+        sh.moveTo(0, 0);
+        sh.lineTo(sx * 0.55, -0.05);
+        sh.lineTo(sx * 0.45, -0.25);
+        sh.lineTo(sx * 0.3, -0.18);
+        sh.lineTo(sx * 0.2, -0.38);
+        sh.lineTo(0, -0.3);
+        sh.lineTo(0, 0);
+        put(w, new THREE.ShapeGeometry(sh), mat("#3e2723", { ds: true }), 0, 0.05, 0);
+        B(w, 0.04, 0.04, 0.04, "#3e2723", sx * 0.55, 0.03, 0);
+      } else {
+        const wing = S(w, 0.2, a.fur, sx * 0.04, -0.18, 0, void 0, 8, 6);
+        wing.scale.set(0.35, 1.1, 0.8);
+      }
     }
   } else {
     armL = limb(torso, 0.07, 0.2, a.fur, -0.27, 0.36, 0);
@@ -3821,7 +3968,12 @@ function buildAnimal(charId, color) {
     const m = S(head, 0.15, a.muzzle || a.belly, 0, -0.08, 0.2, void 0, 8, 6);
     m.scale.set(1.2, 0.8, 0.7);
   }
-  if (a.bigEye) for (const sx of [-1, 1]) {
+  if (a.frog) for (const sx of [-1, 1]) {
+    S(head, 0.11, a.fur, sx * 0.15, 0.22, 0.08, void 0, 8, 6);
+    S(head, 0.08, "#ffffff", sx * 0.15, 0.25, 0.14, void 0, 8, 6);
+    S(head, 0.05, "#111", sx * 0.15, 0.25, 0.2, void 0, 6, 5);
+  }
+  else if (a.bigEye) for (const sx of [-1, 1]) {
     S(head, 0.11, "#f5f5f5", sx * 0.12, 0.04, 0.22, void 0, 10, 8).scale.z = 0.5;
     S(head, 0.075, a.bigEye, sx * 0.12, 0.04, 0.26, void 0, 8, 6).scale.z = 0.5;
     S(head, 0.045, "#111", sx * 0.12, 0.04, 0.29, void 0, 6, 5);
@@ -3910,6 +4062,57 @@ function buildAnimal(charId, color) {
     const sc = put(head, new THREE.ConeGeometry(0.1, 0.12, 4), a.scales, k * 0.13, 0.2, -0.12);
     sc.rotation.x = -2;
   }
+  if (charId === "bat") {
+    put(head, new THREE.TorusGeometry(0.24, 0.07, 6, 14), "#ffb300", 0, -0.26, 0).rotation.x = Math.PI / 2;
+  }
+  if (charId === "serow") {
+    for (const sx of [-1, 1]) {
+      const h = put(head, new THREE.ConeGeometry(0.04, 0.22, 6), "#212121", sx * 0.1, 0.32, -0.02);
+      h.rotation.x = -0.4;
+    }
+    B(torso, 0.18, 0.3, 0.2, "#2b2826", 0, 0.45, -0.15);
+  }
+  if (charId === "marten") {
+    const th = S(torso, 0.18, "#ffca28", 0, 0.4, 0.15, void 0, 8, 6);
+    th.scale.set(1, 0.8, 0.6);
+  }
+  if (charId === "barbet") {
+    S(head, 0.12, "#e53935", 0, 0.2, 0.15, void 0, 7, 5).scale.z = 0.5;
+    S(head, 0.13, "#1e88e5", -0.05, 0, 0.2, void 0, 7, 5).scale.set(1.6, 0.6, 0.5);
+    S(head, 0.12, "#fdd835", 0, -0.17, 0.18, void 0, 7, 5).scale.z = 0.5;
+    const bk = put(head, new THREE.ConeGeometry(0.09, 0.18, 6), "#212121", 0, -0.05, 0.35);
+    bk.rotation.x = Math.PI / 2;
+  }
+  if (charId === "civet") {
+    const st = S(head, 0.1, "#ffffff", 0, 0.1, 0.25, void 0, 6, 5);
+    st.scale.set(0.35, 1.5, 0.5);
+    st.rotation.x = 0.6;
+    for (const sx of [-1, 1]) S(head, 0.09, "#37474f", sx * 0.11, 0.05, 0.24, void 0, 6, 4).scale.z = 0.4;
+  }
+  if (charId === "boar") {
+    const sn = C(head, 0.11, 0.12, 0.16, "#8d6e63", 0, -0.07, 0.3, 10);
+    sn.rotation.x = Math.PI / 2;
+    S(head, 0.025, "#3e2723", -0.04, -0.07, 0.39);
+    S(head, 0.025, "#3e2723", 0.04, -0.07, 0.39);
+    for (const sx of [-1, 1]) {
+      const t = put(head, new THREE.ConeGeometry(0.025, 0.14, 5), "#fffde7", sx * 0.1, -0.08, 0.32);
+      t.rotation.z = -sx * 0.4;
+    }
+    for (let i = 0; i < 5; i++) put(torso, new THREE.ConeGeometry(0.05, 0.14, 4), "#2b1d16", 0, 0.55 - i * 0.1, -0.22 - i % 2 * 0.02).rotation.x = -0.6;
+  }
+  if (charId === "spoonbill") {
+    S(head, 0.2, "#212121", 0, -0.02, 0.2, void 0, 8, 6).scale.set(1.3, 0.6, 0.6);
+    const bill = B(head, 0.06, 0.04, 0.4, "#212121", 0, -0.06, 0.48);
+    const sp = S(head, 0.07, "#212121", 0, -0.06, 0.7, void 0, 6, 4);
+    sp.scale.set(1.3, 0.4, 1.3);
+    for (let i = 0; i < 3; i++) {
+      const c = put(head, new THREE.ConeGeometry(0.03, 0.2, 4), "#ffffff", 0, 0.25, -0.2 - i * 0.05);
+      c.rotation.x = -1.2;
+    }
+  }
+  if (charId === "frog") {
+    const m = B(head, 0.3, 0.02, 0.02, "#1b5e20", 0, -0.1, 0.29);
+  }
   const tail = new THREE.Group();
   tail.position.set(0, 0, -0.25);
   torso.add(tail);
@@ -3922,6 +4125,13 @@ function buildAnimal(charId, color) {
   if (a.tail === "otter") {
     const tl = C(tail, 0.03, 0.09, 0.55, a.fur, 0, -0.1, 0, 7);
     tl.rotation.x = -1.2;
+  }
+  if (a.tail === "bushy") {
+    for (let i = 0; i < 5; i++) {
+      const b = S(tail, 0.15 + i * 0.015, a.fur, 0, 0.05 + i * 0.16, -0.1 - Math.sin(i * 0.7) * 0.15, void 0, 7, 5);
+      b.scale.set(0.9, 1, 1);
+    }
+    S(tail, 0.12, "#8d6e63", 0, 0.85, 0.05, void 0, 6, 5);
   }
   if (a.tail === "owl") {
     const tl = B(tail, 0.22, 0.05, 0.22, a.fur, 0, 0, -0.05);
@@ -4472,6 +4682,11 @@ var World = class {
     this.spacing = spacing;
     this.buildTiles();
     if (this.geo.city) this.buildCity(this.geo.city);
+    try {
+      this.buildScenery(id);
+    } catch (e) {
+      console.warn("scenery", e);
+    }
     this.tokens = {};
     this.marks = {};
     this.floaters = [];
@@ -4499,6 +4714,279 @@ var World = class {
       g.rotation.y = Math.random();
       this.scene.add(g);
       placed++;
+    }
+  }
+  // ---- 當地生活場景：火車、捷運、機車、漁船、海鷗、稻田、鹽田、魚塭…… ----
+  freeSpot(q, r = 2.5, hmin = 0.3, hmax = 1.6) {
+    const h = this.H(q.x, q.y);
+    if (h < hmin || h > hmax) return false;
+    return !this.lmSpots.some((p) => p.distanceTo(q) < r + 2.2) && !this.path.some((p) => p.distanceTo(q) < r + 2.2) && !this.tileObjs.some((o) => o.lot.position.distanceTo(new THREE2.Vector3(q.x, o.lot.position.y, q.y)) < r + 0.8);
+  }
+  randSpots(n, r, hmin, hmax, area, tries = 400) {
+    const out = [], G2 = this.geo, W = G2.W * 0.45, H = G2.H * 0.45;
+    for (let t = 0; t < tries && out.length < n; t++) {
+      const q = area ? area() : new THREE2.Vector2(G2.ox + (Math.random() - 0.5) * 2 * W, G2.oz + (Math.random() - 0.5) * 2 * H);
+      if (this.freeSpot(q, r, hmin, hmax) && !out.some((o) => o.distanceTo(q) < r * 2)) out.push(q);
+    }
+    return out;
+  }
+  mover(obj, pts, speed, closed = true, yfn) {
+    if (!pts || pts.length < 2) return obj;
+    const L = [0];
+    for (let i = 1; i < pts.length + (closed ? 1 : 0); i++) L.push(L[i - 1] + pts[i - 1].distanceTo(pts[i % pts.length]));
+    const total = L[L.length - 1];
+    let d = Math.random() * total, dir = 1;
+    obj.userData.tick = (t, dt) => {
+      d += dt * speed * dir;
+      if (closed) d = (d % total + total) % total;
+      else if (d > total || d < 0) {
+        dir *= -1;
+        d = Math.max(0, Math.min(total, d));
+      }
+      let j = 0;
+      while (j < L.length - 2 && L[j + 1] < d) j++;
+      const a = pts[j], b = pts[(j + 1) % pts.length], f = (d - L[j]) / Math.max(1e-6, L[j + 1] - L[j]);
+      const x = a.x + (b.x - a.x) * f, z = a.y + (b.y - a.y) * f;
+      obj.position.set(x, yfn ? yfn(x, z) : obj.position.y, z);
+      obj.rotation.y = Math.atan2((b.x - a.x) * dir, (b.y - a.y) * dir);
+    };
+    this.scene.add(obj);
+    return obj;
+  }
+  train(colors, cars = 3) {
+    const g = new THREE2.Group();
+    for (let i = 0; i < cars; i++) {
+      const c = new THREE2.Group();
+      c.position.z = -i * 1.25;
+      g.add(c);
+      B(c, 0.6, 0.55, 1.15, colors[0]);
+      B(c, 0.62, 0.12, 1.17, colors[1], 0, 0.3);
+      for (let k = -1; k <= 1; k++) B(c, 0.63, 0.14, 0.22, "#263238", 0, 0.36, k * 0.35);
+      if (i === 0) {
+        const n = S(c, 0.3, colors[0], 0, 0.27, 0.62, void 0, 8, 6);
+        n.scale.set(1, 0.9, 1.4);
+      }
+    }
+    return g;
+  }
+  scooter(color) {
+    const g = new THREE2.Group();
+    B(g, 0.18, 0.18, 0.7, color, 0, 0.12);
+    for (const z of [-0.28, 0.28]) {
+      const w = C(g, 0.11, 0.11, 0.07, "#212121", 0, 0.11, z, 10);
+      w.rotation.z = Math.PI / 2;
+    }
+    B(g, 0.05, 0.4, 0.05, "#9e9e9e", 0, 0.25, 0.3);
+    B(g, 0.3, 0.04, 0.04, "#9e9e9e", 0, 0.62, 0.3);
+    C(g, 0.1, 0.12, 0.35, ["#e53935", "#1e88e5", "#43a047", "#8e24aa"][Math.floor(Math.random() * 4)], 0, 0.3, -0.05, 8);
+    S(g, 0.12, "#fdd835", 0, 0.75, -0.05, void 0, 8, 6);
+    return g;
+  }
+  boat() {
+    const g = new THREE2.Group();
+    const h = S(g, 0.5, ["#fafafa", "#e53935", "#1e88e5", "#ffb300"][Math.floor(Math.random() * 4)], 0, 0.05, 0, void 0, 8, 5);
+    h.scale.set(0.8, 0.45, 2);
+    B(g, 0.5, 0.4, 0.5, "#eceff1", 0, 0.15, -0.2);
+    C(g, 0.03, 0.03, 1, "#795548", 0, 0.2, 0.3, 4);
+    for (let i = 0; i < 4; i++) S(g, 0.05, "#ffeb3b", 0, 1 - i * 0.18, 0.3 + (i % 2 ? 0.1 : -0.1), { e: "#ffeb3b", ei: 0.8 }, 4, 3);
+    return g;
+  }
+  bird() {
+    const g = new THREE2.Group();
+    S(g, 0.12, "#ffffff", 0, 0, 0, void 0, 6, 4).scale.set(0.8, 0.7, 1.4);
+    const wl2 = B(g, 0.6, 0.03, 0.18, "#eceff1", -0.32, 0, 0), wr = B(g, 0.6, 0.03, 0.18, "#eceff1", 0.32, 0, 0);
+    const prev = g.userData.tick;
+    g.userData.flap = (t) => {
+      wl2.rotation.z = Math.sin(t * 8) * 0.5;
+      wr.rotation.z = -Math.sin(t * 8) * 0.5;
+    };
+    return g;
+  }
+  ellipsePts(cx, cz, a, b, n = 64) {
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / n * Math.PI * 2;
+      pts.push(new THREE2.Vector2(cx + Math.cos(t) * a, cz + Math.sin(t) * b));
+    }
+    return pts;
+  }
+  buildScenery(id) {
+    const H = (x, z) => this.H(x, z);
+    const ring = this.path.map((p, i) => {
+      const o = this.tileObjs[i];
+      return new THREE2.Vector2(p.x - o.nm.x * (this.tileSize * 0.62), p.y - o.nm.y * (this.tileSize * 0.62));
+    });
+    for (let i = 0; i < 4; i++) this.mover(this.scooter(["#e53935", "#fafafa", "#1e88e5", "#fdd835"][i]), ring, 3 + i * 0.6, true, (x, z) => Math.max(0.35, H(x, z)) + 0.2);
+    for (let i = 0; i < 8; i++) {
+      const b = this.bird();
+      const cx = (Math.random() - 0.5) * this.geo.W * 0.7, cz = (Math.random() - 0.5) * this.geo.H * 0.7, y = 9 + Math.random() * 5;
+      const pts = this.ellipsePts(cx, cz, 6 + Math.random() * 6, 5 + Math.random() * 5, 32);
+      this.mover(b, pts, 4 + Math.random() * 2, true, () => y);
+      const tk = b.userData.tick;
+      b.userData.tick = (t, dt) => {
+        tk(t, dt);
+        b.userData.flap(t + cx);
+      };
+    }
+    const seaSpots = [];
+    for (let t = 0; t < 600 && seaSpots.length < 7; t++) {
+      const q = new THREE2.Vector2(this.geo.ox + (Math.random() - 0.5) * this.geo.W * 0.95, this.geo.oz + (Math.random() - 0.5) * this.geo.H * 0.95);
+      if (H(q.x, q.y) < -1 && !this.path.some((p) => p.distanceTo(q) < 9) && !this.lmSpots.some((p) => p.distanceTo(q) < 8)) seaSpots.push(q);
+    }
+    seaSpots.forEach((q) => {
+      const pts = this.ellipsePts(q.x, q.y, 3 + Math.random() * 3, 2 + Math.random() * 3, 24).filter((p) => H(p.x, p.y) < -0.5);
+      if (pts.length > 6) this.mover(this.boat(), pts, 0.8 + Math.random() * 0.6, true, () => 0.05);
+    });
+    const paddies = (n, area) => this.randSpots(n, 2.2, 0.3, 1.2, area).forEach((q) => {
+      const g = new THREE2.Group();
+      const c = Math.random() < 0.5 ? "#9ccc65" : "#cddc39";
+      B(g, 3.6, 0.06, 2.6, c);
+      for (let k = -2; k <= 2; k++) B(g, 3.6, 0.02, 0.05, "#7cb342", 0, 0.06, k * 0.5);
+      B(g, 0.12, 0.08, 2.6, "#a1887f", 1.8, 0, 0);
+      g.position.set(q.x, H(q.x, q.y) + 0.01, q.y);
+      g.rotation.y = Math.random() * 0.4;
+      this.scene.add(g);
+    });
+    const temples = (n) => this.randSpots(n, 1.6, 0.3, 2.5).forEach((q) => {
+      const g = new THREE2.Group();
+      B(g, 1.1, 0.6, 0.8, "#c62828");
+      const r = new THREE2.Mesh(new THREE2.ConeGeometry(0.95, 0.4, 4), mat("#e65100"));
+      r.rotation.y = Math.PI / 4;
+      r.scale.set(1.2, 1, 0.9);
+      r.position.y = 0.8;
+      g.add(r);
+      g.position.set(q.x, H(q.x, q.y), q.y);
+      g.rotation.y = Math.random() * 6;
+      this.scene.add(g);
+    });
+    const turbines = (n, area) => this.randSpots(n, 1.2, 0.25, 1, area).forEach((q) => {
+      const g = new THREE2.Group();
+      C(g, 0.06, 0.1, 4, "#fafafa", 0, 0, 0, 6);
+      const hub = new THREE2.Group();
+      hub.position.set(0, 4, 0.12);
+      g.add(hub);
+      for (let i = 0; i < 3; i++) {
+        const bl = B(hub, 0.1, 1.5, 0.03, "#fafafa", 0, 0, 0);
+        bl.geometry.translate(0, 0.75, 0);
+        bl.position.y = 0;
+        bl.rotation.z = i * 2.094;
+      }
+      g.position.set(q.x, H(q.x, q.y), q.y);
+      g.userData.tick = (t, dt) => {
+        hub.rotation.z += dt * 1.8;
+      };
+      this.scene.add(g);
+    });
+    const palms = (n) => this.randSpots(n, 1, 0.3, 2).forEach((q) => {
+      const g = new THREE2.Group();
+      for (let k = 0; k < 3; k++) {
+        const x = (k - 1) * 0.5;
+        C(g, 0.04, 0.05, 1.8, "#8d6e63", x, 0, 0, 5);
+        S(g, 0.3, "#2e7d32", x, 1.9, 0, void 0, 6, 4).scale.y = 0.5;
+      }
+      g.position.set(q.x, H(q.x, q.y), q.y);
+      this.scene.add(g);
+    });
+    if (id === "taiwan") {
+      const west = this.path.map((p, i) => ({ p, o: this.tileObjs[i] })).filter(({ p }) => p.x < -6).map(({ p, o }) => new THREE2.Vector2(p.x + o.nm.x * 9, p.y + o.nm.y * 9)).sort((a, b) => a.y - b.y);
+      const hsr = west.filter((q, i) => i % 2 === 0);
+      if (hsr.length > 4) {
+        for (let i = 0; i < hsr.length - 1; i++) {
+          const a = hsr[i], b = hsr[i + 1], m = a.clone().lerp(b, 0.5), len = a.distanceTo(b);
+          const tr = B(new THREE2.Group(), 0.5, 0.1, len, "#bdbdbd");
+          tr.position.set(m.x, Math.max(0.4, H(m.x, m.y)) + 0.9, m.y);
+          tr.rotation.y = Math.atan2(b.x - a.x, b.y - a.y);
+          this.scene.add(tr);
+          const pl2 = C(new THREE2.Group(), 0.1, 0.12, 0.9, "#9e9e9e", 0, 0, 0, 6);
+          pl2.position.set(a.x, Math.max(0.4, H(a.x, a.y)), a.y);
+          this.scene.add(pl2);
+        }
+        this.mover(this.train(["#fafafa", "#ff6f00"], 4), hsr, 9, false, (x, z) => Math.max(0.4, H(x, z)) + 0.95);
+      }
+      paddies(14);
+      temples(8);
+      palms(10);
+      turbines(8, () => {
+        const q = this.path[Math.floor(Math.random() * this.path.length)];
+        return q.x < -5 ? new THREE2.Vector2(q.x - 4 + Math.random() * 2, q.y + (Math.random() - 0.5) * 4) : new THREE2.Vector2(999, 999);
+      });
+    }
+    if (id === "taipei") {
+      const mrt = this.ellipsePts(0, 0, this.geo.a * 0.62, this.geo.b * 0.58, 48);
+      for (let i = 0; i < mrt.length; i++) {
+        const a = mrt[i], b = mrt[(i + 1) % mrt.length], m = a.clone().lerp(b, 0.5);
+        const tr = B(new THREE2.Group(), 0.4, 0.08, a.distanceTo(b) + 0.05, "#cfd8dc");
+        tr.position.set(m.x, H(m.x, m.y) + 1.6, m.y);
+        tr.rotation.y = Math.atan2(b.x - a.x, b.y - a.y);
+        this.scene.add(tr);
+        if (i % 3 === 0) {
+          const pl2 = C(new THREE2.Group(), 0.08, 0.1, 1.6, "#b0bec5", 0, 0, 0, 6);
+          pl2.position.set(a.x, H(a.x, a.y), a.y);
+          this.scene.add(pl2);
+        }
+      }
+      this.mover(this.train(["#eceff1", "#1e88e5"], 3), mrt, 7, true, (x, z) => H(x, z) + 1.65);
+      this.mover(this.train(["#eceff1", "#8d6e63"], 3), mrt.slice().reverse(), 6, true, (x, z) => H(x, z) + 1.65);
+      const river = [];
+      for (let z = -50; z <= 50; z += 4) river.push(new THREE2.Vector2(-47 - Math.sin(z * 0.08) * 3, z));
+      this.mover(this.boat(), river, 1.5, false, () => 0.05);
+      this.mover(this.boat(), river.slice().reverse(), 1.2, false, () => 0.05);
+      temples(4);
+      palms(4);
+    }
+    if (id === "tainan") {
+      this.randSpots(10, 1.8, 0.3, 0.9, () => new THREE2.Vector2(-50 + Math.random() * 12, (Math.random() - 0.5) * 70)).forEach((q) => {
+        const g = new THREE2.Group();
+        for (let i = 0; i < 4; i++) B(g, 1.4, 0.04, 1.4, i % 2 ? "#ffffff" : "#b3e5fc", i % 2 * 1.5 - 0.75, 0, Math.floor(i / 2) * 1.5 - 0.75);
+        g.position.set(q.x, H(q.x, q.y) + 0.02, q.y);
+        this.scene.add(g);
+      });
+      this.randSpots(10, 2, 0.3, 1).forEach((q) => {
+        const g = new THREE2.Group();
+        B(g, 3.2, 0.1, 2.4, "#8d6e63");
+        B(g, 2.9, 0.05, 2.1, "#4db6ac", 0, 0.08);
+        const wh = new THREE2.Group();
+        wh.position.set(0.6, 0.25, 0);
+        g.add(wh);
+        for (let i = 0; i < 6; i++) {
+          const p = B(wh, 0.04, 0.35, 0.18, "#fdd835", 0, 0, 0);
+          p.geometry.translate(0, 0.17, 0);
+          p.position.y = 0;
+          p.rotation.x = i * 1.047;
+        }
+        g.position.set(q.x, H(q.x, q.y), q.y);
+        g.userData.tick = (t, dt) => {
+          wh.rotation.x += dt * 4;
+        };
+        this.scene.add(g);
+      });
+      temples(8);
+      paddies(6);
+      palms(6);
+    }
+    if (id === "islands") {
+      const isl = this.geo.isl;
+      for (let i = 1; i < isl.length; i++) {
+        const a = new THREE2.Vector2(isl[0][0], isl[0][1]), b = new THREE2.Vector2(isl[i][0], isl[i][1]);
+        const pts = [];
+        for (let k = 0; k <= 10; k++) pts.push(a.clone().lerp(b, k / 10));
+        if (i % 2) this.mover(this.boat(), pts.filter((p) => H(p.x, p.y) < -0.4), 2, false, () => 0.05);
+      }
+      for (const [cx, cz, r] of isl.slice(3)) {
+        const g = new THREE2.Group();
+        C(g, 0.3, 0.4, 2.5, "#fafafa", 0, 0, 0, 8);
+        C(g, 0.35, 0.35, 0.4, "#e53935", 0, 2.5, 0, 8, { e: "#ff5252", ei: 0.4 });
+        g.position.set(cx + r * 0.4, H(cx + r * 0.4, cz), cz);
+        this.scene.add(g);
+      }
+      for (let i = 0; i < 40; i++) {
+        const q = new THREE2.Vector2((Math.random() - 0.5) * 140, (Math.random() - 0.5) * 120);
+        if (H(q.x, q.y) > -0.6 || H(q.x, q.y) < -1.3 || this.path.some((p) => p.distanceTo(q) < 3)) continue;
+        const c = S(new THREE2.Group(), 0.4 + Math.random() * 0.5, ["#ff8a80", "#ffd180", "#ea80fc", "#80d8ff"][i % 4], 0, 0, 0, void 0, 6, 4);
+        c.position.set(q.x, H(q.x, q.y) + 0.2, q.y);
+        this.scene.add(c);
+      }
+      palms(8);
     }
   }
   resize() {
@@ -5645,7 +6133,7 @@ function doPublish() {
 }
 setInterval(() => {
   if (!G.isHost || !G.s || G.s.phase !== "play") return;
-  const isAuto = (p) => p.bot || !online(p.ctl);
+  const isAuto = (p) => p.bot || p.away || !online(p.ctl);
   let changed = false, n = 0;
   while (tick(G.s, Date.now(), isAuto) && n++ < 5) changed = true;
   if (changed) publish();
@@ -5707,6 +6195,7 @@ function tryClaimSeat(s) {
       G.hostStart = Date.now();
     }
     toast("已重新回到座位：" + p.name);
+    if (G.net) G.net.pub("hi", { from: myId, t: "ping" });
     return;
   }
   G.claimAsked = true;
@@ -5899,7 +6388,7 @@ function renderPlayers() {
   $("#players").innerHTML = s.players.map((p, i) => {
     const c = charOf(p.char);
     const ic = [p.veh ? VEH[p.veh].icon : "", p.god ? GODS[p.god.id].icon : "", p.st.hosp ? "🏥" : "", p.st.jail ? "🚓" : "", p.st.sleep ? "😴" : "", p.st.turtle ? "🐢" : "", p.dir < 0 ? "🔄" : ""].join("");
-    const off = !p.bot && !online(p.ctl) && s.phase === "play" ? '<span class="off">離線・託管</span>' : "";
+    const off = !p.bot && s.phase === "play" && !p.out ? p.away ? '<span class="off">☕暫離・託管</span>' : !online(p.ctl) ? '<span class="off">離線・託管</span>' : "" : "";
     return `<div class="pc ${i === s.turn && s.phase === "play" ? "cur" : ""} ${p.out ? "out" : ""}" data-p="${esc(p.id)}">
       <div class="av" style="background:${c.color}33">${avHtml(p.ctl === p.id || p.bot ? p.id : "", c.emoji)}</div>
       <div><div class="nm" style="color:${c.color}">${esc(p.name)}${p.ctl === myId && !p.bot ? "（你）" : ""}</div>
@@ -5917,9 +6406,13 @@ function renderHud() {
   renderNet();
   if (s.phase === "over") {
     renderOver();
+    $("#awayBox").classList.add("hidden");
     return;
   }
-  const c = cur(s), mine = isMyTurn();
+  const mps = myPlayers().filter((p) => !p.out);
+  $("#awayBtn").classList.toggle("hidden", !mps.length);
+  $("#awayBox").classList.toggle("hidden", !(mps.length && mps.every((p) => p.away)));
+  const c = cur(s), mine = isMyTurn() && !c.away;
   const acts = $("#acts");
   let st = "";
   if (s.step === "pre") st = mine ? `輪到你了！${c.name}` : `${c.name} 的回合…`;
@@ -6370,6 +6863,26 @@ function renderOver() {
   $("#status").textContent = "遊戲結束";
 }
 $("#fsBtn").onclick = () => enterFS(true);
+function setAway(on) {
+  myPlayers().filter((p) => !p.out).forEach((p) => send(p.id, { type: "away", on }));
+  if (on) closeSheet();
+}
+$("#awayBtn").onclick = () => openSheet(`<button class="x" data-close>✕</button><h3>☕ 臨時離開</h3>
+  <p>暫離期間由電腦幫你代打（擲骰、買地、付錢都會自動處理），你的座位和資產都會保留。</p>
+  <button class="pri" style="width:100%;margin:4px 0" id="awayStay">☕ 暫離一下（留在這個畫面）</button>
+  <button class="ghost" style="width:100%;margin:4px 0" id="awayHome">🏠 回首頁（之後用房號 ${esc(G.s && G.s.room || "")} 回來）</button>
+  <p class="note">回來的方法：打開同一個網址，或在首頁輸入房號，系統會把你放回原本的座位。</p>`);
+document.addEventListener("click", (e) => {
+  if (e.target.id === "awayStay") setAway(true);
+  if (e.target.id === "awayHome") {
+    setAway(true);
+    LS.set("tr3d-lastroom", { r: G.s.room, b: G.bi, t: Date.now() });
+    setTimeout(() => {
+      location.href = location.pathname;
+    }, 600);
+  }
+  if (e.target.id === "awayBack") setAway(false);
+});
 $("#camBtn").onclick = () => {
   if (world.follow) {
     world.overview();

@@ -129,6 +129,8 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
 @keyframes bob{50%{transform:translate(-50%,10px)}}
 .pwa #fsBtn,.pwa #fsHomeBtn{display:none}
 #hud{padding-top:env(safe-area-inset-top)}
+#awayBox{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:28;display:flex;align-items:center;justify-content:center;padding:16px}
+#awayBox .ab{background:#fffdf5;border-radius:20px;padding:20px;width:min(340px,100%);text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4)}
 .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700;z-index:50;background:#0d6aa8}
 </style>
 </head>
@@ -197,6 +199,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
   <div id="players"></div>
   <div id="roundinfo"></div>
   <div id="topbtn">
+    <button id="awayBtn" title="臨時離開">☕</button>
     <button id="fsBtn" title="全螢幕">⛶</button>
     <button id="camBtn" title="視角">🗺️</button>
     <button id="stockBtn" title="股市">📈</button>
@@ -214,6 +217,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
     <div id="acts"></div>
   </div>
 </div>
+<div id="awayBox" class="hidden"><div class="ab"><div style="font-size:44px">☕</div><div style="font-size:20px;font-weight:900;margin:6px 0">你暫時離開中</div><div class="note" style="color:#555">電腦正在幫你代打，座位和資產都保留著</div><button class="pri" id="awayBack" style="width:100%;margin-top:12px;font-size:18px">👋 回來繼續玩</button></div></div>
 <div id="notice"><div class="nb"><div class="nt"></div><div class="nx"></div></div></div>
 <div id="dice" class="hidden"></div>
 <div id="toast"></div>

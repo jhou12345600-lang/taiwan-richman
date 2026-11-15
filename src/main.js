@@ -346,7 +346,7 @@ function doPublish() {
 // 房主主迴圈
 setInterval(() => {
   if (!G.isHost || !G.s || G.s.phase !== 'play') return;
-  const isAuto = p => p.bot || !online(p.ctl);
+  const isAuto = p => p.bot || p.away || !online(p.ctl);
   let changed = false, n = 0;
   while (tick(G.s, Date.now(), isAuto) && n++ < 5) changed = true;
   if (changed) publish();
@@ -389,7 +389,7 @@ function tryClaimSeat(s) {
   if (!G.solo && !canJudge()) { if (!G.claimTimer) G.claimTimer = setTimeout(() => { G.claimTimer = null; if (G.s && G.s.players && !G.s.players.find(p => p.ctl === myId)) tryClaimSeat(G.s); }, 2000); return; }
   const saved = LS.get('tr3d-seat-' + s.room, null);
   const p = saved && s.players.find(x => x.ctl === saved && !x.bot);
-  if (p && !online(p.ctl)) { myId = saved; SS.set('tr3d-sid', myId); if (s.host === myId) { G.isHost = true; G.hostStart = Date.now(); } toast('已重新回到座位：' + p.name); return; }
+  if (p && !online(p.ctl)) { myId = saved; SS.set('tr3d-sid', myId); if (s.host === myId) { G.isHost = true; G.hostStart = Date.now(); } toast('已重新回到座位：' + p.name); if (G.net) G.net.pub('hi', { from: myId, t: 'ping' }); return; }
   G.claimAsked = true;
   const offl = s.players.filter(x => !x.bot && !x.out && !online(x.ctl));
   if (!offl.length) { toast('遊戲已開始，你目前是觀戰模式'); return; }
@@ -503,7 +503,7 @@ function renderPlayers() {
   $('#players').innerHTML = s.players.map((p, i) => {
     const c = charOf(p.char);
     const ic = [p.veh ? VEH[p.veh].icon : '', p.god ? GODS[p.god.id].icon : '', p.st.hosp ? '🏥' : '', p.st.jail ? '🚓' : '', p.st.sleep ? '😴' : '', p.st.turtle ? '🐢' : '', p.dir < 0 ? '🔄' : ''].join('');
-    const off = !p.bot && !online(p.ctl) && s.phase === 'play' ? '<span class="off">離線・託管</span>' : '';
+    const off = !p.bot && s.phase === 'play' && !p.out ? (p.away ? '<span class="off">☕暫離・託管</span>' : !online(p.ctl) ? '<span class="off">離線・託管</span>' : '') : '';
     return `<div class="pc ${i === s.turn && s.phase === 'play' ? 'cur' : ''} ${p.out ? 'out' : ''}" data-p="${esc(p.id)}">
       <div class="av" style="background:${c.color}33">${avHtml(p.ctl === p.id || p.bot ? p.id : '', c.emoji)}</div>
       <div><div class="nm" style="color:${c.color}">${esc(p.name)}${p.ctl === myId && !p.bot ? '（你）' : ''}</div>
@@ -519,8 +519,11 @@ function renderHud() {
   const feed = s.log.slice(-4);
   $('#feed').innerHTML = feed.map(l => `<div>${esc(l)}</div>`).join('');
   renderNet();
-  if (s.phase === 'over') { renderOver(); return; }
-  const c = cur(s), mine = isMyTurn();
+  if (s.phase === 'over') { renderOver(); $('#awayBox').classList.add('hidden'); return; }
+  const mps = myPlayers().filter(p => !p.out);
+  $('#awayBtn').classList.toggle('hidden', !mps.length);
+  $('#awayBox').classList.toggle('hidden', !(mps.length && mps.every(p => p.away)));
+  const c = cur(s), mine = isMyTurn() && !c.away;
   const acts = $('#acts');
   let st = '';
   if (s.step === 'pre') st = mine ? `輪到你了！${c.name}` : `${c.name} 的回合…`;
@@ -849,6 +852,17 @@ function renderOver() {
 
 // 按鈕
 $('#fsBtn').onclick = () => enterFS(true);
+function setAway(on) { myPlayers().filter(p => !p.out).forEach(p => send(p.id, { type: 'away', on })); if (on) closeSheet(); }
+$('#awayBtn').onclick = () => openSheet(`<button class="x" data-close>✕</button><h3>☕ 臨時離開</h3>
+  <p>暫離期間由電腦幫你代打（擲骰、買地、付錢都會自動處理），你的座位和資產都會保留。</p>
+  <button class="pri" style="width:100%;margin:4px 0" id="awayStay">☕ 暫離一下（留在這個畫面）</button>
+  <button class="ghost" style="width:100%;margin:4px 0" id="awayHome">🏠 回首頁（之後用房號 ${esc(G.s && G.s.room || '')} 回來）</button>
+  <p class="note">回來的方法：打開同一個網址，或在首頁輸入房號，系統會把你放回原本的座位。</p>`);
+document.addEventListener('click', e => {
+  if (e.target.id === 'awayStay') setAway(true);
+  if (e.target.id === 'awayHome') { setAway(true); LS.set('tr3d-lastroom', { r: G.s.room, b: G.bi, t: Date.now() }); setTimeout(() => { location.href = location.pathname; }, 600); }
+  if (e.target.id === 'awayBack') setAway(false);
+});
 $('#camBtn').onclick = () => { if (world.follow) { world.overview(); toast('全島視角'); } else { world.zoomIn(); toast('跟隨目前玩家'); } };
 $('#stockBtn').onclick = () => openStock();
 $('#logBtn').onclick = () => { if (!G.s) return; openSheet(`<button class="x" data-close>✕</button><h3>📜 遊戲紀錄</h3><div class="note" style="font-size:13px;color:#333">${G.s.log.slice().reverse().map(esc).join('<br>')}</div>`); };

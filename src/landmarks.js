@@ -826,6 +826,15 @@ function limb(parent, r, len, c, x, y, z) {
   return pivot;
 }
 const ANIMALS = {
+  bat: { fur: '#4e342e', belly: '#6d4c41', ear: 'cat', wings: 'bat', tail: 'none', muzzle: '#5d4037' },
+  serow: { fur: '#4e4a46', belly: '#8d8580', ear: 'deer', tail: 'short', tailC: '#3e3a36', muzzle: '#bdb5ae' },
+  marten: { fur: '#3e2723', belly: '#ffb300', ear: 'small', tail: 'long', muzzle: '#d7ccc8' },
+  barbet: { fur: '#43a047', belly: '#7cb342', ear: 'none', headC: '#43a047', beak: '#212121', wings: 1, tail: 'owl', leg: '#9e9e9e' },
+  civet: { fur: '#78909c', belly: '#cfd8dc', ear: 'small', tail: 'long', muzzle: '#546e7a' },
+  boar: { fur: '#4e342e', belly: '#5d4037', ear: 'cat', tail: 'short', tailC: '#3e2723', muzzle: '#4e342e' },
+  squirrel: { fur: '#6d4c41', belly: '#d84315', ear: 'cat', tail: 'bushy' },
+  spoonbill: { fur: '#fafafa', belly: '#ffffff', ear: 'none', headC: '#fafafa', wings: 1, tail: 'owl', leg: '#212121' },
+  frog: { fur: '#43a047', belly: '#fff59d', ear: 'none', headC: '#43a047', tail: 'none', frog: 1 },
   bear: { fur: '#1c1c1c', belly: '#262626', ear: 'round', muzzle: '#c8a27a', tail: 'short', tailC: '#1c1c1c' },
   cloudleo: { fur: '#cdb48a', belly: '#f3e9d2', ear: 'cat', spots: '#4e4030', cloud: 1, tail: 'long' },
   otter: { fur: '#6d4c41', belly: '#d7ccc8', ear: 'small', tail: 'otter', whisker: 1 },
@@ -845,16 +854,19 @@ function buildAnimal(charId, color) {
   C(root, 0.42, 0.46, 0.06, '#ffffff', 0, 0, 0, 16, { e: color, ei: 0.35 });
   const body = new THREE.Group(); body.position.y = 0.06; root.add(body);
   const legC = a.leg || a.fur;
-  const legL = limb(body, a.leg ? 0.04 : 0.09, 0.26, legC, -0.13, 0.42, 0), legR = limb(body, a.leg ? 0.04 : 0.09, 0.26, legC, 0.13, 0.42, 0);
+  const legL = limb(body, a.leg ? 0.04 : 0.09, 0.26, legC, -0.13, 0.42, -0.06), legR = limb(body, a.leg ? 0.04 : 0.09, 0.26, legC, 0.13, 0.42, -0.06);
   for (const l of [legL, legR]) { const f = S(l, 0.1, a.leg ? a.leg : a.fur, 0, -0.42, 0.05, undefined, 6, 4); f.scale.set(1, 0.5, 1.5); }
   const torso = new THREE.Group(); torso.position.y = 0.42; body.add(torso);
   const tb = S(torso, 0.3, a.fur, 0, 0.18, 0, undefined, 12, 9); tb.scale.set(1, 1.15, 0.95);
-  const bl = S(torso, 0.2, a.belly, 0, 0.15, 0.15, undefined, 10, 8); bl.scale.set(1, 1.2, 0.6);
+  const bl = S(torso, 0.21, a.belly, 0, 0.13, 0.13, undefined, 12, 9); bl.scale.set(1, 1.25, 0.85);
   let armL, armR;
   if (a.wings) {
     armL = new THREE.Group(); armL.position.set(-0.27, 0.35, 0); torso.add(armL);
     armR = new THREE.Group(); armR.position.set(0.27, 0.35, 0); torso.add(armR);
-    for (const [w, sx] of [[armL, -1], [armR, 1]]) { const wing = S(w, 0.2, a.fur, sx * 0.04, -0.18, 0, undefined, 8, 6); wing.scale.set(0.35, 1.1, 0.8); }
+    for (const [w, sx] of [[armL, -1], [armR, 1]]) {
+      if (a.wings === 'bat') { const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(sx * 0.55, -0.05); sh.lineTo(sx * 0.45, -0.25); sh.lineTo(sx * 0.3, -0.18); sh.lineTo(sx * 0.2, -0.38); sh.lineTo(0, -0.3); sh.lineTo(0, 0); put(w, new THREE.ShapeGeometry(sh), mat('#3e2723', { ds: true }), 0, 0.05, 0); B(w, 0.04, 0.04, 0.04, '#3e2723', sx * 0.55, 0.03, 0); }
+      else { const wing = S(w, 0.2, a.fur, sx * 0.04, -0.18, 0, undefined, 8, 6); wing.scale.set(0.35, 1.1, 0.8); }
+    }
   } else {
     armL = limb(torso, 0.07, 0.2, a.fur, -0.27, 0.36, 0); armR = limb(torso, 0.07, 0.2, a.fur, 0.27, 0.36, 0);
     for (const q of [armL, armR]) S(q, 0.08, a.face || a.belly, 0, -0.36, 0, undefined, 6, 5);
@@ -866,7 +878,8 @@ function buildAnimal(charId, color) {
   if (a.face) { const fc = S(head, 0.2, a.face, 0, -0.02, 0.15, undefined, 10, 8); fc.scale.set(1.1, 1, 0.6); }
   else if (!a.headC && a.ear !== 'tuft') { const m = S(head, 0.15, a.muzzle || a.belly, 0, -0.08, 0.2, undefined, 8, 6); m.scale.set(1.2, 0.8, 0.7); }
   // 眼睛
-  if (a.bigEye) for (const sx of [-1, 1]) { S(head, 0.11, '#f5f5f5', sx * 0.12, 0.04, 0.22, undefined, 10, 8).scale.z = 0.5; S(head, 0.075, a.bigEye, sx * 0.12, 0.04, 0.26, undefined, 8, 6).scale.z = 0.5; S(head, 0.045, '#111', sx * 0.12, 0.04, 0.29, undefined, 6, 5); S(head, 0.016, '#fff', sx * 0.1, 0.07, 0.32, undefined, 4, 3); }
+  if (a.frog) for (const sx of [-1, 1]) { S(head, 0.11, a.fur, sx * 0.15, 0.22, 0.08, undefined, 8, 6); S(head, 0.08, '#ffffff', sx * 0.15, 0.25, 0.14, undefined, 8, 6); S(head, 0.05, '#111', sx * 0.15, 0.25, 0.2, undefined, 6, 5); }
+  else if (a.bigEye) for (const sx of [-1, 1]) { S(head, 0.11, '#f5f5f5', sx * 0.12, 0.04, 0.22, undefined, 10, 8).scale.z = 0.5; S(head, 0.075, a.bigEye, sx * 0.12, 0.04, 0.26, undefined, 8, 6).scale.z = 0.5; S(head, 0.045, '#111', sx * 0.12, 0.04, 0.29, undefined, 6, 5); S(head, 0.016, '#fff', sx * 0.1, 0.07, 0.32, undefined, 4, 3); }
   else for (const sx of [-1, 1]) { S(head, 0.06, '#ffffff', sx * 0.11, 0.05, 0.25, undefined, 8, 6); S(head, 0.038, '#111', sx * 0.11, 0.05, 0.29, undefined, 6, 5); S(head, 0.014, '#fff', sx * 0.1, 0.07, 0.32, undefined, 4, 3); }
   for (const sx of [-1, 1]) S(head, 0.05, '#ff8a80', sx * 0.19, -0.07, 0.22, undefined, 5, 4).scale.z = 0.3;
   if (a.beak) { const bk = put(head, new THREE.ConeGeometry(0.07, 0.2, 6), a.beak, 0, -0.04, 0.33); bk.rotation.x = Math.PI / 2; }
@@ -893,11 +906,20 @@ function buildAnimal(charId, color) {
   if (charId === 'pheasant') { for (const sx of [-1, 1]) S(head, 0.07, a.face, sx * 0.12, 0.05, 0.2, undefined, 6, 5).scale.z = 0.4; }
   if (a.scales) for (let r = 0; r < 3; r++) for (let k = -1; k <= 1; k++) { const sc = put(torso, new THREE.ConeGeometry(0.12, 0.14, 4), a.scales, k * 0.17, 0.35 - r * 0.15, -0.2 - r * 0.02); sc.rotation.x = -2.2; }
   if (a.scales) for (let k = -1; k <= 1; k++) { const sc = put(head, new THREE.ConeGeometry(0.1, 0.12, 4), a.scales, k * 0.13, 0.2, -0.12); sc.rotation.x = -2.0; }
+  if (charId === 'bat') { put(head, new THREE.TorusGeometry(0.24, 0.07, 6, 14), '#ffb300', 0, -0.26, 0).rotation.x = Math.PI / 2; }
+  if (charId === 'serow') { for (const sx of [-1, 1]) { const h = put(head, new THREE.ConeGeometry(0.04, 0.22, 6), '#212121', sx * 0.1, 0.32, -0.02); h.rotation.x = -0.4; } B(torso, 0.18, 0.3, 0.2, '#2b2826', 0, 0.45, -0.15); }
+  if (charId === 'marten') { const th = S(torso, 0.18, '#ffca28', 0, 0.4, 0.15, undefined, 8, 6); th.scale.set(1, 0.8, 0.6); }
+  if (charId === 'barbet') { S(head, 0.12, '#e53935', 0, 0.2, 0.15, undefined, 7, 5).scale.z = 0.5; S(head, 0.13, '#1e88e5', -0.05, 0.0, 0.2, undefined, 7, 5).scale.set(1.6, 0.6, 0.5); S(head, 0.12, '#fdd835', 0, -0.17, 0.18, undefined, 7, 5).scale.z = 0.5; const bk = put(head, new THREE.ConeGeometry(0.09, 0.18, 6), '#212121', 0, -0.05, 0.35); bk.rotation.x = Math.PI / 2; }
+  if (charId === 'civet') { const st = S(head, 0.1, '#ffffff', 0, 0.1, 0.25, undefined, 6, 5); st.scale.set(0.35, 1.5, 0.5); st.rotation.x = 0.6; for (const sx of [-1, 1]) S(head, 0.09, '#37474f', sx * 0.11, 0.05, 0.24, undefined, 6, 4).scale.z = 0.4; }
+  if (charId === 'boar') { const sn = C(head, 0.11, 0.12, 0.16, '#8d6e63', 0, -0.07, 0.3, 10); sn.rotation.x = Math.PI / 2; S(head, 0.025, '#3e2723', -0.04, -0.07, 0.39); S(head, 0.025, '#3e2723', 0.04, -0.07, 0.39); for (const sx of [-1, 1]) { const t = put(head, new THREE.ConeGeometry(0.025, 0.14, 5), '#fffde7', sx * 0.1, -0.08, 0.32); t.rotation.z = -sx * 0.4; } for (let i = 0; i < 5; i++) put(torso, new THREE.ConeGeometry(0.05, 0.14, 4), '#2b1d16', 0, 0.55 - i * 0.1, -0.22 - (i % 2) * 0.02).rotation.x = -0.6; }
+  if (charId === 'spoonbill') { S(head, 0.2, '#212121', 0, -0.02, 0.2, undefined, 8, 6).scale.set(1.3, 0.6, 0.6); const bill = B(head, 0.06, 0.04, 0.4, '#212121', 0, -0.06, 0.48); const sp = S(head, 0.07, '#212121', 0, -0.06, 0.7, undefined, 6, 4); sp.scale.set(1.3, 0.4, 1.3); for (let i = 0; i < 3; i++) { const c = put(head, new THREE.ConeGeometry(0.03, 0.2, 4), '#ffffff', 0, 0.25, -0.2 - i * 0.05); c.rotation.x = -1.2; } }
+  if (charId === 'frog') { const m = B(head, 0.3, 0.02, 0.02, '#1b5e20', 0, -0.1, 0.29); }
   // 尾巴
   const tail = new THREE.Group(); tail.position.set(0, 0.0, -0.25); torso.add(tail);
   if (a.tail === 'long') { const tl = C(tail, 0.04, 0.06, 0.6, a.fur, 0, 0, 0, 6); tl.rotation.x = -0.9; if (charId === 'leopard') for (let i = 0; i < 3; i++) C(tail, 0.065, 0.065, 0.05, a.spots, 0, 0.12 + i * 0.13, -0.1 - i * 0.12, 6).rotation.x = -0.9; }
   if (a.tail === 'short') S(tail, 0.07, a.tailC || '#ffffff', 0, 0.12, 0);
   if (a.tail === 'otter') { const tl = C(tail, 0.03, 0.09, 0.55, a.fur, 0, -0.1, 0, 7); tl.rotation.x = -1.2; }
+  if (a.tail === 'bushy') { for (let i = 0; i < 5; i++) { const b = S(tail, 0.15 + i * 0.015, a.fur, 0, 0.05 + i * 0.16, -0.1 - Math.sin(i * 0.7) * 0.15, undefined, 7, 5); b.scale.set(0.9, 1, 1); } S(tail, 0.12, '#8d6e63', 0, 0.85, 0.05, undefined, 6, 5); }
   if (a.tail === 'owl') { const tl = B(tail, 0.22, 0.05, 0.22, a.fur, 0, 0.0, -0.05); tl.rotation.x = -0.6; }
   if (a.tail === 'bird') { for (const sx of [-1, 1]) { const f = B(tail, 0.12, 0.05, 0.85, a.fur, sx * 0.05, 0, -0.4); f.rotation.x = -0.35; B(tail, 0.12, 0.051, 0.15, '#ffffff', sx * 0.05, -0.15, -0.8).rotation.x = -0.35; } }
   if (a.tail === 'pheasant') { for (let i = 0; i < 6; i++) { const f = B(tail, 0.1, 0.04, 0.16, i % 2 ? '#eceff1' : '#212121', 0, 0.02 + i * 0.05, -0.08 - i * 0.15); f.rotation.x = -0.35; } }

@@ -4451,7 +4451,7 @@ var COAST = [
   [121.4, 25.17],
   [121.48, 25.26]
 ];
-var SC = 31;
+var SC = 42;
 var proj = ([lon, lat]) => new THREE2.Vector2((lon - 121) * 0.915 * 1.5 * SC, -(lat - 23.6) * SC);
 var POLY = COAST.map(proj);
 var SPINE = [[121.6, 24.95], [121.35, 24.35], [121.1, 23.7], [120.92, 23], [120.8, 22.3]].map(proj);
@@ -4560,7 +4560,7 @@ function ellipsePath(a, b, start = Math.PI / 2) {
   return { pts: out, spacing: total / N_TILES };
 }
 var GEO = {
-  taiwan: { height: heightAt, path: buildPath, spine: true, W: 165, H: 180, ox: -2, oz: 2, view: [0, 148, 34, 0, 1] },
+  taiwan: { height: heightAt, path: buildPath, spine: true, W: 225, H: 245, ox: -3, oz: 3, view: [0, 200, 46, 0, 1] },
   taipei: {
     a: 41,
     b: 30,
@@ -4619,9 +4619,16 @@ var GEO = {
     }
   }
 };
+var MAPK = 1.35;
 for (const k of ["taipei", "tainan", "islands"]) {
-  const g = GEO[k];
-  g.height = g.height.bind(g);
+  const g = GEO[k], h0 = g.height.bind(g);
+  g.K = MAPK;
+  g.height = (x, z) => h0(x / MAPK, z / MAPK);
+  g.a *= MAPK;
+  g.b *= MAPK;
+  g.W *= MAPK;
+  g.H *= MAPK;
+  g.view = g.view.map((v) => v * MAPK);
   g.path = () => ellipsePath(g.a, g.b);
 }
 function tileTexture(i) {
@@ -4711,13 +4718,13 @@ var World = class {
     this.renderer.toneMapping = THREE2.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.mobile = mobile;
-    this.camera = new THREE2.PerspectiveCamera(45, 1, 0.5, 600);
+    this.camera = new THREE2.PerspectiveCamera(45, 1, 0.5, 900);
     this.camera.position.set(0, 148, 34);
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.maxPolarAngle = Math.PI * 0.46;
     this.controls.minDistance = 8;
-    this.controls.maxDistance = 200;
+    this.controls.maxDistance = 280;
     this.controls.target.set(0, 0, 1);
     this.controls.addEventListener("start", () => {
       this.userMoved = performance.now();
@@ -4762,13 +4769,13 @@ var World = class {
     });
     const sc = this.scene = new THREE2.Scene();
     sc.background = new THREE2.Color("#8fd0f2");
-    sc.fog = new THREE2.Fog("#8fd0f2", 160, 320);
+    sc.fog = new THREE2.Fog("#8fd0f2", 230, 460);
     sc.add(new THREE2.HemisphereLight("#dff4ff", "#4b6b3a", 0.9));
     const sun = this.sun = new THREE2.DirectionalLight("#fff4e0", 2);
-    sun.position.set(-40, 80, 30);
+    sun.position.set(-55, 110, 40);
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.mobile ? 1024 : 2048, this.mobile ? 1024 : 2048);
-    Object.assign(sun.shadow.camera, { left: -80, right: 80, top: 80, bottom: -80, near: 1, far: 230 });
+    Object.assign(sun.shadow.camera, { left: -110, right: 110, top: 115, bottom: -115, near: 1, far: 320 });
     sun.shadow.bias = -8e-4;
     sun.shadow.normalBias = 0.03;
     sc.add(sun);
@@ -5026,15 +5033,16 @@ var World = class {
       }
       this.mover(this.train(["#eceff1", "#1e88e5"], 3), mrt, 7, true, (x, z) => H(x, z) + 1.65);
       this.mover(this.train(["#eceff1", "#8d6e63"], 3), mrt.slice().reverse(), 6, true, (x, z) => H(x, z) + 1.65);
+      const K = this.geo.K || 1;
       const river = [];
-      for (let z = -50; z <= 50; z += 4) river.push(new THREE2.Vector2(-47 - Math.sin(z * 0.08) * 3, z));
+      for (let z = -50; z <= 50; z += 4) river.push(new THREE2.Vector2((-47 - Math.sin(z * 0.08) * 3) * K, z * K));
       this.mover(this.boat(), river, 1.5, false, () => 0.05);
       this.mover(this.boat(), river.slice().reverse(), 1.2, false, () => 0.05);
       temples(4);
       palms(4);
     }
     if (id === "tainan") {
-      this.randSpots(10, 1.8, 0.3, 0.9, () => new THREE2.Vector2(-50 + Math.random() * 12, (Math.random() - 0.5) * 70)).forEach((q) => {
+      this.randSpots(14, 1.8, 0.3, 0.9, () => new THREE2.Vector2((-50 + Math.random() * 12) * (this.geo.K || 1), (Math.random() - 0.5) * 70 * (this.geo.K || 1))).forEach((q) => {
         const g = new THREE2.Group();
         for (let i = 0; i < 4; i++) B(g, 1.4, 0.04, 1.4, i % 2 ? "#ffffff" : "#b3e5fc", i % 2 * 1.5 - 0.75, 0, Math.floor(i / 2) * 1.5 - 0.75);
         g.position.set(q.x, H(q.x, q.y) + 0.02, q.y);
@@ -5064,7 +5072,7 @@ var World = class {
       palms(6);
     }
     if (id === "islands") {
-      const isl = this.geo.isl;
+      const KK = this.geo.K || 1, isl = this.geo.isl.map(([x, z, r]) => [x * KK, z * KK, r * KK]);
       for (let i = 1; i < isl.length; i++) {
         const a = new THREE2.Vector2(isl[0][0], isl[0][1]), b = new THREE2.Vector2(isl[i][0], isl[i][1]);
         const pts = [];
@@ -5078,8 +5086,8 @@ var World = class {
         g.position.set(cx + r * 0.4, H(cx + r * 0.4, cz), cz);
         this.scene.add(g);
       }
-      for (let i = 0; i < 40; i++) {
-        const q = new THREE2.Vector2((Math.random() - 0.5) * 140, (Math.random() - 0.5) * 120);
+      for (let i = 0; i < 60; i++) {
+        const q = new THREE2.Vector2((Math.random() - 0.5) * 140 * KK, (Math.random() - 0.5) * 120 * KK);
         if (H(q.x, q.y) > -0.6 || H(q.x, q.y) < -1.3 || this.path.some((p) => p.distanceTo(q) < 3)) continue;
         const c = S(new THREE2.Group(), 0.4 + Math.random() * 0.5, ["#ff8a80", "#ffd180", "#ea80fc", "#80d8ff"][i % 4], 0, 0, 0, void 0, 6, 4);
         c.position.set(q.x, H(q.x, q.y) + 0.2, q.y);
@@ -5199,11 +5207,11 @@ var World = class {
       }
       const t = TILES[i];
       const lm = buildLandmark(t.model || t.type);
-      const R = 2.3;
+      const R = 2.6;
       const clear = (q) => !this.lmSpots.some((r) => r.distanceTo(q) < R * 2) && !this.path.some((r) => r.distanceTo(q) < size2 * 0.72 + R) && !lots.some((r) => r.distanceTo(q) < R + 0.9);
       const dir = t.sea ? -1 : 1;
       const score = (q) => Math.min(...this.lmSpots.map((r) => r.distanceTo(q) - R * 2), ...this.path.map((r) => r.distanceTo(q) - (size2 * 0.72 + R)), ...lots.map((r) => r.distanceTo(q) - (R + 0.9)));
-      let lp = null, bestQ = null, bestS = -1e9, sc = 1.15;
+      let lp = null, bestQ = null, bestS = -1e9, sc = 1.35;
       search: for (let off = t.sea ? 6.4 : 5.4; off < (t.sea ? 16 : 30); off += 0.7) {
         for (const sh of [0, 1.5, -1.5, 3, -3, 4.5, -4.5, 6, -6]) {
           const q = new THREE2.Vector2(p.x + dir * nm.x * off, p.y + dir * nm.y * off).addScaledVector(tan, sh);
@@ -5235,7 +5243,7 @@ var World = class {
       if (!lp) {
         lp = bestQ || new THREE2.Vector2(p.x + dir * nm.x * 6, p.y + dir * nm.y * 6);
         const dT = Math.min(...this.path.map((r, j) => Math.max(Math.abs(r.x - lp.x), Math.abs(r.y - lp.y)) - (this.tileSizes ? this.tileSizes[j] : size2) / 2));
-        sc = Math.max(0.45, Math.min(1.15, (dT - 0.2) / 1.9));
+        sc = Math.max(0.45, Math.min(1.35, (dT - 0.2) / 1.9));
       }
       lm.position.set(lp.x, t.sea ? 0 : this.H(lp.x, lp.y) - 0.05, lp.y);
       this.lmSpots.push(lp.clone());
@@ -5282,6 +5290,21 @@ var World = class {
       g.add(ring);
       this.tileObjs.push({ g, base, lm, lot, ring, nm, tan, ang, level: -1, owner: void 0, pos: new THREE2.Vector3(p.x, y + 0.17, p.y) });
     }
+    for (let i = 0; i < n; i++) {
+      const a = this.tileObjs[i].pos, b = this.tileObjs[(i + 1) % n].pos;
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      if (len < 0.5) continue;
+      const road = new THREE2.Mesh(new THREE2.BoxGeometry(1.5, 0.12, len), mat("#bfae8a"));
+      road.position.set((a.x + b.x) / 2, (a.y + b.y) / 2 - 0.2, (a.z + b.z) / 2);
+      road.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
+      road.receiveShadow = true;
+      this.scene.add(road);
+      const line = new THREE2.Mesh(new THREE2.BoxGeometry(0.12, 0.13, len * 0.8), mat("#fff8e1"));
+      line.position.copy(road.position);
+      line.position.y += 5e-3;
+      line.rotation.y = road.rotation.y;
+      this.scene.add(line);
+    }
     const S2 = this.tileSizes;
     const clr = (x, z) => Math.min(...this.tileObjs.map((o, j) => Math.max(Math.abs(o.pos.x - x), Math.abs(o.pos.z - z)) - (S2 ? S2[j] : size0) / 2));
     this.tileObjs.forEach((o, i) => {
@@ -5304,7 +5327,7 @@ var World = class {
         if (!TILES[i].sea) L.y = h - 0.05;
         c = clr(L.x, L.z);
       }
-      if (c < 1.9 * sc) o.lm.scale.setScalar(Math.max(0.35, c / 1.9 - 0.03));
+      if (c < 1.9 * sc) o.lm.scale.setScalar(Math.max(0.35, Math.min(sc, c / 1.9 - 0.03)));
       const pad = o.lm.userData.pad;
       if (pad) {
         pad.position.x = L.x;

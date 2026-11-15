@@ -5,7 +5,15 @@ export const PRE_T = 40000, DEC_T = 25000;
 const HOSPI = () => TILES.findIndex(t => t.type === 'hospital');
 const POLI = () => TILES.findIndex(t => t.type === 'police');
 export const OWNABLE = t => t.type === 'prop' || t.type === 'company' || t.type === 'bigland';
-export const BIG = { gas: { name: '加油站', icon: '⛽', cost: 4000, fee: 1500 }, lab: { name: '研究所', icon: '🔬', cost: 5000, fee: 1000 }, hotel: { name: '度假飯店', icon: '🏨', cost: 7000, fee: 3000 } };
+export const BIG = {
+  park: { name: '主題公園', icon: '🌳', cost: 3000, fee: 800, desc: '遊客付門票，還會送地主點券' },
+  gas: { name: '加油站', icon: '⛽', cost: 4000, fee: 1500, desc: '收加油費；地主停下點券 +15' },
+  lab: { name: '研究所', icon: '🔬', cost: 5000, fee: 1000, desc: '地主停下送道具卡；別人付錢後地主點券 +20' },
+  mall: { name: '購物中心', icon: '🛍️', cost: 6000, fee: 2000, desc: '收購物費；別人停下時地主多拿 10% 的業績獎金' },
+  hotel: { name: '度假飯店', icon: '🏨', cost: 7000, fee: 3000, desc: '收住宿費，還要住一晚（停一回合）' },
+  fun: { name: '遊樂園', icon: '🎡', cost: 9000, fee: 3500, desc: '收門票；遊客玩得開心會拿到一張道具卡' },
+};
+export const BIG_MAX = 3;
 export const VEH = [{ name: '步行', icon: '🚶', dice: 1, price: 0 }, { name: '機車', icon: '🛵', dice: 2, price: 3000 }, { name: '汽車', icon: '🚗', dice: 3, price: 8000 }];
 export function diceCount(s, p) { return Math.max(s.settings.dice || 1, VEH[p.veh || 0].dice); }
 const rnd = n => Math.floor(Math.random() * n);
@@ -25,12 +33,13 @@ export function cardCost(p, k) { return Math.round(CARDS[k].cost * (hasSkill(p, 
 export function propValue(s, i) {
   const t = TILES[i], st = s.tiles[i];
   if (t.type === 'company') return price(s, i);
-  if (t.type === 'bigland') return price(s, i) + (st.b ? BIG[st.b].cost : 0);
+  if (t.type === 'bigland') return price(s, i) + (st.b ? BIG[st.b].cost + ((st.bl || 1) - 1) * bigUpCost(s, i) : 0);
   return price(s, i) + st.l * upCost(s, i);
 }
 export function companyCount(s, pid) { return s.tiles.filter((x, i) => x && x.o === pid && TILES[i].type === 'company').length; }
 export function companyFee(s, i, dice) { const st = s.tiles[i]; return Math.max(400, (dice || 7) * 200 * companyCount(s, st.o)); }
-export function bigFee(s, i) { const st = s.tiles[i]; return st.b ? BIG[st.b].fee : 500; }
+export function bigFee(s, i) { const st = s.tiles[i]; return st.b ? r10(BIG[st.b].fee * (1 + ((st.bl || 1) - 1) * 0.6)) : 500; }
+export function bigUpCost(s, i) { const st = s.tiles[i]; return st.b ? r100(BIG[st.b].cost * 0.6) : 0; }
 export function ownsGroup(s, g, pid) {
   return TILES.every((t, i) => t.g !== g || s.tiles[i].o === pid);
 }
@@ -99,16 +108,9 @@ export function createGame(players, settings, now) {
 function setStep(s, step, now) {
   s.step = step;
   s.deadline = now + (step === 'pre' ? PRE_T : DEC_T);
-  s.botAt = now + 700 + rnd(700);
+  s.botAt = now + 450 + rnd(450);
 }
-function done(s, now, delay = 1300) {
-  const p = cur(s);
-  if (s.bankAfter && p && s.bankAfter === p.id && !p.out && s.phase === 'play') {
-    s.bankAfter = null; s.pending = { type: 'bank', pass: 1 }; setStep(s, 'decide', now + delay - 600); s.deadline = now + delay + DEC_T; return;
-  }
-  s.bankAfter = null;
-  s.step = 'done'; s.pending = null; s.until = now + delay;
-}
+function done(s, now, delay = 800) { s.step = 'done'; s.pending = null; s.until = now + delay; }
 
 function beginTurn(s, now) {
   const p = cur(s);
@@ -199,7 +201,7 @@ function startMove(s, p, steps, now, dice) {
     const mk = s.marks[pos];
     if (mk && !(mk === 'block' && hasSkill(p, 'noblock')) && !(mk === 'mine' && hasSkill(p, 'nomine'))) { mark = mk; break; }
   }
-  s.anim = { pid: p.id, path, t0: now, dice: dice || null, dur: (dice ? 900 : 200) + (path.length - 1) * 340 };
+  s.anim = { pid: p.id, path, t0: now, dice: dice || null, dur: (dice ? 750 : 200) + (path.length - 1) * 280 };
   s.moveInfo = { pass, mark };
   s.step = 'move';
   s.until = now + s.anim.dur;
@@ -212,7 +214,7 @@ function finishMove(s, now) {
   const { pass, mark } = s.moveInfo || {};
   s.moveInfo = null;
   // 大富翁6：經過銀行可以存提款
-  if (path.slice(1, -1).some(i => TILES[i].type === 'bank')) s.bankAfter = p.id;
+  if (path.slice(1).some(i => TILES[i].type === 'bank')) { p.bankOk = true; log(s, `🏦 ${p.name} 經過銀行，下回合擲骰前可以存提款`); }
   for (let k = 0; k < (pass || 0); k++) {
     const sal = hasSkill(p, 'salary') ? SALARY * 1.5 : SALARY;
     p.cash += sal; addPts(p, 10);
@@ -270,7 +272,7 @@ function liquidate(s, p, need) {
     for (const i of mine) {
       if (short <= 0) break;
       const v = r10(propValue(s, i) * 0.5);
-      p.cash += v; short -= v; s.tiles[i].o = null; s.tiles[i].l = 0; s.tiles[i].b = null;
+      p.cash += v; short -= v; s.tiles[i].o = null; s.tiles[i].l = 0; s.tiles[i].b = null; s.tiles[i].bl = 0;
       log(s, `🏚️ ${p.name} 變賣 ${TILES[i].name} 得 ${money(v)}`);
     }
   }
@@ -291,7 +293,7 @@ function gain(s, p, amt) { if (s.chanceCtx === p.id && hasSkill(p, 'lucky')) amt
 function bankrupt(s, p) {
   if (p.out) return;
   p.out = true; p.cash = 0; p.deposit = 0; p.cards = []; p.god = null;
-  s.tiles.forEach(t => { if (t && t.o === p.id) { t.o = null; t.l = 0; t.b = null; } });
+  s.tiles.forEach(t => { if (t && t.o === p.id) { t.o = null; t.l = 0; t.b = null; t.bl = 0; } });
   s.lotto.tix = s.lotto.tix.filter(x => x.pid !== p.id);
   log(s, `💸 ${p.name} 破產出局了！`);
   fx(s, { k: 'bankrupt', pid: p.id });
@@ -320,7 +322,7 @@ function land(s, now) {
     case 'lottery':
       if (p.cash >= 500 && !s.lotto.tix.some(x => x.pid === p.id)) return ask(s, { type: 'lottery' }, now);
       log(s, `🎰 ${p.name} 已經有樂透彩券了`); return done(s, now);
-    case 'bank': return ask(s, { type: 'bank' }, now);
+    case 'bank': p.bankOk = true; return ask(s, { type: 'bank' }, now);
     case 'hospital': log(s, `🏥 ${p.name} 來醫院探病，獲得點券`); addPts(p, 5); return done(s, now);
     case 'police': log(s, `🚓 ${p.name} 到警察局做筆錄，獲得點券`); addPts(p, 5); return done(s, now);
     default: return done(s, now);
@@ -397,18 +399,21 @@ function landBig(s, p, i, now) {
   const st = s.tiles[i], t = TILES[i];
   if (st.o == null) { if (p.cash >= price(s, i)) return ask(s, { type: 'buy', tile: i }, now); return done(s, now); }
   if (st.o === p.id) {
-    if (!st.b) { if (p.cash >= BIG.gas.cost) return ask(s, { type: 'bigbuild', tile: i }, now); return done(s, now); }
+    if (!st.b) { if (p.cash >= BIG.park.cost || hasGod(p, 'fushen')) return ask(s, { type: 'bigbuild', tile: i }, now); return done(s, now); }
     if (st.b === 'lab') { log(s, `🔬 研究所研發出新道具！`); giveCard(s, p); }
-    if (st.b === 'gas') { log(s, `⛽ ${p.name} 在自己的加油站加滿油，點券 +15`); addPts(p, 15); }
-    if (st.b === 'hotel') { log(s, `🏨 ${p.name} 在自家飯店休息，點券 +15`); addPts(p, 15); }
-    return done(s, now, 1500);
+    if (st.b === 'gas' || st.b === 'hotel' || st.b === 'park') { log(s, `${BIG[st.b].icon} ${p.name} 在自己的${BIG[st.b].name}休息，點券 +15`); addPts(p, 15); }
+    if ((st.bl || 1) < BIG_MAX && (p.cash >= bigUpCost(s, i) || hasGod(p, 'fushen'))) return ask(s, { type: 'bigup', tile: i }, now);
+    return done(s, now, 1200);
   }
   const o = pl(s, st.o), b = st.b ? BIG[st.b] : null;
   const paid = payOwner(s, p, o, bigFee(s, i), t.name, i, now);
-  if (paid) log(s, `${b ? b.icon : '🏗️'} ${p.name} 在 ${o.name} 的${b ? b.name : '建地'}付了 ${money(paid)}`);
-  if (paid && st.b === 'lab') { addPts(o, 20); }
+  if (paid) log(s, `${b ? b.icon : '🏗️'} ${p.name} 在 ${o.name} 的${b ? b.name + (st.bl > 1 ? `（${st.bl} 級）` : '') : '建地'}付了 ${money(paid)}`);
+  if (paid && st.b === 'lab') addPts(o, 20);
+  if (paid && st.b === 'park') addPts(o, 10 * (st.bl || 1));
+  if (paid && st.b === 'mall') { const bonus = r10(paid * 0.1); gain(s, o, bonus); }
+  if (st.b === 'fun' && !p.out) { log(s, `🎡 ${p.name} 在遊樂園玩得很開心`); giveCard(s, p); }
   if (st.b === 'hotel' && !p.out && !hasGod(p, 'mazu')) { p.st.sleep = Math.max(p.st.sleep, 1); log(s, `🏨 ${p.name} 在度假飯店住一晚，休息一回合`); }
-  done(s, now, 1700);
+  done(s, now, 1300);
 }
 // 拍賣：放棄購買的土地，大家出價
 function startAuction(s, i, seller, now) {
@@ -593,8 +598,16 @@ export function act(s, pid, a, now) {
     if (a.type === 'roll') return doRoll(s, p, now);
     if (a.type === 'card') return useCard(s, p, a, now);
     if (a.type === 'stock') return doStock(s, p, a);
+    if (a.type === 'bank') {
+      if (!p.bankOk) return '要經過或停在銀行才能存提款';
+      let amt = Math.round(a.amount || 0);
+      if (amt > 0) { amt = Math.min(amt, p.cash); p.cash -= amt; p.deposit += amt; log(s, `🏦 ${p.name} 存入 ${money(amt)}`); }
+      else if (amt < 0) { amt = Math.min(-amt, p.deposit); p.deposit -= amt; p.cash += amt; log(s, `🏦 ${p.name} 提領 ${money(amt)}`); }
+      return null;
+    }
     return '現在不能這樣做';
   }
+  if (a.type === 'end' && s.step === 'done') { s.until = 0; return null; }
   if (s.step !== 'decide' || !s.pending) return '現在不能這樣做';
   const pd = s.pending;
   switch (pd.type) {
@@ -605,10 +618,10 @@ export function act(s, pid, a, now) {
         p.cash -= c; s.tiles[pd.tile].o = p.id;
         log(s, `🏠 ${p.name} 買下 ${TILES[pd.tile].name}（${money(c)}）`);
         fx(s, { k: 'buy', tile: pd.tile, pid: p.id }); fx(s, { k: 'money', pid: p.id, d: -c });
-        return done(s, now, 900), null;
+        return done(s, now, 500), null;
       }
       if (s.settings.auction !== false && startAuction(s, pd.tile, p.id, now)) return null;
-      return done(s, now, 900), null;
+      return done(s, now, 500), null;
     }
     case 'car': {
       if (a.type === 'veh') {
@@ -617,17 +630,28 @@ export function act(s, pid, a, now) {
         p.cash -= VEH[v].price; p.veh = v; fx(s, { k: 'money', pid: p.id, d: -VEH[v].price });
         log(s, `${VEH[v].icon} ${p.name} 買了${VEH[v].name}，之後擲 ${VEH[v].dice} 顆骰子！`);
       }
-      return done(s, now, 900), null;
+      return done(s, now, 500), null;
     }
     case 'bigbuild': {
       if (a.type === 'build') {
         const b = BIG[a.kind]; if (!b) return '無效';
         const c = hasGod(p, 'fushen') ? 0 : b.cost; if (p.cash < c) return '現金不足';
-        p.cash -= c; s.tiles[pd.tile].b = a.kind; if (c) fx(s, { k: 'money', pid: p.id, d: -c });
+        p.cash -= c; s.tiles[pd.tile].b = a.kind; s.tiles[pd.tile].bl = 1; if (c) fx(s, { k: 'money', pid: p.id, d: -c });
         fx(s, { k: 'build', tile: pd.tile, pid: p.id });
         log(s, `${b.icon} ${p.name} 在 ${TILES[pd.tile].name} 蓋了${b.name}`);
       }
-      return done(s, now, 900), null;
+      return done(s, now, 500), null;
+    }
+    case 'bigup': {
+      if (a.type === 'yes') {
+        const st = s.tiles[pd.tile], c = hasGod(p, 'fushen') ? 0 : bigUpCost(s, pd.tile);
+        if (p.cash < c) return '現金不足';
+        if ((st.bl || 1) >= BIG_MAX) return '已經最高級';
+        p.cash -= c; st.bl = (st.bl || 1) + 1; if (c) fx(s, { k: 'money', pid: p.id, d: -c });
+        fx(s, { k: 'build', tile: pd.tile, pid: p.id });
+        log(s, `${BIG[st.b].icon} ${p.name} 把${BIG[st.b].name}擴建到 ${st.bl} 級！收費提高`);
+      }
+      return done(s, now, 500), null;
     }
     case 'minigame': {
       const sc = a.type === 'mg' ? Math.max(0, Math.min(60, a.score | 0)) : 0;
@@ -647,7 +671,7 @@ export function act(s, pid, a, now) {
         log(s, `🏗️ ${p.name} 把 ${TILES[pd.tile].name} 蓋成${LEVEL_NAMES[st.l]}${c ? `（${money(c)}）` : '（福神免費）'}`);
         fx(s, { k: 'build', tile: pd.tile, pid: p.id }); if (c) fx(s, { k: 'money', pid: p.id, d: -c });
       }
-      return done(s, now, 900), null;
+      return done(s, now, 500), null;
     }
     case 'shop': {
       if (a.type === 'buyCard') {
@@ -661,7 +685,7 @@ export function act(s, pid, a, now) {
         return null;
       }
       if (hasSkill(p, 'network')) { log(s, `🤝 ${p.name} 人脈廣，老闆多送一張卡`); giveCard(s, p); }
-      return done(s, now, 900), null;
+      return done(s, now, 500), null;
     }
     case 'lottery': {
       if (a.type === 'pick') {
@@ -671,7 +695,7 @@ export function act(s, pid, a, now) {
         fx(s, { k: 'money', pid: p.id, d: -500 });
         log(s, `🎰 ${p.name} 買了 ${num} 號樂透（彩金 ${money(s.lotto.pool)}，${7 - (s.round % 7)} 天後開獎）`);
       }
-      return done(s, now, 900), null;
+      return done(s, now, 500), null;
     }
     case 'bank': {
       if (a.type === 'bank') {
@@ -689,6 +713,7 @@ export function act(s, pid, a, now) {
 }
 
 function doRoll(s, p, now) {
+  p.bankOk = false;
   if (p.stay) {
     p.stay = false;
     log(s, `🛑 ${p.name} 原地停留`);
@@ -895,7 +920,8 @@ export function botAction(s, p) {
     }
     case 'lottery': return Math.random() < 0.5 ? { type: 'pick', num: 1 + rnd(20) } : { type: 'no' };
     case 'car': { const v = p.veh + 1; return p.cash - VEH[v].price > 12000 ? { type: 'veh', v } : { type: 'no' }; }
-    case 'bigbuild': { for (const k of ['hotel', 'lab', 'gas']) if (p.cash - BIG[k].cost > 6000) return { type: 'build', kind: k }; return { type: 'no' }; }
+    case 'bigbuild': { for (const k of ['fun', 'hotel', 'mall', 'lab', 'gas', 'park']) if (p.cash - BIG[k].cost > 3000) return { type: 'build', kind: k }; return { type: 'no' }; }
+    case 'bigup': return { type: p.cash - bigUpCost(s, pd.tile) > 4000 ? 'yes' : 'no' };
     case 'minigame': return { type: 'mg', score: 10 + rnd(35) };
     case 'bank':
       if (!pd.did && p.cash > 26000) return { type: 'bank', amount: r100(p.cash - 16000) };

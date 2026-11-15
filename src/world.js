@@ -521,7 +521,7 @@ export class World {
       if (!t) return;
       const o = this.tileObjs[i];
       if (o.owner !== t.o) { o.owner = t.o; o.base.material.color.set(t.o ? colors[t.o] : '#cbbf9f'); if (!t.o) o.level = -1; else if (o.level !== -1) o.level = 'x'; }
-      const key = t.l + ':' + (t.b || '');
+      const key = t.l + ':' + (t.b || '') + ':' + (t.bl || 0);
       if (o.level !== key) {
         const grew = t.o && this.inited && o.level !== -1 && o.level !== key;
         const first = t.o && this.inited && o.level === -1;
@@ -529,6 +529,7 @@ export class World {
         if (t.o) {
           const tp = TILES[i].type;
           const h = tp === 'company' ? buildOwnerSign(colors[t.o]) : tp === 'bigland' ? (t.b ? buildBig(t.b, colors[t.o]) : buildOwnerSign(colors[t.o])) : buildHouses(t.l, colors[t.o]);
+          if (tp === 'bigland' && t.b && t.bl > 1) { h.scale.multiplyScalar(1 + (t.bl - 1) * 0.18); for (let k = 0; k < t.bl; k++) { const st = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), mat('#ffd600', { e: '#ffab00', ei: 0.6 })); st.position.set((k - (t.bl - 1) / 2) * 0.4, 3.0, 0); h.add(st); } }
           if (grew || first) { h.userData.base = h.scale.x; h.scale.setScalar(0.01); h.userData.growT = performance.now(); }
           o.lot.add(h);
         }
@@ -635,11 +636,11 @@ export class World {
         let target, jump = 0, face = null;
         const an = s.anim;
         if (an && an.pid === p.id && s.step === 'move') {
-          const el = now - an.t0 - (an.dice ? 900 : 200);
+          const el = now - an.t0 - (an.dice ? 750 : 200);
           const path = an.path;
           if (el < 0) target = this.tilePos(path[0]).clone();
           else {
-            const k = Math.floor(el / 340), f = (el % 340) / 340;
+            const k = Math.floor(el / 280), f = (el % 280) / 280;
             if (k >= path.length - 1) target = this.tilePos(path[path.length - 1]).clone();
             else {
               const A = this.tilePos(path[k]), Bp = this.tilePos(path[k + 1]);

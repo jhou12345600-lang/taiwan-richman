@@ -1,6 +1,6 @@
 // ===== 寶島富翁 3D：主程式（房主 / 玩家 / 介面）=====
 import { MAPS, useMap, TILES, N_TILES, GROUPS, CHARS, CARDS, GODS, STOCKS, EMOTES, LEVEL_NAMES, TOLL_MUL } from './data.js';
-import { BIG, VEH, companyCount, companyFee, diceCount, chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T } from './engine.js';
+import { BIG, BIG_MAX, bigUpCost, bigFee, VEH, companyCount, companyFee, diceCount, chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T } from './engine.js';
 import { World } from './world.js';
 import { MqttNet, LocalNet, BROKERS } from './net.js';
 
@@ -536,10 +536,14 @@ function renderHud() {
   if (acts.dataset.k !== key) {
     acts.dataset.k = key;
     if (mine && s.step === 'pre') {
-      acts.innerHTML = `<button class="ghost" id="aCard">🃏 道具 ${c.cards.length}</button><button class="pri" id="rollBtn">🎲 擲骰子</button><button class="ghost" id="aStock">📈 股市</button>`;
+      acts.innerHTML = `<button class="ghost" id="aCard">🃏 道具 ${c.cards.length}</button><button class="pri" id="rollBtn">🎲 擲骰子</button><button class="ghost" id="aStock">📈 股市</button>${c.bankOk ? '<button class="green" id="aBank">🏦 銀行</button>' : ''}`;
+      if (c.bankOk) $('#aBank').onclick = () => openBank();
       $('#rollBtn').onclick = () => { if (G.ui.target) cancelTarget(); beep('dice'); send(c.id, { type: 'roll' }); };
       $('#aCard').onclick = () => openCards();
       $('#aStock').onclick = () => openStock();
+    } else if (isMyTurn() && s.step === 'done' && !c.away) {
+      acts.innerHTML = `<button class="pri" id="endBtn">⏭ 換下一位</button>`;
+      $('#endBtn').onclick = () => send(c.id, { type: 'end' });
     } else {
       const me = myPlayer();
       acts.innerHTML = me ? `<button class="ghost" id="aMine">👤 我的資產</button>` : '<span style="color:#fff;font-size:13px">觀戰中</span>';
@@ -577,12 +581,12 @@ function showDice(an) {
   const start = Date.now();
   const spin = () => {
     const el2 = Date.now() - start;
-    if (el2 < 750) { el.innerHTML = an.dice.map(() => dieHtml(1 + Math.floor(Math.random() * 6))).join(''); el.querySelectorAll('.die').forEach(d => d.classList.add('spin')); requestAnimationFrame(spin); }
+    if (el2 < 600) { el.innerHTML = an.dice.map(() => dieHtml(1 + Math.floor(Math.random() * 6))).join(''); el.querySelectorAll('.die').forEach(d => d.classList.add('spin')); requestAnimationFrame(spin); }
     else { el.innerHTML = an.dice.map(v => dieHtml(v)).join(''); setTimeout(() => el.classList.add('hidden'), 900); }
   };
   beep('dice'); spin();
   const n = an.path.length - 1;
-  for (let k = 0; k < n; k++) setTimeout(() => beep('step'), 900 + k * 340);
+  for (let k = 0; k < n; k++) setTimeout(() => beep('step'), 750 + k * 280);
 }
 
 // ---------- 特效 ----------
@@ -633,7 +637,7 @@ function tileInfoHtml(i) {
     const st = s.tiles[i], o = st.o && pl(s, st.o);
     h += `<div class="kv"><b>種類</b><span>${t.type === 'company' ? '🏢 投資公司' : '🏗️ 大型建地'}</span><b>地主</b><span>${o ? esc(o.name) : '（無）'}</span><b>價格</b><span>${money(price(s, i))}</span>`;
     if (t.type === 'company') h += `<b>收費</b><span>骰子點數 × $200 × 地主擁有的公司數${o ? `（目前 ${companyCount(s, o.id)} 家）` : ''}</span></div>`;
-    else h += `<b>建築</b><span>${st.b ? BIG[st.b].icon + BIG[st.b].name : '空地'}</span><b>收費</b><span>${money(st.b ? BIG[st.b].fee : 500)}${st.b === 'hotel' ? '＋住一晚（停一回合）' : ''}</span></div><p class="note">⛽加油站 收 $1500｜🔬研究所 收 $1000，地主停下送道具卡｜🏨度假飯店 收 $3000 並讓人住一晚</p>`;
+    else h += `<b>建築</b><span>${st.b ? BIG[st.b].icon + BIG[st.b].name + `（${st.bl || 1}/${BIG_MAX} 級）` : '空地'}</span><b>收費</b><span>${money(bigFee(s, i))}${st.b === 'hotel' ? '＋住一晚（停一回合）' : ''}</span></div><p class="note">${Object.values(BIG).map(b => `${b.icon}${b.name}：${b.desc}`).join('<br>')}<br>地主再停到這裡可以擴建（最高 ${BIG_MAX} 級，收費提高）。</p>`;
   }
   if (t.type === 'prop' && s.tiles) {
     const st = s.tiles[i], o = st.o && pl(s, st.o);
@@ -692,8 +696,12 @@ function openDecide(refresh = false) {
       `</div><p class="note">踩到地雷車子會被炸壞喔！</p><button class="ghost" style="width:100%;margin-top:8px" data-a="no">不買</button>`;
   } else if (pd.type === 'bigbuild') {
     h = tileInfoHtml(pd.tile) + `<p>要在這塊大型建地蓋什麼？（現金 ${money(p.cash)}）</p><div class="choice">` +
-      Object.entries(BIG).map(([k, b]) => `<button class="green" data-big="${k}" ${p.cash < b.cost && !(p.god && p.god.id === 'fushen') ? 'disabled' : ''}>${b.icon} ${b.name}<br><small>${money(b.cost)}・收 ${money(b.fee)}</small></button>`).join('') +
+      Object.entries(BIG).map(([k, b]) => `<button class="green" style="flex:1 1 45%" data-big="${k}" ${p.cash < b.cost && !(p.god && p.god.id === 'fushen') ? 'disabled' : ''}>${b.icon} ${b.name}　${money(b.cost)}<br><small>收 ${money(b.fee)}・${b.desc}</small></button>`).join('') +
       `</div><button class="ghost" style="width:100%;margin-top:8px" data-a="no">先不蓋</button>`;
+  } else if (pd.type === 'bigup') {
+    const st = s.tiles[pd.tile], b = BIG[st.b], c1 = (p.god && p.god.id === 'fushen') ? 0 : bigUpCost(s, pd.tile);
+    h = tileInfoHtml(pd.tile) + `<p>要把${b.icon}<b>${b.name}</b>從 ${st.bl || 1} 級擴建到 <b>${(st.bl || 1) + 1} 級</b>嗎？花費 <b>${c1 ? money(c1) : '免費（福神）'}</b>，收費會提高到 ${money(Math.round(b.fee * (1 + (st.bl || 1) * 0.6) / 10) * 10)}</p>
+      <div class="choice"><button class="green" data-a="yes">🏗️ 擴建</button><button class="ghost" data-a="no">不用</button></div>`;
   } else if (pd.type === 'minigame') {
     h = `<h3>🕹️ 小遊戲：接金幣</h3><p>10 秒內點掉落的金幣，接到幾枚就送幾點點券（最多 60）！小心炸彈💣會扣分。</p><div id="mg" style="position:relative;height:300px;background:linear-gradient(#81d4fa,#e1f5fe);border-radius:14px;overflow:hidden;touch-action:none"></div>
       <div class="row" style="margin-top:8px"><b id="mgScore">0 枚</b><button class="pri" id="mgStart">開始！</button></div>`;
@@ -721,6 +729,15 @@ function openDecide(refresh = false) {
   sh.querySelectorAll('[data-bank]').forEach(b => b.onclick = () => send(id, { type: 'bank', amount: +b.dataset.bank }));
 }
 
+function openBank() {
+  const s = G.s, p = cur(s);
+  openSheet(`<button class="x" data-close>✕</button><h3>🏦 銀行</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
+    <p class="note">每月 1 日存款發 10% 利息，存款不會被查稅、均富卡拿走。</p>
+    <div class="choice"><button class="green" data-bank="1000">存 $1000</button><button class="green" data-bank="5000">存 $5000</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
+    <div class="choice"><button class="blue" data-bank="-1000">領 $1000</button><button class="blue" data-bank="-5000">領 $5000</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
+    <button class="ghost" style="width:100%;margin-top:10px" data-close>完成</button>`, 'bankpre');
+  $('#sheet').querySelectorAll('[data-bank]').forEach(b => b.onclick = () => { send(p.id, { type: 'bank', amount: +b.dataset.bank }); setTimeout(() => { if (G.ui.mode === 'bankpre') openBank(); }, 350); });
+}
 // 小遊戲：接金幣
 function setupMinigame(pid) {
   const box = $('#mg'); let score = 0, running = false;
@@ -873,7 +890,8 @@ $('#helpBtn').onclick = () => openSheet(`<button class="x" data-close>✕</butto
   <p>🎲 輪到你時先可以用道具卡、買賣股票，再擲骰子前進。</p>
   <p>🏠 停在無人景點可以買下；停在自己的地可以加蓋，最高蓋到摩天大樓。別人停到你的地要付過路費；自己的地連在一起會「連鎖」，過路費整串加總（大富翁6規則）。</p>
   <p>🎲 預設 1 顆骰子，到🛵車行買機車（2 顆）、汽車（3 顆）。一輪是一天，月曆會走動。</p>
-  <p>🏢 投資公司：別人停下要付「骰子點數 × $200 × 你的公司數」。🏗️ 大型建地：可蓋加油站、研究所、度假飯店。</p>
+  <p>🏢 投資公司：別人停下要付「骰子點數 × $200 × 你的公司數」。🏗️ 大型建地：可蓋主題公園、加油站、研究所、購物中心、度假飯店、遊樂園，再停到可以擴建到 3 級。</p>
+  <p>🏦 經過或停在銀行後，下次擲骰前可以按「銀行」存提款。買完地可以按「⏭ 換下一位」馬上換人。</p>
   <p>🔨 有人放棄買地時，其他玩家可以出價拍賣。🎰 樂透每 7 天開獎、沒人中就累積。🕹️ 小遊戲接金幣賺點券。🔮魔法屋、👼天使、😈惡魔隨機出現。</p>
   <p>🚉 經過台北車站領環島獎金 $1000、點券 +10；經過或停在🏦銀行可以存提款，每月 1 日發存款利息 10%。</p>
   <p>🏪 道具店用點券買卡；⛩️ 廟會請到神明附身 5 回合（財神、福神、土地公、媽祖是好神，衰神、窮神是壞神）。</p>

@@ -281,6 +281,13 @@ const IS_TILES = [
   CH,
 ];
 
+{
+  const ins = (arr, after, tile) => { const i = arr.findIndex(t => t.name === after); if (i >= 0) arr.splice(i + 1, 0, tile); };
+  ins(TW_TILES, '七星潭', BL('花蓮海岸建地', 'resortland', '太平洋海岸的大片建地'));
+  ins(TP_TILES, '台北動物園', BL('南港開發區', 'creative', '新興的南港開發區'));
+  ins(TN_TILES, '漁光島', BL('安平港開發區', 'riverside', '安平港邊的開發區'));
+  ins(IS_TILES, '水頭聚落', BL('金門開發區', 'resortland', '金門的大型建地'));
+}
 export const MAPS = {
   taiwan: { name: '台灣環島', icon: '🏝️', desc: '繞台灣一圈，北中南東 53 個景點', tiles: TW_TILES },
   taipei: { name: '台北城市', icon: '🏙️', desc: '台北 12 區的地標、夜市與老街', tiles: TP_TILES },

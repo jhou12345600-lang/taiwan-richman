@@ -51,7 +51,12 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
 .seat .e{font-size:26px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:50%}
 .seat .nm{flex:1;font-weight:700}.seat small{color:#888;font-weight:500}
 .seat button{padding:6px 10px;font-size:13px}
-.code{font-size:30px;font-weight:900;letter-spacing:6px;text-align:center;color:#0d6aa8}
+.code{font-size:40px;font-weight:900;letter-spacing:8px;text-align:center;color:#0d6aa8}
+.code:before{content:'房號';display:block;font-size:13px;letter-spacing:0;color:#888}
+.maps{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.mapc{background:#fff;border:3px solid transparent;border-radius:14px;padding:8px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.1)}
+.mapc.sel{border-color:#ffb300;background:#fff8e1}
+.mapc .mi{font-size:26px}.mapc .mn{font-weight:900}.mapc .md{font-size:11px;color:#777;line-height:1.4}
 .share{display:flex;gap:8px;align-items:center}
 .share input{font-size:12px}
 #qr{display:flex;justify-content:center;margin:8px 0}
@@ -134,7 +139,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
 <!-- 首頁 -->
 <div class="screen hidden" id="home">
   <div class="panel">
-    <div class="logo"><h1>寶島富翁 3D</h1><p>大富翁6玩法・台灣環島 72 格・2–6 人連線</p></div>
+    <div class="logo"><h1>寶島富翁 3D</h1><p>大富翁6玩法・4 張台灣地圖・2–6 人連線</p></div>
     <div class="lab">你的暱稱</div>
     <input id="nameIn" maxlength="8" placeholder="輸入暱稱">
     <div class="lab">自訂頭像（選填，會顯示在角色頭上）</div>
@@ -143,10 +148,13 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
     <div class="chars" id="charPick"></div>
     <div class="col">
       <button class="pri hidden" id="joinBtn" style="font-size:18px">🚪 加入房間</button>
-      <button class="pri" id="createBtn" style="font-size:18px">🌐 建立連線房間（傳網址給朋友）</button>
+      <button class="pri" id="createBtn" style="font-size:18px">🌐 建立連線房間</button>
+      <div id="codeRow" style="background:#e3f2fd;border-radius:14px;padding:10px">
+        <div class="lab" style="margin-top:0">🔢 朋友開好房間了？輸入房號加入</div>
+        <div class="row"><input id="codeIn" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="例如 382915" style="font-size:22px;letter-spacing:4px;text-align:center"><button class="blue" id="codeBtn" style="flex:0 0 auto;font-size:17px">加入</button></div>
+      </div>
       <button class="green hidden" id="lastBtn"></button>
       <button class="ghost" id="pasteBtn">📋 貼上邀請連結加入</button>
-      <div class="row" id="codeRow"><input id="codeIn" maxlength="8" placeholder="有房號？輸入加入" style="text-transform:uppercase"><button class="blue" id="codeBtn" style="flex:0 0 auto">加入</button></div>
       <button class="ghost" id="soloBtn">🤖 單機遊戲（跟電腦 / 同一台輪流玩）</button>
       <button class="ghost" id="fsHomeBtn">⛶ 全螢幕</button>
     </div>
@@ -163,8 +171,10 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
       <div class="code" id="roomCode"></div>
       <div class="share"><input id="shareUrl" readonly><button class="blue" id="copyBtn">複製</button><button class="green" id="shareBtn">分享</button></div>
       <div id="qr"></div>
-      <p class="note" style="text-align:center">把網址或 QR Code 傳給朋友，打開就能加入（最多 6 人）</p>
+      <p class="note" style="text-align:center">朋友在首頁輸入<b>房號</b>，或打開網址／掃 QR Code 就能加入（最多 6 人）</p>
     </div>
+    <div class="lab">🗺️ 選擇地圖</div>
+    <div id="mapPick" class="maps"></div>
     <div class="lab">玩家 <span id="seatCount"></span></div>
     <div id="seats"></div>
     <div id="hostCtl">
@@ -172,6 +182,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
       <div class="row">
         <div><div class="lab">起始資金</div><select id="setCash"><option value="20000">$20,000</option><option value="30000" selected>$30,000</option><option value="50000">$50,000</option></select></div>
         <div><div class="lab">回合上限</div><select id="setRounds"><option value="30">30 回合</option><option value="50" selected>50 回合</option><option value="80">80 回合</option><option value="0">無限（破產制）</option></select></div>
+        <div><div class="lab">拍賣</div><select id="setAuction"><option value="1" selected>開啟</option><option value="0">關閉</option></select></div>
         <div><div class="lab">骰子</div><select id="setDice"><option value="1" selected>1 顆（大富翁6）</option><option value="2">2 顆（快速）</option></select></div>
       </div>
       <button class="pri" id="startBtn" style="width:100%;margin-top:12px;font-size:18px">🎲 開始遊戲</button>

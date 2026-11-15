@@ -664,6 +664,122 @@ M.fortsd = g => {
   C(g, 0.02, 0.02, 0.7, '#9e9e9e', -0.2, 1.4, -0.2, 4); B(g, 0.35, 0.22, 0.02, '#1e88e5', -0.02, 1.85, -0.2);
 };
 
+// ---- 新地圖景點 ----
+function shophouse(g, x, z, c, h = 1.0, rot = 0) {
+  const t = new THREE.Group(); t.position.set(x, 0, z); t.rotation.y = rot; g.add(t);
+  B(t, 0.7, h, 0.8, c); B(t, 0.72, 0.12, 0.82, '#5d4037', 0, h);
+  B(t, 0.22, 0.35, 0.02, '#4e342e', 0, 0, 0.41); B(t, 0.45, 0.2, 0.02, '#90caf9', 0, h * 0.62, 0.41);
+  lantern(t, 0.25, h * 0.45, 0.45);
+  return t;
+}
+function platform(g, r = 1.7, c = '#9e9e9e', h = 0.12) { return C(g, r, r + 0.05, h, c, 0, 0, 0, 14); }
+function fence(g, w, d, c = '#795548') {
+  for (const [x, z, ww, dd] of [[0, -d / 2, w, 0.06], [0, d / 2, w, 0.06], [-w / 2, 0, 0.06, d], [w / 2, 0, 0.06, d]]) B(g, ww, 0.3, dd, c, x, 0.05, z);
+}
+M.nightmarket = g => nightMarket(g, '', '#ab47bc');
+M.nightmarket2 = g => { nightMarket(g, '', '#ef5350'); temple2(new THREE.Group(), '#c62828', '#bf360c'); };
+M.nightmarket3 = g => nightMarket(g, '', '#29b6f6');
+M.oldstreet = g => { B(g, 3.3, 0.1, 2.6, '#a1887f'); const cs = ['#ffe0b2', '#d7ccc8', '#ffccbc', '#f0f4c3']; for (let k = 0; k < 4; k++) shophouse(g, -1.2 + k * 0.8, -0.5, cs[k], 0.9 + (k % 2) * 0.3); B(g, 3.0, 0.03, 0.6, '#8d6e63', 0, 0.1, 0.6); };
+M.dihua = g => { B(g, 3.3, 0.1, 3.0, '#b0a596'); const cs = ['#ffcc80', '#bcaaa4', '#ffab91', '#e6ee9c']; for (let k = 0; k < 4; k++) { const x = -1.2 + k * 0.8; B(g, 0.75, 1.3, 1.2, cs[k], x, 0.1, -0.3); const tp = put(g, new THREE.CylinderGeometry(0.3, 0.3, 0.12, 12, 1, false, 0, Math.PI), cs[k], x, 1.45, 0.3); tp.rotation.z = Math.PI / 2; tp.rotation.y = Math.PI / 2; B(g, 0.25, 0.4, 0.03, '#4e342e', x, 0.1, 0.31); } };
+M.presidential = g => {
+  B(g, 3.3, 0.15, 2.6, '#bdbdbd');
+  B(g, 3.0, 0.9, 1.0, '#b5523b', 0, 0.15, -0.5); for (let k = 0; k < 4; k++) B(g, 3.02, 0.06, 1.02, '#fafafa', 0, 0.3 + k * 0.2, -0.5);
+  B(g, 0.7, 2.6, 0.7, '#b5523b', 0, 0.15, -0.3); B(g, 0.72, 0.1, 0.72, '#fafafa', 0, 1.6, -0.3); B(g, 0.72, 0.1, 0.72, '#fafafa', 0, 2.2, -0.3);
+  frustum(g, 0.3, 0.75, 0.4, '#5d4037', 0, 2.75, -0.3);
+  C(g, 0.02, 0.02, 0.7, '#9e9e9e', 1.2, 0.15, 0.8, 4); B(g, 0.45, 0.3, 0.02, '#e53935', 1.43, 0.6, 0.8);
+};
+M.park = g => { platform(g, 1.75, '#7cb342', 0.12); water(g, 0.7, 0.6, 0.4, 0.13, '#4fc3f7'); for (const [x, z] of [[-1, -0.8], [-1.2, 0.5], [0.2, -1.2], [1.2, -0.6], [-0.3, 1.1]]) roundTree(g, x, z, 0.38, '#388e3c', 0.12); B(g, 0.9, 0.5, 0.7, '#eceff1', 1.0, 0.12, 1.0); roof(g, 1.1, 0.9, 0.3, '#78909c', 1.0, 0.62, 1.0); };
+M.park2 = g => { platform(g, 1.75, '#8bc34a', 0.12); for (let i = 0; i < 11; i++) { const a = i * 2.4, r = 0.4 + (i % 4) * 0.35; roundTree(g, Math.cos(a) * r, Math.sin(a) * r, 0.3 + (i % 3) * 0.08, ['#2e7d32', '#43a047', '#558b2f'][i % 3], 0.12); } water(g, 0.45, 0.9, 0.9, 0.13); };
+M.pier = g => { water(g, 1.8, 0, 0.5, 0.03, '#4fc3f7'); B(g, 3.2, 0.15, 1.2, '#8d6e63', 0, 0.05, -1.0); for (let k = 0; k < 4; k++) stall(g, -1.2 + k * 0.8, -1.2, ['#e53935', '#fb8c00', '#43a047', '#1e88e5'][k]); const b = S(g, 0.35, '#fafafa', 0.5, 0.15, 0.8, undefined, 8, 5); b.scale.set(2, 0.5, 0.7); C(g, 0.02, 0.02, 0.8, '#795548', 0.5, 0.2, 0.8, 4); S(g, 0.5, '#ff7043', -1.2, 1.8, 1.4, { e: '#ff5722', ei: 0.8 }, 10, 8); };
+M.grandhotel = g => {
+  B(g, 3.3, 0.3, 2.4, '#bdbdbd');
+  B(g, 2.8, 1.2, 1.4, '#c62828', 0, 0.3, -0.3); for (let k = -3; k <= 3; k++) C(g, 0.07, 0.07, 1.2, '#b71c1c', k * 0.42, 0.3, 0.42, 6);
+  roof(g, 3.4, 2.0, 0.45, '#fbc02d', 0, 1.5, -0.3); B(g, 2.0, 0.5, 1.0, '#c62828', 0, 1.9, -0.3); roof(g, 2.6, 1.6, 0.45, '#fbc02d', 0, 2.4, -0.3);
+  B(g, 0.9, 0.4, 0.6, '#c62828', 0, 2.8, -0.3); roof(g, 1.3, 1.0, 0.4, '#fbc02d', 0, 3.2, -0.3);
+};
+M.thermal = g => { platform(g, 1.75, '#8d8d7a', 0.15); water(g, 1.3, 0, 0, 0.16, '#80cbc4'); rocks(g, 12, 1.6, '#757575', 0.2, 0.2); const st = []; for (let i = 0; i < 10; i++) { const m = S(g, 0.3, '#ffffff', (Math.random() - 0.5) * 2, 0.3, (Math.random() - 0.5) * 2, { op: 0.5 }, 6, 5); m.castShadow = false; m.userData.ph = Math.random(); st.push(m); } anim(g, t => st.forEach(m => { const f = (t * 0.2 + m.userData.ph) % 1; m.position.y = 0.3 + f * 2.2; m.material.opacity = 0.55 * (1 - f); m.scale.setScalar(0.7 + f * 1.2); })); };
+M.yangming = g => { platform(g, 1.75, '#7cb342', 0.15); put(g, new THREE.ConeGeometry(1.4, 2.0, 7), '#689f38', -0.3, 1.15, -0.4); for (let i = 0; i < 14; i++) { const x = 0.3 + (i % 5) * 0.28, z = 0.2 + Math.floor(i / 5) * 0.35; C(g, 0.01, 0.01, 0.3, '#2e7d32', x, 0.15, z, 3); const f = put(g, new THREE.ConeGeometry(0.07, 0.14, 6, 1, true), mat('#ffffff', { ds: true }), x, 0.5, z); f.rotation.x = Math.PI; } const st = S(g, 0.25, '#ffffff', -0.9, 0.6, 0.8, { op: 0.6 }, 6, 5); st.castShadow = false; anim(g, t => { st.position.y = 0.6 + ((t * 0.3) % 1) * 1.2; }); };
+M.songshan = g => { B(g, 3.3, 0.1, 3.0, '#9e9e9e'); B(g, 2.6, 0.9, 1.4, '#a1887f', -0.2, 0.1, -0.5); roof(g, 2.9, 1.6, 0.35, '#5d4037', -0.2, 1.0, -0.5); C(g, 0.18, 0.25, 2.6, '#b5523b', 1.2, 0.1, -0.9, 10); water(g, 0.7, 0.3, 1.0, 0.11, '#4fc3f7'); };
+M.dome = g => { platform(g, 1.8, '#bdbdbd', 0.12); const d = S(g, 1.5, mat('#eceff1', { r: 0.3, m: 0.3 }), 0, 0.12, 0, undefined, 18, 10); d.scale.y = 0.45; C(g, 1.52, 1.52, 0.25, '#90a4ae', 0, 0.12, 0, 18); };
+M.wheel = g => { platform(g, 1.6, '#bdbdbd', 0.12); B(g, 2.4, 0.9, 1.0, '#eceff1', 0, 0.12, -0.8); const w = new THREE.Group(); w.position.set(0, 2.3, 0.2); g.add(w); const ring = put(w, new THREE.TorusGeometry(1.3, 0.05, 6, 30), '#e53935', 0, 0, 0); for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; const sp = B(w, 0.03, 1.3, 0.03, '#eeeeee', 0, 0, 0); sp.geometry.translate(0, 0.65, 0); sp.position.y = 0; sp.rotation.z = a; S(w, 0.12, ['#ffeb3b', '#29b6f6', '#ab47bc'][i % 3], Math.cos(a) * 1.3, Math.sin(a) * 1.3, 0, undefined, 6, 5); } for (const sx of [-1, 1]) { const l = B(g, 0.08, 2.4, 0.08, '#9e9e9e', sx * 0.5, 0.12, 0.2); l.rotation.z = sx * 0.2; } anim(g, (t, dt) => { w.rotation.z += dt * 0.25; }); };
+M.xiangshan = g => { C(g, 1.7, 1.8, 0.2, '#558b2f', 0, 0, 0, 10); put(g, new THREE.ConeGeometry(1.5, 2.4, 7), '#33691e', 0, 1.4, -0.3); for (const [x, y, z, r] of [[0.3, 1.9, 0.4, 0.35], [-0.4, 1.5, 0.6, 0.3], [0.7, 1.2, 0.8, 0.28]]) S(g, r, '#9e9e9e', x, y, z, undefined, 6, 5); B(g, 0.6, 0.06, 0.4, '#8d6e63', 0.1, 2.25, 0.2); };
+M.yatsen = g => {
+  B(g, 3.3, 0.25, 2.8, '#eeeeee'); B(g, 2.8, 1.0, 2.0, '#fff8e1', 0, 0.25, -0.2);
+  for (let k = -3; k <= 3; k++) C(g, 0.08, 0.08, 1.0, '#c62828', k * 0.42, 0.25, 0.85, 6);
+  const r = roof(g, 3.4, 2.6, 0.6, '#fbc02d', 0, 1.25, -0.2);
+  for (const sx of [-1, 1]) { const tip = put(g, new THREE.ConeGeometry(0.12, 0.6, 4), '#fbc02d', sx * 1.7, 1.4, 1.0); tip.rotation.z = -sx * 1.1; }
+};
+M.maokong = g => {
+  C(g, 1.7, 1.8, 0.15, '#558b2f', 0, 0, 0, 10);
+  for (const [x, z, f] of [[-1.3, 0.8, 0], [0.2, -0.2, 0.3], [1.3, -1.0, 0.5]]) { B(g, 0.12, 1.6 + f * 2, 0.12, '#9e9e9e', x, 0.15, z); }
+  const A = new THREE.Vector3(-1.3, 1.75, 0.8), Bv = new THREE.Vector3(1.3, 2.75, -1.0);
+  put(g, new THREE.TubeGeometry(new THREE.LineCurve3(A, Bv), 1, 0.015, 3), '#424242', 0, 0, 0);
+  const cars = []; for (let i = 0; i < 3; i++) { const c = B(g, 0.3, 0.3, 0.3, ['#e53935', '#1e88e5', '#fdd835'][i], 0, 0, 0); cars.push(c); }
+  for (let k = 0; k < 6; k++) put(g, new THREE.CylinderGeometry(0.12, 0.12, 0.15, 6), '#2e7d32', -0.8 + k * 0.3, 0.2, 1.2);
+  anim(g, t => cars.forEach((c, i) => { const f = ((t * 0.08) + i / 3) % 1; c.position.lerpVectors(A, Bv, f); c.position.y -= 0.3; }));
+};
+M.zoo = g => {
+  platform(g, 1.75, '#9ccc65', 0.12); fence(g, 3.0, 3.0);
+  const gir = new THREE.Group(); gir.position.set(-0.5, 0.12, -0.3); g.add(gir);
+  B(gir, 0.6, 0.35, 0.3, '#fbc02d', 0, 0.55, 0); for (const [x, z] of [[-0.22, -0.1], [0.22, -0.1], [-0.22, 0.1], [0.22, 0.1]]) B(gir, 0.06, 0.55, 0.06, '#fbc02d', x, 0, z);
+  const nk = B(gir, 0.12, 0.9, 0.12, '#fbc02d', 0.28, 0.85, 0); nk.rotation.z = -0.3; B(gir, 0.28, 0.14, 0.16, '#fbc02d', 0.5, 1.68, 0);
+  for (let i = 0; i < 5; i++) S(gir, 0.05, '#8d6e63', -0.2 + i * 0.1, 0.92, 0.16, undefined, 4, 3);
+  const el = S(g, 0.4, '#90a4ae', 0.8, 0.5, 0.6, undefined, 8, 6); el.scale.set(1.3, 0.9, 0.9); S(g, 0.25, '#90a4ae', 1.3, 0.65, 0.6, undefined, 7, 5);
+  roundTree(g, 1.0, -1.0, 0.35); roundTree(g, -1.2, 0.9, 0.3);
+};
+M.templehill = g => { C(g, 1.75, 1.85, 0.2, '#689f38', 0, 0, 0, 10); put(g, new THREE.ConeGeometry(1.6, 1.0, 8), '#7cb342', 0, 0.7, 0); const t = new THREE.Group(); t.position.y = 0.9; t.scale.setScalar(0.7); g.add(t); temple2(t, '#c62828', '#e65100'); };
+M.campus = g => { B(g, 3.3, 0.1, 3.3, '#9ccc65'); B(g, 0.8, 0.03, 3.2, '#bdbdbd', 0, 0.1, 0); for (let k = 0; k < 4; k++) for (const sx of [-1, 1]) palm(g, sx * 0.6, -1.3 + k * 0.85, 1.4, 0.1); B(g, 2.2, 0.9, 0.8, '#d7ccc8', 0, 0.1, -1.5); for (let k = -2; k <= 2; k++) put(g, new THREE.TorusGeometry(0.15, 0.04, 4, 8, Math.PI), '#795548', k * 0.4, 0.45, -1.1); };
+M.hayashi = g => { B(g, 3.0, 0.1, 2.6, '#9e9e9e'); B(g, 2.0, 2.2, 1.6, '#e8d8b8', 0, 0.1, -0.3); for (let f = 0; f < 5; f++) for (let k = -3; k <= 3; k++) B(g, 0.16, 0.22, 0.02, '#5d4037', k * 0.27, 0.35 + f * 0.4, 0.51); const sh = new THREE.Group(); sh.position.set(0.5, 2.3, -0.3); g.add(sh); B(sh, 0.4, 0.3, 0.4, '#d7ccc8'); roof(sh, 0.6, 0.6, 0.25, '#5d4037', 0, 0.3, 0); B(g, 0.06, 0.4, 0.06, '#e53935', 0.0, 2.3, 0.2); B(g, 0.06, 0.4, 0.06, '#e53935', 0.3, 2.3, 0.2); B(g, 0.45, 0.06, 0.06, '#e53935', 0.15, 2.7, 0.2); };
+M.museum2 = g => { B(g, 3.3, 0.12, 3.0, '#e0e0e0'); for (let i = 0; i < 4; i++) B(g, 1.0, 0.8 + i * 0.3, 1.0, '#fafafa', -1.0 + (i % 2) * 1.1, 0.12, -0.8 + Math.floor(i / 2) * 1.1); const cv = new THREE.Group(); cv.position.y = 2.1; g.add(cv); for (let i = 0; i < 6; i++) { const t = put(cv, new THREE.CylinderGeometry(0.5, 0.5, 0.06, 5), mat('#eceff1', { op: 0.85 }), -1 + (i % 3) * 0.9, 0, -0.5 + Math.floor(i / 3) * 0.9); t.rotation.y = i; } };
+M.treehouse = g => { platform(g, 1.75, '#795548', 0.1); B(g, 2.2, 1.1, 1.4, '#a1887f', 0, 0.1, 0); for (let i = 0; i < 9; i++) { const a = i * 0.7; const r = C(g, 0.06, 0.1, 1.3, '#5d4037', Math.cos(a) * 1.0, 0.1, Math.sin(a) * 0.6, 5); r.rotation.z = Math.cos(a) * 0.4; } for (let i = 0; i < 5; i++) S(g, 0.6, '#2e7d32', -0.9 + i * 0.45, 1.5 + (i % 2) * 0.2, (i % 2) * 0.3 - 0.2, undefined, 7, 5); };
+M.eternal = g => { water(g, 1.8, 0, 0, 0.03, '#4fc3f7'); const f = new THREE.Group(); g.add(f); B(f, 2.2, 0.6, 2.2, '#a1887f', 0, 0.05, 0); for (const [x, z] of [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]]) { const b = B(f, 0.7, 0.62, 0.7, '#8d6e63', x, 0.05, z); b.rotation.y = Math.PI / 4; } B(f, 1.6, 0.05, 1.6, '#9ccc65', 0, 0.65); C(f, 0.08, 0.1, 0.8, '#37474f', 0.3, 0.75, 0.4, 6).rotation.x = Math.PI / 2.3; B(f, 0.5, 0.25, 0.3, '#5d4037', 0, 0.05, 1.15); };
+M.yuguang = g => { const sand = C(g, 1.75, 1.8, 0.12, '#f3dfa2', 0, 0, 0, 14); water(g, 1.0, 0.9, 0.8, 0.06, '#29b6f6'); for (let k = 0; k < 6; k++) tree(g, -1.2 + k * 0.35, -1.0 + (k % 2) * 0.3, 1.1, '#33691e', 0.12); for (let k = 0; k < 6; k++) B(g, 0.06, 0.6 + k * 0.1, 0.06, '#d7ccc8', -0.6 + k * 0.25, 0.12, 0.6); };
+M.mangrove = g => { water(g, 1.8, 0, 0, 0.03, '#558b2f'); for (let k = 0; k < 6; k++) for (const sx of [-1, 1]) { const tr = C(g, 0.05, 0.08, 1.0, '#5d4037', sx * 0.6, 0, -1.4 + k * 0.55, 5); tr.rotation.z = -sx * 0.3; S(g, 0.45, '#388e3c', sx * 0.35, 1.0, -1.4 + k * 0.55, undefined, 6, 5); } const boat = B(g, 0.35, 0.1, 0.9, '#a1887f', 0, 0.05, 0.3); };
+M.saltmtn = g => { platform(g, 1.8, '#eeeeee', 0.08); put(g, new THREE.ConeGeometry(1.2, 1.8, 8), mat('#ffffff', { r: 0.9 }), -0.3, 0.98, -0.3); put(g, new THREE.ConeGeometry(0.7, 1.0, 8), mat('#fafafa', { r: 0.9 }), 0.9, 0.58, 0.6); for (let k = 0; k < 4; k++) B(g, 0.6, 0.03, 0.6, '#b3e5fc', -1.2 + k * 0.7, 0.08, 1.3); };
+M.crystal = g => { platform(g, 1.7, '#b0bec5', 0.12); const gl = mat('#b3e5fc', { op: 0.55, r: 0.05, m: 0.5 }); B(g, 1.3, 1.4, 2.0, gl, 0, 0.12, 0); const r = roof(g, 1.4, 2.1, 0.8, gl, 0, 1.52, 0); C(g, 0.04, 0.12, 1.0, '#e1f5fe', 0, 2.3, 0.7, 6); B(g, 0.05, 0.4, 0.05, '#ffffff', 0, 3.3, 0.7); B(g, 0.25, 0.05, 0.05, '#ffffff', 0, 3.55, 0.7); };
+M.lanternport = g => { water(g, 1.8, 0, 0, 0.03, '#1a237e'); const ls = []; for (let i = 0; i < 16; i++) { const c = ['#ffeb3b', '#ff4081', '#40c4ff', '#69f0ae'][i % 4]; const m = S(g, 0.12, c, Math.cos(i) * (0.4 + (i % 4) * 0.35), 0.4 + (i % 3) * 0.4, Math.sin(i) * (0.4 + (i % 4) * 0.35), { e: c, ei: 1 }, 6, 5); ls.push(m); } anim(g, t => ls.forEach((m, i) => { m.material.emissiveIntensity = 0.6 + Math.sin(t * 3 + i) * 0.4; })); };
+M.sugar = g => { platform(g, 1.75, '#9e9e9e', 0.1); B(g, 1.8, 1.0, 1.2, '#b5523b', -0.4, 0.1, -0.6); C(g, 0.2, 0.28, 2.6, '#8d3b27', 0.9, 0.1, -0.8, 10); B(g, 3.0, 0.04, 0.12, '#424242', 0, 0.1, 0.8); B(g, 0.6, 0.4, 0.38, '#2e7d32', -0.5, 0.14, 0.8); B(g, 0.6, 0.35, 0.36, '#fdd835', 0.3, 0.14, 0.8); };
+M.mudspring = g => { platform(g, 1.75, '#7cb342', 0.15); water(g, 1.1, 0.2, 0.2, 0.16, '#9e9e8a'); rocks(g, 8, 1.4, '#795548', 0.2, 0.2); hall(g, 1.0, 0.6, 0.5, '#d7a86e', '#5d4037', -0.9, 0.15, -1.0, 0.3); const st = S(g, 0.3, '#ffffff', 0.2, 0.6, 0.2, { op: 0.5 }, 6, 5); st.castShadow = false; anim(g, t => { st.position.y = 0.4 + ((t * 0.3) % 1) * 1.2; }); };
+M.reservoir = g => { platform(g, 1.75, '#689f38', 0.12); water(g, 1.4, 0.1, 0.1, 0.13, '#1e88e5'); for (const [x, z] of [[0.3, 0.2], [-0.5, 0.6], [0.6, -0.6]]) C(g, 0.25, 0.3, 0.12, '#7cb342', x, 0.1, z, 7); B(g, 3.2, 0.3, 0.3, '#9e9e9e', 0, 0.12, 1.45); C(g, 0.15, 0.2, 0.7, '#5d4037', -1.1, 0.12, -1.0, 6); S(g, 0.12, '#f5cba7', -1.1, 0.9, -1.0); };
+M.blueprint = g => { B(g, 3.2, 0.1, 2.6, '#9e9e9e'); B(g, 2.6, 1.8, 0.2, '#1565c0', 0, 0.1, -0.8); const w = mat('#ffffff', { e: '#ffffff', ei: 0.3 }); for (const [x, y, ww, hh] of [[0, 0.5, 1.4, 0.03], [0, 1.4, 1.4, 0.03], [-0.7, 0.95, 0.03, 0.9], [0.7, 0.95, 0.03, 0.9]]) B(g, ww, hh, 0.01, w, x, y, -0.69); for (const sx of [-1, 1]) { const r = B(g, 0.85, 0.03, 0.01, w, sx * 0.36, 1.6, -0.69); r.rotation.z = -sx * 0.5; } B(g, 0.3, 0.5, 0.01, w, 0, 0.5, -0.69); };
+M.erkan = g => { islet(g, 1.8, '#8d9a63', 0.3); for (let k = 0; k < 4; k++) { const x = -1.1 + (k % 2) * 1.2, z = -0.6 + Math.floor(k / 2) * 1.1; B(g, 0.9, 0.6, 0.7, '#5d5d5d', x, 0.2, z); roof(g, 1.1, 0.9, 0.35, '#c62828', x, 0.8, z); } };
+M.moses = g => { water(g, 1.8, 0, 0, 0.02, '#29b6f6'); C(g, 0.6, 0.8, 0.5, '#7cb342', -1.1, -0.2, -1.0, 8); C(g, 0.5, 0.7, 0.45, '#8bc34a', 1.1, -0.2, 1.0, 8); const p = B(g, 0.35, 0.12, 2.6, '#f3dfa2', 0, -0.04, 0); p.rotation.y = -0.78; for (let i = 0; i < 4; i++) S(g, 0.08, '#f5cba7', -0.6 + i * 0.4, 0.2, 0.6 - i * 0.4, undefined, 5, 4); };
+M.turtlebeach = g => { const sand = C(g, 1.75, 1.8, 0.15, '#f3dfa2', 0, -0.05, 0, 14); water(g, 0.9, 0.9, 0.9, 0.06, '#4dd0e1'); for (const [x, z, r] of [[-0.6, -0.4, 0.3], [0.4, -0.8, 1.2], [0.9, 0.9, 2.4]]) { const t = new THREE.Group(); t.position.set(x, 0.1, z); t.rotation.y = r; g.add(t); const sh = S(t, 0.3, '#4e6b2f', 0, 0.1, 0, undefined, 8, 5); sh.scale.set(1, 0.4, 1.2); S(t, 0.1, '#8bc34a', 0, 0.08, 0.38, undefined, 6, 4); for (const [fx, fz] of [[-0.28, 0.2], [0.28, 0.2], [-0.2, -0.25], [0.2, -0.25]]) { const f = S(t, 0.1, '#8bc34a', fx, 0.05, fz, undefined, 5, 3); f.scale.set(1.4, 0.3, 0.6); } } palm(g, -1.2, 0.8, 1.2, 0.1); };
+M.juguang = g => { islet(g, 1.8, '#8d9a63', 0.3); B(g, 2.2, 0.4, 2.2, '#bdbdbd', 0, 0.2, 0); let y = 0.6; for (let f = 0; f < 3; f++) { const w = 1.5 - f * 0.35; B(g, w, 0.55, w, '#fafafa', 0, y, 0); roof(g, w * 1.35, w * 1.35, 0.3, '#2e7d32', 0, y + 0.55, 0); y += 0.85; } C(g, 0.02, 0.04, 0.4, '#d4af37', 0, y - 0.05, 0, 5); };
+M.tunnel = g => { islet(g, 1.8, '#757575', 0.4); const rock = S(g, 1.4, '#8d8d8d', 0, 0.3, -0.3, undefined, 9, 6); rock.scale.set(1.2, 0.9, 0.9); const hole = S(g, 0.55, '#1a1a1a', 0, 0.45, 0.45, undefined, 10, 8); hole.scale.set(1, 1, 0.3); water(g, 0.5, 0, 1.1, 0.05, '#0277bd'); B(g, 0.25, 0.08, 0.6, '#ff7043', 0.1, 0.08, 1.2); };
+M.windlion = g => { islet(g, 1.6, '#8d9a63', 0.3); B(g, 0.8, 0.4, 0.6, '#9e9e9e', 0, 0.2, 0); const lion = new THREE.Group(); lion.position.y = 0.6; g.add(lion); C(lion, 0.3, 0.35, 0.9, '#a1887f', 0, 0, 0, 8); S(lion, 0.32, '#a1887f', 0, 1.1, 0.05, undefined, 8, 6); B(lion, 0.7, 0.5, 0.05, '#e53935', 0, 0.4, 0.33); for (const sx of [-1, 1]) S(lion, 0.08, '#212121', sx * 0.12, 1.15, 0.33, undefined, 5, 4); B(lion, 0.3, 0.06, 0.05, '#212121', 0, 1.0, 0.35); };
+M.shuitou = g => { islet(g, 1.8, '#8d9a63', 0.3); for (let k = 0; k < 3; k++) { const x = -1.0 + k * 1.0; B(g, 0.85, 0.65, 1.0, '#c0552f', x, 0.2, -0.2); roof(g, 1.0, 1.2, 0.35, '#8d3b27', x, 0.85, -0.2); for (const sx of [-1, 1]) { const t = put(g, new THREE.ConeGeometry(0.05, 0.3, 4), '#8d3b27', x + sx * 0.5, 1.15, -0.2); t.rotation.z = -sx * 1.0; } } };
+M.qinbi = g => { islet(g, 1.8, '#689f38', 0.35); put(g, new THREE.ConeGeometry(1.3, 1.8, 7), '#558b2f', 0, 1.0, -0.6); for (let k = 0; k < 6; k++) { const x = -1.0 + (k % 3) * 1.0, z = 0.1 + Math.floor(k / 3) * 0.7, y = 0.2 + (1 - Math.floor(k / 3)) * 0.4; B(g, 0.6, 0.45, 0.5, '#9e9e9e', x, y, z); roof(g, 0.75, 0.65, 0.25, '#5d4037', x, y + 0.45, z); } };
+M.bluetears = g => { water(g, 1.8, 0, 0, 0.02, '#0d1b3e'); rocks(g, 6, 1.6, '#424242', 0.1, 0.3); const ps = []; for (let i = 0; i < 30; i++) { const a = Math.random() * 6.28, r = Math.random() * 1.6; const m = S(g, 0.06, '#00e5ff', Math.cos(a) * r, 0.06, Math.sin(a) * r, { e: '#00e5ff', ei: 1.5 }, 5, 4); m.castShadow = false; m.userData.ph = Math.random() * 6; ps.push(m); } anim(g, t => ps.forEach(m => { const v = 0.5 + Math.sin(t * 2 + m.userData.ph) * 0.5; m.material.emissiveIntensity = 0.3 + v * 1.8; m.scale.setScalar(0.6 + v * 0.8); })); };
+M.milksea = g => { water(g, 1.8, 0, 0, 0.02, '#b2ebf2'); C(g, 0.9, 1.0, 0.6, '#5d8a4a', -0.6, -0.1, -0.6, 8); put(g, new THREE.ConeGeometry(0.8, 1.0, 7), '#6d7b5a', -0.6, 0.9, -0.6); for (let i = 0; i < 4; i++) { const s = S(g, 0.3, '#ffffff', 0.8 - i * 0.2, 0.08, 0.8, { op: 0.6 }, 6, 4); s.scale.y = 0.2; } };
+M.seaspring = g => { islet(g, 1.8, '#8d9a63', 0.3); for (const [x, z] of [[-0.6, 0.3], [0.5, 0.6], [0.1, -0.5]]) { C(g, 0.45, 0.5, 0.15, '#757575', x, 0.15, z, 10); water(g, 0.38, x, z, 0.27, '#80deea'); } const st = S(g, 0.3, '#ffffff', 0, 0.6, 0, { op: 0.5 }, 6, 5); st.castShadow = false; anim(g, t => { st.position.y = 0.5 + ((t * 0.3) % 1) * 1.0; }); };
+M.cave = g => { islet(g, 1.7, '#7cb342', 0.35); const r = S(g, 1.1, '#8d7b68', 0, 0.4, -0.2, undefined, 8, 6); r.scale.set(1.3, 0.9, 1); const h = S(g, 0.45, '#2b2b2b', 0, 0.55, 0.7, undefined, 8, 6); h.scale.z = 0.4; for (let k = 0; k < 5; k++) B(g, 0.3, 0.05, 0.3, '#a1887f', -1.0 + k * 0.4, 0.2, 1.2); };
+// ---- 公司（投資）----
+M.metro = g => { platform(g, 1.75, '#9e9e9e', 0.1); for (const x of [-1.1, 0, 1.1]) B(g, 0.2, 1.2, 0.2, '#bdbdbd', x, 0.1, 0); B(g, 3.2, 0.15, 0.6, '#bdbdbd', 0, 1.3, 0); const tr = B(g, 2.2, 0.45, 0.45, '#eceff1', 0, 1.45, 0); B(g, 2.22, 0.1, 0.47, '#1e88e5', 0, 1.6, 0); for (let k = -3; k <= 3; k++) B(g, 0.18, 0.15, 0.02, '#263238', k * 0.3, 1.65, 0.23); };
+M.hsr = g => { platform(g, 1.75, '#9e9e9e', 0.1); B(g, 3.2, 0.06, 0.6, '#616161', 0, 0.1, 0.4); const nose = S(g, 0.3, '#fafafa', 1.2, 0.45, 0.4, undefined, 10, 6); nose.scale.set(2.2, 0.9, 1); B(g, 2.0, 0.55, 0.6, '#fafafa', -0.1, 0.16, 0.4); B(g, 3.0, 0.08, 0.62, '#ff6f00', 0, 0.35, 0.4); B(g, 1.8, 1.0, 0.8, '#eceff1', 0, 0.1, -0.9); roof(g, 2.2, 1.0, 0.3, '#90a4ae', 0, 1.1, -0.9); };
+M.power = g => { platform(g, 1.75, '#9e9e9e', 0.1); C(g, 0.6, 0.8, 1.6, '#cfd8dc', -0.6, 0.1, -0.5, 14); C(g, 0.12, 0.14, 2.4, '#b71c1c', 0.8, 0.1, -0.6, 8); B(g, 1.2, 0.8, 0.8, '#eceff1', 0.4, 0.1, 0.6); const bolt = B(g, 0.2, 0.5, 0.06, '#ffeb3b', 0.4, 0.95, 1.01, { e: '#ffc107', ei: 0.8 }); bolt.rotation.z = 0.4; };
+M.bus = g => { platform(g, 1.75, '#9e9e9e', 0.1); const b = new THREE.Group(); b.position.set(0, 0.1, 0.4); g.add(b); B(b, 2.2, 0.8, 0.8, '#43a047', 0, 0.15); B(b, 2.0, 0.3, 0.82, '#b3e5fc', 0, 0.55); for (const x of [-0.7, 0.7]) for (const z of [-0.4, 0.4]) { const w = C(b, 0.15, 0.15, 0.1, '#212121', x, 0.15, z, 10); w.rotation.x = Math.PI / 2; } B(g, 1.2, 0.08, 0.5, '#5d4037', 0, 1.0, -1.0); for (const x of [-0.5, 0.5]) B(g, 0.06, 0.9, 0.06, '#9e9e9e', x, 0.1, -1.0); };
+M.ferry = g => { water(g, 1.8, 0, 0, 0.02, '#29b6f6'); const s = new THREE.Group(); g.add(s); const hull = S(s, 0.6, '#fafafa', 0, 0.15, 0, undefined, 10, 6); hull.scale.set(2.4, 0.5, 0.9); B(s, 1.4, 0.45, 0.8, '#eceff1', -0.1, 0.35, 0); B(s, 1.42, 0.1, 0.82, '#1565c0', -0.1, 0.55, 0); C(s, 0.1, 0.12, 0.5, '#e53935', -0.4, 0.8, 0, 8); anim(g, t => { s.position.y = Math.sin(t * 1.5) * 0.06; s.rotation.z = Math.sin(t) * 0.04; }); };
+M.airport = g => { islet(g, 1.8, '#9e9e9e', 0.2); B(g, 3.2, 0.03, 0.6, '#424242', 0, 0.1, 0.5); const pl = new THREE.Group(); pl.position.set(-0.3, 0.3, 0.5); g.add(pl); const f = C(pl, 0.12, 0.12, 1.4, '#fafafa', 0, 0, 0, 8); f.rotation.z = Math.PI / 2; B(pl, 0.4, 0.03, 1.6, '#fafafa', 0, 0, 0); B(pl, 0.2, 0.3, 0.03, '#1e88e5', -0.6, 0.15, 0); C(g, 0.15, 0.2, 1.4, '#eceff1', 1.0, 0.1, -0.8, 8); C(g, 0.3, 0.3, 0.3, '#4fc3f7', 1.0, 1.5, -0.8, 8); };
+// ---- 大型建地 ----
+function bigland(g, c = '#a1887f') { B(g, 3.3, 0.08, 3.3, c); fence(g, 3.3, 3.3, '#fafafa'); C(g, 0.03, 0.03, 1.0, '#795548', -1.3, 0.08, 1.3, 4); B(g, 0.8, 0.45, 0.04, '#ffeb3b', -1.3, 0.85, 1.32); }
+M.resortland = g => { bigland(g, '#f3dfa2'); palm(g, 1.2, -1.2, 1.2, 0.08); palm(g, -1.2, -1.1, 1.0, 0.08); };
+M.creative = g => { bigland(g, '#bcaaa4'); };
+M.riverside = g => { bigland(g, '#a5d6a7'); };
+// ---- 特殊格 ----
+M.game = g => { B(g, 1.6, 0.12, 1.6, '#ce93d8'); const m = new THREE.Group(); m.position.y = 0.12; g.add(m); B(m, 0.9, 1.5, 0.7, '#7b1fa2'); B(m, 0.7, 0.5, 0.05, '#80deea', 0, 0.9, 0.36, { e: '#4dd0e1', ei: 0.7 }); B(m, 0.75, 0.15, 0.3, '#4a148c', 0, 0.6, 0.45); S(m, 0.06, '#e53935', -0.15, 0.78, 0.5, { e: '#ff1744' }); S(m, 0.06, '#ffeb3b', 0.15, 0.78, 0.5, { e: '#ffeb3b' }); const coin = C(g, 0.25, 0.25, 0.06, '#ffd600', 0, 2.1, 0, 14, { m: 0.7, r: 0.3, e: '#ffab00', ei: 0.3 }); coin.rotation.x = Math.PI / 2; anim(g, t => { coin.rotation.z = t * 3; coin.position.y = 2.1 + Math.sin(t * 2) * 0.1; }); };
+M.carshop = g => { B(g, 2.4, 0.1, 2.0, '#9e9e9e'); B(g, 2.0, 1.0, 0.9, '#eceff1', 0, 0.1, -0.5); B(g, 1.6, 0.6, 0.03, '#90caf9', 0, 0.2, -0.04); B(g, 2.1, 0.25, 0.95, '#e53935', 0, 1.1, -0.5); const car = new THREE.Group(); car.position.set(0.3, 0.1, 0.5); g.add(car); B(car, 0.9, 0.3, 0.45, '#1e88e5', 0, 0.1); B(car, 0.5, 0.25, 0.42, '#90caf9', -0.05, 0.4); for (const x of [-0.3, 0.3]) for (const z of [-0.23, 0.23]) { const w = C(car, 0.1, 0.1, 0.08, '#212121', x, 0.1, z, 10); w.rotation.x = Math.PI / 2; } };
+M.magic = g => { B(g, 1.8, 0.12, 1.8, '#4a148c'); C(g, 0.6, 0.7, 1.0, '#7e57c2', 0, 0.12, 0, 8); const hat = put(g, new THREE.ConeGeometry(0.85, 1.4, 8), '#311b92', 0, 1.82, 0); const st = S(g, 0.12, '#ffeb3b', 0, 2.6, 0, { e: '#ffeb3b', ei: 1 }, 6, 5); B(g, 0.3, 0.5, 0.03, '#ffd54f', 0, 0.12, 0.66, { e: '#ffb300', ei: 0.6 }); anim(g, t => { hat.rotation.y = t * 0.6; st.position.y = 2.6 + Math.sin(t * 3) * 0.1; }); };
+
+export function buildBig(kind, color) {
+  const g = new THREE.Group();
+  if (kind === 'gas') { B(g, 1.6, 0.06, 1.4, '#eceff1'); for (const x of [-0.6, 0.6]) B(g, 0.1, 0.9, 0.1, '#9e9e9e', x, 0, 0); B(g, 1.8, 0.15, 1.2, color, 0, 0.9); B(g, 0.3, 0.5, 0.25, '#e53935', -0.25, 0.06, 0); B(g, 0.3, 0.5, 0.25, '#e53935', 0.25, 0.06, 0); C(g, 0.03, 0.03, 1.5, '#9e9e9e', 0.9, 0, 0.6, 4); B(g, 0.4, 0.4, 0.05, '#ffeb3b', 0.9, 1.3, 0.6); }
+  else if (kind === 'lab') { B(g, 1.6, 0.9, 1.2, '#eceff1'); const d = S(g, 0.5, '#90a4ae', 0, 0.9, 0, { m: 0.5 }, 12, 8); d.scale.y = 0.6; B(g, 1.62, 0.12, 1.22, color, 0, 0.5); C(g, 0.02, 0.02, 0.8, '#9e9e9e', 0.6, 0.9, 0.4, 4); S(g, 0.08, '#ff1744', 0.6, 1.72, 0.4, { e: '#ff1744' }); }
+  else if (kind === 'hotel') { const tex = windowsTex(color); B(g, 1.6, 2.6, 1.0, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5 })); B(g, 1.7, 0.15, 1.1, '#fafafa', 0, 2.6); water(g, 0.4, 0.6, 0.8, 0.02, '#4fc3f7'); palm(g, -0.7, 0.8, 0.9); }
+  return g;
+}
+export function buildOwnerSign(color) { const g = new THREE.Group(); C(g, 0.03, 0.03, 1.2, '#eeeeee', 0, 0, 0, 4); B(g, 0.6, 0.38, 0.03, color, 0.3, 0.8, 0); S(g, 0.06, '#ffd54f', 0, 1.25, 0); return g; }
+
 export function buildLandmark(id) {
   const g = new THREE.Group();
   (M[id] || M.chance)(g);

@@ -1,6 +1,6 @@
 // ===== 寶島富翁 3D：主程式（房主 / 玩家 / 介面）=====
-import { TILES, N_TILES, GROUPS, CHARS, CARDS, GODS, STOCKS, EMOTES, LEVEL_NAMES, TOLL_MUL } from './data.js';
-import { chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T } from './engine.js';
+import { MAPS, useMap, TILES, N_TILES, GROUPS, CHARS, CARDS, GODS, STOCKS, EMOTES, LEVEL_NAMES, TOLL_MUL } from './data.js';
+import { BIG, VEH, companyCount, companyFee, diceCount, chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T } from './engine.js';
 import { World } from './world.js';
 import { MqttNet, LocalNet, BROKERS } from './net.js';
 
@@ -134,7 +134,7 @@ function myName() {
 function show(id) {
   for (const k of ['#home', '#lobby', '#hud']) $(k).classList.toggle('hidden', k !== id);
 }
-function goRoom(r, b) { location.href = location.pathname + '?r=' + r + '&b=' + (b | 0); }
+function goRoom(r, b) { G.room = String(r).toUpperCase(); G.bi = b | 0; joinFlow(); }
 function parseInvite(t) {
   t = String(t || '').trim();
   const m = t.match(/[?&]r=([A-Z0-9]{4,8})(?:.*?[?&]b=(\d))?/i); if (m) return { r: m[1].toUpperCase(), b: +(m[2] || 0) };
@@ -152,9 +152,10 @@ if (!G.room && lastRoom && Date.now() - lastRoom.t < 6 * 3600e3) {
 }
 if (isIOS && !standalone && LS.get('tr3d-iosguide', null) !== 'never') setTimeout(() => { if (!G.s) iosGuide(true); }, 1500);
 if (isIOS && !standalone) $('#fsHomeBtn').textContent = '📱 iPhone 全螢幕玩法（加到主畫面）';
+$('#codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('#codeBtn').click(); });
 $('#codeBtn').onclick = () => {
   const c = $('#codeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (c.length < 4) { toast('請輸入房號'); return; }
+  if (c.length < 4) { toast('請輸入 6 位數房號'); return; }
   goRoom(c, 0);
 };
 if (G.room) {
@@ -178,7 +179,7 @@ $('#createBtn').onclick = async () => {
   enterFS(false);
   const name = myName();
   $('#createBtn').disabled = true; $('#homeMsg').textContent = '正在建立房間…';
-  G.room = rid(6);
+  G.room = String(100000 + Math.floor(Math.random() * 900000));
   let ok = false;
   for (let b = 0; b < BROKERS.length && !ok && !G.localMode; b++) {
     G.bi = b; $('#homeMsg').textContent = `正在連線伺服器 ${b + 1}…`;
@@ -195,19 +196,26 @@ $('#createBtn').onclick = async () => {
   publish(true);
   enterLobby();
 };
-$('#joinBtn').onclick = async () => {
+async function joinFlow() {
   enterFS(false);
   myName();
-  $('#joinBtn').disabled = true; $('#homeMsg').textContent = '正在連線…';
-  try { await connectNet(); } catch (e) {
-    $('#joinBtn').disabled = false; $('#homeMsg').textContent = '❌ 連線失敗，請重新整理再試一次。'; return;
+  $('#joinBtn').disabled = true; $('#codeBtn').disabled = true;
+  const order = [G.bi, ...[0, 1, 2].filter(b => b !== G.bi)];
+  for (const b of order) {
+    G.bi = b; $('#homeMsg').textContent = `正在尋找房間 ${G.room}（伺服器 ${b + 1}）…`;
+    try { await connectNet(); } catch (e) { continue; }
+    G.joinWanted = true;
+    G.net.pub('hi', { from: myId, t: 'hello' });
+    for (let k = 0; k < 20 && !G.s; k++) await new Promise(r => setTimeout(r, 200));
+    if (G.s) break;
+    G.joinWanted = false;
   }
-  $('#homeMsg').textContent = '正在取得房間資料…';
-  G.joinWanted = true;
+  $('#joinBtn').disabled = false; $('#codeBtn').disabled = false;
+  if (!G.s) { $('#homeMsg').textContent = `⌛ 找不到房間 ${G.room}，請確認房號，或請房主重新建立房間。`; if (G.net) G.net.close(); G.net = null; return; }
+  history.replaceState(null, '', shareUrl());
   LS.set('tr3d-lastroom', { r: G.room, b: G.bi, t: Date.now() });
-  G.net.pub('hi', { from: myId, t: 'hello' });
-  setTimeout(() => { if (!G.s) { $('#homeMsg').textContent = '⌛ 找不到房間，可能房主已離開或網址錯誤。'; $('#joinBtn').disabled = false; } }, 9000);
-};
+}
+$('#joinBtn').onclick = () => joinFlow();
 
 function shareUrl() {
   const u = new URL(location.href); u.search = '';
@@ -216,7 +224,7 @@ function shareUrl() {
   return u.toString();
 }
 function lobbyState() {
-  return { phase: 'lobby', v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 30000, maxRounds: 50, dice: 1 }, fx: [], fxn: 0, log: [] };
+  return { phase: 'lobby', v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 30000, maxRounds: 50, dice: 1, map: LS.get('tr3d-map', 'taiwan'), auction: true }, fx: [], fxn: 0, log: [] };
 }
 
 // ---------- 連線 ----------
@@ -316,6 +324,7 @@ function send(pid, a) {
   if (G.isHost) {
     if (G.s.phase === 'lobby') return;
     const err = act(G.s, pid, a, Date.now());
+    if (a.type === 'bid' && err) { toast(err); return; }
     if (err) toast(err); else publish();
   } else if (G.net) G.net.pub('act', { from: myId, pid, a });
 }
@@ -347,6 +356,7 @@ setInterval(() => { if (G.isHost && G.s && !G.solo) doPublish(); }, 6000);
 
 // ---------- 套用狀態 ----------
 function applyState(s) {
+  if (s.map) useMap(s.map); else if (s.settings && s.settings.map) useMap(s.settings.map);
   const first = !G.s || G.s !== s && G.seenFx < 0;
   G.s = s;
   if (s.phase === 'lobby') {
@@ -409,6 +419,10 @@ function enterLobby() {
 }
 function renderLobby() {
   const s = G.s; if (!s || s.phase !== 'lobby') return;
+  const mp = s.settings.map || 'taiwan';
+  world.loadMap(mp);
+  $('#mapPick').innerHTML = Object.entries(MAPS).map(([k, m]) => `<div class="mapc ${k === mp ? 'sel' : ''}" data-m="${k}"><div class="mi">${m.icon}</div><div class="mn">${m.name}</div><div class="md">${m.desc}<br>${m.tiles.length} 格</div></div>`).join('');
+  $('#mapPick').querySelectorAll('.mapc').forEach(el => el.onclick = () => { if (!G.isHost) { toast('只有房主可以選地圖'); return; } s.settings.map = el.dataset.m; LS.set('tr3d-map', el.dataset.m); publish(); });
   $('#seatCount').textContent = `(${s.seats.length}/6)`;
   $('#seats').innerHTML = s.seats.map((x, i) => {
     const c = charOf(x.char);
@@ -421,6 +435,7 @@ function renderLobby() {
   $('#seats').querySelectorAll('[data-kick]').forEach(b => b.onclick = () => { s.seats.splice(+b.dataset.kick, 1); publish(); });
   $('#hostCtl').classList.toggle('hidden', !G.isHost);
   if (G.isHost) {
+    $('#setAuction').value = s.settings.auction === false ? '0' : '1';
     $('#setCash').value = s.settings.startCash; $('#setRounds').value = s.settings.maxRounds; $('#setDice').value = s.settings.dice;
     $('#startBtn').disabled = s.seats.length < 2;
     $('#addBot').disabled = $('#addLocal').disabled = s.seats.length >= 6;
@@ -441,6 +456,7 @@ $('#addLocal').onclick = () => {
   publish();
 };
 for (const [id, k] of [['#setCash', 'startCash'], ['#setRounds', 'maxRounds'], ['#setDice', 'dice']]) $(id).onchange = e => { G.s.settings[k] = +e.target.value; publish(); };
+$('#setAuction').onchange = e => { G.s.settings.auction = e.target.value === '1'; publish(); };
 $('#shareBtn').onclick = async () => {
   try { await navigator.share({ title: '寶島富翁 3D', text: `一起來玩寶島富翁！房號 ${G.room}`, url: $('#shareUrl').value }); } catch (e) {}
 };
@@ -486,7 +502,7 @@ function renderPlayers() {
   const s = G.s; if (!s || !s.players) return;
   $('#players').innerHTML = s.players.map((p, i) => {
     const c = charOf(p.char);
-    const ic = [p.god ? GODS[p.god.id].icon : '', p.st.hosp ? '🏥' : '', p.st.jail ? '🚓' : '', p.st.sleep ? '😴' : '', p.st.turtle ? '🐢' : '', p.dir < 0 ? '🔄' : ''].join('');
+    const ic = [p.veh ? VEH[p.veh].icon : '', p.god ? GODS[p.god.id].icon : '', p.st.hosp ? '🏥' : '', p.st.jail ? '🚓' : '', p.st.sleep ? '😴' : '', p.st.turtle ? '🐢' : '', p.dir < 0 ? '🔄' : ''].join('');
     const off = !p.bot && !online(p.ctl) && s.phase === 'play' ? '<span class="off">離線・託管</span>' : '';
     return `<div class="pc ${i === s.turn && s.phase === 'play' ? 'cur' : ''} ${p.out ? 'out' : ''}" data-p="${esc(p.id)}">
       <div class="av" style="background:${c.color}33">${avHtml(p.ctl === p.id || p.bot ? p.id : '', c.emoji)}</div>
@@ -510,6 +526,7 @@ function renderHud() {
   if (s.step === 'pre') st = mine ? `輪到你了！${c.name}` : `${c.name} 的回合…`;
   else if (s.step === 'move') st = `${c.name} 移動中…`;
   else if (s.step === 'decide') st = mine ? '請做決定' : `${c.name} 思考中…`;
+  else if (s.step === 'auction') st = '🔨 拍賣進行中…';
   else st = `${c.name}`;
   $('#status').textContent = st;
   const key = s.v + ':' + mine + ':' + s.step + ':' + G.ui.mode;
@@ -532,6 +549,7 @@ function renderHud() {
     if (G.ui.decideKey !== s.pending.type + ':' + s.turn + ':' + s.round || G.ui.mode !== 'decide') { G.ui.decideKey = s.pending.type + ':' + s.turn + ':' + s.round; openDecide(); }
     else if (s.pending.type === 'shop' || s.pending.type === 'bank') openDecide(true);
   } else if (G.ui.mode === 'decide') { G.ui.decideKey = null; closeSheet(); }
+  if (s.step === 'auction') renderAuction(); else if (G.ui.mode === 'auction') closeSheet();
   // 計時條
   updateTimer();
   // 骰子動畫
@@ -608,6 +626,12 @@ $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' && G.ui
 function tileInfoHtml(i) {
   const s = G.s, t = TILES[i];
   let h = `<h3>${t.icon || ''} ${esc(t.name)}</h3><p class="note">${esc(t.desc || '')}</p>`;
+  if ((t.type === 'company' || t.type === 'bigland') && s.tiles) {
+    const st = s.tiles[i], o = st.o && pl(s, st.o);
+    h += `<div class="kv"><b>種類</b><span>${t.type === 'company' ? '🏢 投資公司' : '🏗️ 大型建地'}</span><b>地主</b><span>${o ? esc(o.name) : '（無）'}</span><b>價格</b><span>${money(price(s, i))}</span>`;
+    if (t.type === 'company') h += `<b>收費</b><span>骰子點數 × $200 × 地主擁有的公司數${o ? `（目前 ${companyCount(s, o.id)} 家）` : ''}</span></div>`;
+    else h += `<b>建築</b><span>${st.b ? BIG[st.b].icon + BIG[st.b].name : '空地'}</span><b>收費</b><span>${money(st.b ? BIG[st.b].fee : 500)}${st.b === 'hotel' ? '＋住一晚（停一回合）' : ''}</span></div><p class="note">⛽加油站 收 $1500｜🔬研究所 收 $1000，地主停下送道具卡｜🏨度假飯店 收 $3000 並讓人住一晚</p>`;
+  }
   if (t.type === 'prop' && s.tiles) {
     const st = s.tiles[i], o = st.o && pl(s, st.o);
     h += `<div class="kv"><b>區域</b><span style="color:${GROUPS[t.g].color};font-weight:900">${GROUPS[t.g].name}</span>
@@ -659,9 +683,21 @@ function openDecide(refresh = false) {
       Object.entries(CARDS).map(([k, c]) => `<div class="card"><div class="t">${c.icon} ${c.name}</div><div class="d">${c.desc}</div>
       <button class="${p.points >= cardCost(p, k) ? 'pri' : 'ghost'}" data-buy="${k}" ${p.points < cardCost(p, k) || p.cards.length >= cardLimit(p) ? 'disabled' : ''}>${cardCost(p, k)} 點</button></div>`).join('') +
       `</div><button class="blue" style="width:100%;margin-top:10px" data-a="done">離開商店</button>`;
+  } else if (pd.type === 'car') {
+    h = `<h3>🛵 車行</h3><p>現在的交通工具：<b>${VEH[p.veh].icon}${VEH[p.veh].name}</b>（擲 ${VEH[p.veh].dice} 顆骰）　現金 ${money(p.cash)}</p><div class="choice">` +
+      [1, 2].filter(v => v > p.veh).map(v => `<button class="green" data-veh="${v}" ${p.cash < VEH[v].price ? 'disabled' : ''}>${VEH[v].icon} ${VEH[v].name} ${money(VEH[v].price)}<br><small>擲 ${VEH[v].dice} 顆骰子</small></button>`).join('') +
+      `</div><p class="note">踩到地雷車子會被炸壞喔！</p><button class="ghost" style="width:100%;margin-top:8px" data-a="no">不買</button>`;
+  } else if (pd.type === 'bigbuild') {
+    h = tileInfoHtml(pd.tile) + `<p>要在這塊大型建地蓋什麼？（現金 ${money(p.cash)}）</p><div class="choice">` +
+      Object.entries(BIG).map(([k, b]) => `<button class="green" data-big="${k}" ${p.cash < b.cost && !(p.god && p.god.id === 'fushen') ? 'disabled' : ''}>${b.icon} ${b.name}<br><small>${money(b.cost)}・收 ${money(b.fee)}</small></button>`).join('') +
+      `</div><button class="ghost" style="width:100%;margin-top:8px" data-a="no">先不蓋</button>`;
+  } else if (pd.type === 'minigame') {
+    h = `<h3>🕹️ 小遊戲：接金幣</h3><p>10 秒內點掉落的金幣，接到幾枚就送幾點點券（最多 60）！小心炸彈💣會扣分。</p><div id="mg" style="position:relative;height:300px;background:linear-gradient(#81d4fa,#e1f5fe);border-radius:14px;overflow:hidden;touch-action:none"></div>
+      <div class="row" style="margin-top:8px"><b id="mgScore">0 枚</b><button class="pri" id="mgStart">開始！</button></div>`;
   } else if (pd.type === 'lottery') {
-    h = `<h3>🎰 彩券行</h3><p>花 $500 猜一個點數，開出的骰子一樣就贏 <b>$3000</b>！</p>
-      <div class="choice">${[1, 2, 3, 4, 5, 6].map(n => `<button class="pri" data-pick="${n}">${n}</button>`).join('')}</div>
+    const L = s.lotto || { pool: 0 };
+    h = `<h3>🎰 樂透彩券行</h3><p>目前彩金 <b style="color:#e53935">${money(L.pool)}</b>，${7 - (s.round % 7)} 天後開獎。花 $500 選一個號碼（1–20）：</p>
+      <div class="choice">${Array.from({ length: 20 }, (_, k) => k + 1).map(n => `<button class="pri" style="flex:1 1 17%" data-pick="${n}">${n}</button>`).join('')}</div>
       <button class="ghost" style="width:100%;margin-top:8px" data-a="no">不玩</button>`;
   } else if (pd.type === 'bank') {
     h = `<h3>🏦 ${pd.pass ? '經過銀行' : '銀行'}</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
@@ -673,11 +709,56 @@ function openDecide(refresh = false) {
   openSheet(h, 'decide');
   const sh = $('#sheet');
   sh.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { send(id, { type: b.dataset.a }); closeSheet(); });
+  sh.querySelectorAll('[data-veh]').forEach(b => b.onclick = () => { send(id, { type: 'veh', v: +b.dataset.veh }); closeSheet(); });
+  sh.querySelectorAll('[data-big]').forEach(b => b.onclick = () => { send(id, { type: 'build', kind: b.dataset.big }); closeSheet(); });
+  if (pd.type === 'minigame' && !refresh) setupMinigame(id);
   sh.querySelectorAll('[data-n2]').forEach(b => b.onclick = () => { send(id, { type: 'yes', n: 2 }); closeSheet(); });
   sh.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => send(id, { type: 'buyCard', card: b.dataset.buy }));
   sh.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { send(id, { type: 'pick', num: +b.dataset.pick }); closeSheet(); });
   sh.querySelectorAll('[data-bank]').forEach(b => b.onclick = () => send(id, { type: 'bank', amount: +b.dataset.bank }));
 }
+
+// 小遊戲：接金幣
+function setupMinigame(pid) {
+  const box = $('#mg'); let score = 0, running = false;
+  $('#mgStart').onclick = () => {
+    if (running) return; running = true; $('#mgStart').disabled = true;
+    const end = Date.now() + 10000;
+    const spawn = setInterval(() => {
+      if (Date.now() > end) return;
+      const bomb = Math.random() < 0.18;
+      const c = document.createElement('div');
+      c.textContent = bomb ? '💣' : '🪙';
+      c.style.cssText = `position:absolute;left:${Math.random() * 85}%;top:-40px;font-size:34px;cursor:pointer;user-select:none;transition:top ${1.6 + Math.random()}s linear`;
+      box.appendChild(c); requestAnimationFrame(() => requestAnimationFrame(() => { c.style.top = '320px'; }));
+      const hit = e => { e.preventDefault(); if (c.dataset.done) return; c.dataset.done = 1; score = Math.max(0, score + (bomb ? -5 : 1)); $('#mgScore').textContent = score + ' 枚'; beep(bomb ? 'pay' : 'coin'); c.style.transform = 'scale(1.6)'; c.style.opacity = 0; };
+      c.addEventListener('pointerdown', hit);
+      setTimeout(() => c.remove(), 3000);
+    }, 260);
+    const t = setInterval(() => {
+      const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      $('#mgStart').textContent = left + ' 秒';
+      if (Date.now() > end) { clearInterval(t); clearInterval(spawn); setTimeout(() => { send(pid, { type: 'mg', score }); closeSheet(); }, 600); }
+    }, 200);
+  };
+}
+// 拍賣
+function renderAuction() {
+  const s = G.s, A = s.auction;
+  if (!A || s.step !== 'auction') { if (G.ui.mode === 'auction') closeSheet(); return; }
+  const me = myPlayers().find(p => !p.out && p.id !== A.seller);
+  const best = A.best ? `${esc((pl(s, A.best.pid) || {}).name)} 出價 <b style="color:#e53935">${money(A.best.amt)}</b>` : `底價 <b>${money(A.min)}</b>，還沒有人出價`;
+  const need = A.best ? A.best.amt + 100 : A.min;
+  const left = Math.max(0, Math.ceil((A.until - hnow()) / 1000));
+  const key = A.tile + ':' + (A.best ? A.best.amt : 0) + ':' + left + ':' + !!me;
+  if (G.ui.mode === 'auction' && G.ui.aKey === key) return;
+  G.ui.aKey = key;
+  const t = TILES[A.tile];
+  openSheet(`<h3>🔨 拍賣：${esc(t.name)}</h3><p>${best}</p><p class="note">剩 ${left} 秒・有人出價會延長時間${me ? `・你的現金 ${money(me.cash)}` : ''}</p>` +
+    (me ? `<div class="choice">${[0, 500, 1000, 3000].map(d => `<button class="red" data-bid="${need + d}" ${me.cash < need + d ? 'disabled' : ''}>出 ${money(need + d)}</button>`).join('')}</div>` : '<p class="note">你不能參加這次拍賣（你是放棄購買的人或已破產）</p>'), 'auction', true);
+  $('#sheet').querySelectorAll('[data-bid]').forEach(b => b.onclick = () => send(me.id, { type: 'bid', amount: +b.dataset.bid }));
+}
+setInterval(() => { if (G.s && G.s.step === 'auction') renderAuction(); }, 500);
 
 // 道具卡
 function openCards() {
@@ -697,7 +778,7 @@ function useCardFlow(k) {
     closeSheet(); send(p.id, { type: 'card', card: k }); return;
   }
   if (c.target === 'dice') {
-    const n = s.settings.dice || 1;
+    const n = diceCount(s, p);
     openSheet(`<h3>🎲 遙控骰子</h3><p>要走幾步？</p><div class="choice">${Array.from({ length: 5 * n + 1 }, (_, i) => i + n).map(v => `<button class="pri" data-v="${v}">${v}</button>`).join('')}</div>
       <button class="ghost" style="width:100%;margin-top:8px" data-close>取消</button>`);
     $('#sheet').querySelectorAll('[data-v]').forEach(b => b.onclick = () => { closeSheet(); send(p.id, { type: 'card', card: k, value: +b.dataset.v }); });
@@ -777,7 +858,9 @@ $('#sndBtn').textContent = G.sound ? '🔊' : '🔇';
 $('#helpBtn').onclick = () => openSheet(`<button class="x" data-close>✕</button><h3>❔ 玩法說明</h3><div class="note" style="font-size:14px;color:#333">
   <p>🎲 輪到你時先可以用道具卡、買賣股票，再擲骰子前進。</p>
   <p>🏠 停在無人景點可以買下；停在自己的地可以加蓋，最高蓋到摩天大樓。別人停到你的地要付過路費；自己的地連在一起會「連鎖」，過路費整串加總（大富翁6規則）。</p>
-  <p>🎲 預設 1 顆骰子；一輪是一天，月曆會走動。🔮魔法屋、👼天使、😈惡魔都會隨機出現。</p>
+  <p>🎲 預設 1 顆骰子，到🛵車行買機車（2 顆）、汽車（3 顆）。一輪是一天，月曆會走動。</p>
+  <p>🏢 投資公司：別人停下要付「骰子點數 × $200 × 你的公司數」。🏗️ 大型建地：可蓋加油站、研究所、度假飯店。</p>
+  <p>🔨 有人放棄買地時，其他玩家可以出價拍賣。🎰 樂透每 7 天開獎、沒人中就累積。🕹️ 小遊戲接金幣賺點券。🔮魔法屋、👼天使、😈惡魔隨機出現。</p>
   <p>🚉 經過台北車站領環島獎金 $1000、點券 +10；經過或停在🏦銀行可以存提款，每月 1 日發存款利息 10%。</p>
   <p>🏪 道具店用點券買卡；⛩️ 廟會請到神明附身 5 回合（財神、福神、土地公、媽祖是好神，衰神、窮神是壞神）。</p>
   <p>❓ 機會、📰 新聞會發生隨機事件；🏦 銀行可存提款；🎰 彩券行猜點數。</p>

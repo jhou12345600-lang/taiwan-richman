@@ -1,8 +1,8 @@
 // ===== 寶島富翁 3D：3D 場景 =====
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { TILES, N_TILES, GROUPS, CHARS } from './data.js';
-import { buildLandmark, buildHouses, buildToken, animateToken, mat, B, C, S } from './landmarks.js';
+import { TILES, N_TILES, GROUPS, CHARS, useMap } from './data.js';
+import { buildLandmark, buildHouses, buildToken, animateToken, buildBig, buildOwnerSign, mat, B, C, S } from './landmarks.js';
 
 // 台灣海岸線（經度, 緯度），順時針：北→東→南→西
 const COAST = [
@@ -89,16 +89,61 @@ function buildPath() {
   return { pts: out, spacing: total / N_TILES };
 }
 
+// ---- 其他地圖：橢圓形環狀路線 ----
+function ellipsePath(a, b, start = Math.PI / 2) {
+  const M = 720, pts = [];
+  for (let k = 0; k < M; k++) { const t = start + (k / M) * Math.PI * 2; pts.push(new THREE.Vector2(Math.cos(t) * a + Math.sin(3 * t) * 1.5, Math.sin(t) * b + Math.cos(2 * t) * 1.2)); }
+  const L = [0]; for (let i = 1; i <= M; i++) L.push(L[i - 1] + pts[i - 1].distanceTo(pts[i % M]));
+  const total = L[M], out = [];
+  for (let k = 0; k < N_TILES; k++) { const target = (k / N_TILES) * total; let j = 0; while (L[j + 1] < target) j++; const f = (target - L[j]) / (L[j + 1] - L[j]); out.push(pts[j].clone().lerp(pts[(j + 1) % M], f)); }
+  return { pts: out, spacing: total / N_TILES };
+}
+const GEO = {
+  taiwan: { height: heightAt, path: buildPath, spine: true, W: 165, H: 180, ox: -2, oz: 2, view: [0, 148, 34, 0, 1] },
+  taipei: {
+    a: 41, b: 30, W: 170, H: 150, ox: 0, oz: 0, view: [0, 118, 30, 0, 2], city: 70,
+    height(x, z) {
+      const r = Math.hypot(x / 70, z / 58); if (r > 1) return Math.max(-2.5, -0.3 - (r - 1) * 12);
+      const rp = Math.hypot(x / 41, z / 30), n = vnoise(x * 0.12, z * 0.12);
+      const hill = smooth(1.2, 1.65, rp) * (3.5 + 4 * n + (z < 0 ? smooth(0, -45, z) * 4 : 0)) * (1 - smooth(0.9, 1, r));
+      const river = Math.abs(x + 47 + Math.sin(z * 0.08) * 3) < 2.2 ? -0.9 : 0;
+      return 0.62 + hill + (hill < 0.5 ? river : 0);
+    },
+  },
+  tainan: {
+    a: 38, b: 27, W: 160, H: 140, ox: 0, oz: 0, view: [0, 112, 28, 0, 2], city: 40,
+    height(x, z) {
+      const coast = -52 + Math.sin(z * 0.09) * 3;
+      if (x < coast) return Math.max(-2.5, -0.35 - (coast - x) * 0.25);
+      if (Math.abs(z) > 58 || x > 74) return -1.5;
+      const n = vnoise(x * 0.1, z * 0.1);
+      const hill = smooth(44, 62, x) * (2.5 + 4 * n);
+      const salt = (x < -40 && Math.abs(z) < 20) ? -0.05 : 0;
+      return 0.32 + 0.32 * smooth(coast, coast + 4, x) + hill + salt;
+    },
+  },
+  islands: {
+    a: 38, b: 27, W: 170, H: 150, ox: 0, oz: 0, view: [0, 112, 28, 0, 2], piers: true,
+    isl: [[0, 0, 12], [-14, 8, 6], [12, -7, 5], [-60, -20, 6], [58, 22, 7], [-30, -46, 4], [30, 46, 5]],
+    height(x, z) {
+      let h = -1.4;
+      for (const [cx, cz, r] of this.isl) { const d = r - Math.hypot(x - cx, z - cz) + vnoise(x * 0.3, z * 0.3) * 2; if (d > 0) h = Math.max(h, Math.min(0.3 + d * 0.35, 3.5)); else h = Math.max(h, -0.3 + d * 0.25); }
+      return h;
+    },
+  },
+};
+for (const k of ['taipei', 'tainan', 'islands']) { const g = GEO[k]; g.height = g.height.bind(g); g.path = () => ellipsePath(g.a, g.b); }
+
 function tileTexture(i) {
   const t = TILES[i];
   const cv = document.createElement('canvas'); cv.width = cv.height = 256;
   const x = cv.getContext('2d');
-  const gc = t.g ? GROUPS[t.g].color : '#f9a825';
-  x.fillStyle = t.type === 'prop' ? '#fffaf0' : '#fff3c4'; x.fillRect(0, 0, 256, 256);
+  const gc = t.g ? GROUPS[t.g].color : t.type === 'company' ? '#455a64' : t.type === 'bigland' ? '#795548' : '#f9a825';
+  x.fillStyle = (t.type === 'prop' || t.type === 'company' || t.type === 'bigland') ? '#fffaf0' : '#fff3c4'; x.fillRect(0, 0, 256, 256);
   x.textAlign = 'center'; x.textBaseline = 'middle';
-  if (t.type === 'prop') {
+  if (t.type === 'prop' || t.type === 'company' || t.type === 'bigland') {
     x.fillStyle = gc; x.fillRect(0, 0, 256, 64);
-    x.fillStyle = '#fff'; x.font = 'bold 34px "Noto Sans TC",sans-serif'; x.fillText(GROUPS[t.g].name, 128, 34);
+    x.fillStyle = '#fff'; x.font = 'bold 34px "Noto Sans TC",sans-serif'; x.fillText(t.g ? GROUPS[t.g].name : t.type === 'company' ? '🏢 投資公司' : '🏗️ 大型建地', 128, 34);
     x.fillStyle = '#222';
     let fs = 54; x.font = `bold ${fs}px "Noto Sans TC",sans-serif`;
     while (x.measureText(t.name).width > 236 && fs > 24) { fs -= 3; x.font = `bold ${fs}px "Noto Sans TC",sans-serif`; }
@@ -136,8 +181,7 @@ export class World {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.05;
-    const sc = this.scene = new THREE.Scene();
-    sc.background = new THREE.Color('#8fd0f2'); sc.fog = new THREE.Fog('#8fd0f2', 160, 320);
+    this.mobile = mobile;
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.5, 600);
     this.camera.position.set(0, 148, 34);
     this.controls = new OrbitControls(this.camera, canvas);
@@ -145,21 +189,9 @@ export class World {
     this.controls.target.set(0, 0, 1);
     this.controls.addEventListener('start', () => { this.userMoved = performance.now(); });
 
-    sc.add(new THREE.HemisphereLight('#dff4ff', '#4b6b3a', 0.9));
-    const sun = this.sun = new THREE.DirectionalLight('#fff4e0', 2.0);
-    sun.position.set(-40, 80, 30); sun.castShadow = true;
-    sun.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
-    Object.assign(sun.shadow.camera, { left: -75, right: 75, top: 80, bottom: -80, near: 1, far: 220 });
-    sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
-    sc.add(sun); sc.add(sun.target);
-
-    this.buildTerrain();
-    const { pts, spacing } = buildPath();
-    this.path = pts; this.spacing = spacing;
-    this.buildTiles();
-    this.tokens = {}; this.tokenState = {};
-    this.marks = {}; this.floaters = [];
     this.follow = true; this.followId = null; this.hl = null; this.cheer = {}; this.cheerMode = {};
+    this.floaters = [];
+    this.loadMap('taiwan');
     this.clock = new THREE.Clock();
     this.ray = new THREE.Raycaster(); this.mouse = new THREE.Vector2();
     let downAt = null;
@@ -175,6 +207,41 @@ export class World {
     this.resize(); addEventListener('resize', () => this.resize());
     this.renderer.setAnimationLoop(() => this.frame());
   }
+  loadMap(id) {
+    if (this.mapId === id && this.scene) return;
+    useMap(id); this.mapId = id; this.geo = GEO[id] || GEO.taiwan;
+    if (this.scene) this.scene.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    const sc = this.scene = new THREE.Scene();
+    sc.background = new THREE.Color('#8fd0f2'); sc.fog = new THREE.Fog('#8fd0f2', 160, 320);
+    sc.add(new THREE.HemisphereLight('#dff4ff', '#4b6b3a', 0.9));
+    const sun = this.sun = new THREE.DirectionalLight('#fff4e0', 2.0);
+    sun.position.set(-40, 80, 30); sun.castShadow = true;
+    sun.shadow.mapSize.set(this.mobile ? 1024 : 2048, this.mobile ? 1024 : 2048);
+    Object.assign(sun.shadow.camera, { left: -80, right: 80, top: 80, bottom: -80, near: 1, far: 230 });
+    sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
+    sc.add(sun); sc.add(sun.target);
+    this.H = this.geo.height;
+    this.buildTerrain();
+    const { pts, spacing } = this.geo.path();
+    this.path = pts; this.spacing = spacing;
+    this.buildTiles();
+    if (this.geo.city) this.buildCity(this.geo.city);
+    this.tokens = {}; this.marks = {}; this.floaters = []; this.arrow = null; this.inited = false; this.state = null;
+    this.overview(); this.camTo = null;
+    const v = this.geo.view; this.camera.position.set(v[0], v[1], v[2]); this.controls.target.set(v[3], 0, v[4]);
+  }
+  buildCity(n) {
+    const cs = ['#eceff1', '#cfd8dc', '#ffe0b2', '#d7ccc8', '#b3e5fc', '#f8bbd0'];
+    let placed = 0;
+    for (let t = 0; t < n * 8 && placed < n; t++) {
+      const x = (Math.random() - 0.5) * this.geo.a * 1.4, z = (Math.random() - 0.5) * this.geo.b * 1.4;
+      const q = new THREE.Vector2(x, z);
+      if (this.lmSpots.some(r => r.distanceTo(q) < 3.2) || this.path.some(r => r.distanceTo(q) < 4) || this.H(x, z) > 1 || this.H(x, z) < 0.2) continue;
+      const h = 0.6 + Math.random() * 2.4, w = 0.8 + Math.random() * 0.8;
+      const g = new THREE.Group(); B(g, w, h, w, cs[placed % 6]); B(g, w * 1.02, 0.08, w * 1.02, '#90a4ae', 0, h);
+      g.position.set(x, this.H(x, z), z); g.rotation.y = Math.random(); this.scene.add(g); placed++;
+    }
+  }
   resize() {
     const c = this.renderer.domElement, w = c.clientWidth || innerWidth, h = c.clientHeight || innerHeight;
     this.renderer.setSize(w, h, false); this.camera.aspect = w / h;
@@ -182,12 +249,12 @@ export class World {
   }
 
   buildTerrain() {
-    const W = 165, H = 180, SX = 200, SZ = 220;
+    const G = this.geo, W = G.W, H = G.H, SX = Math.round(W * 1.2), SZ = Math.round(H * 1.2);
     const geo = new THREE.PlaneGeometry(W, H, SX, SZ); geo.rotateX(-Math.PI / 2);
-    geo.translate(-2, 0, 2);
+    geo.translate(G.ox, 0, G.oz);
     const pos = geo.attributes.position, col = new Float32Array(pos.count * 3), c = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), z = pos.getZ(i), h = heightAt(x, z);
+      const x = pos.getX(i), z = pos.getZ(i), h = this.H(x, z);
       pos.setY(i, h);
       if (h < -0.1) c.set(h < -1.2 ? '#2a7fb0' : '#57c4c8');
       else if (h < 0.55) c.set('#e9dca4').lerp(new THREE.Color('#8cc56a'), smooth(0.3, 0.5, h));
@@ -221,8 +288,8 @@ export class World {
     for (let i = 0; i < n; i++) {
       const p = this.path[i], a = this.path[(i - 1 + n) % n], b = this.path[(i + 1) % n];
       const tan = new THREE.Vector2().subVectors(b, a).normalize();
-      let best = null, bd = 1e9;
-      for (let k = 0; k < SPINE.length - 1; k++) {
+      let best = new THREE.Vector2(0, 0), bd = 1e9;
+      if (this.geo.spine) for (let k = 0; k < SPINE.length - 1; k++) {
         const A = SPINE[k], Bq = SPINE[k + 1], d = new THREE.Vector2().subVectors(Bq, A);
         let f = d.dot(new THREE.Vector2().subVectors(p, A)) / d.lengthSq(); f = Math.max(0, Math.min(1, f));
         const q = A.clone().addScaledVector(d, f), dd = q.distanceTo(p); if (dd < bd) { bd = dd; best = q; }
@@ -242,7 +309,7 @@ export class World {
     // 第二輪：建格子、空地、景點（景點不可壓到格子與房子）
     for (let i = 0; i < n; i++) {
       const { p, tan, nm, lotP } = info[i];
-      const y = Math.max(0.35, heightAt(p.x, p.y)) + 0.18;
+      const y = Math.max(0.35, this.H(p.x, p.y)) + 0.18;
       const g = new THREE.Group(); g.position.set(p.x, y, p.y); g.userData.tile = i;
       const ang = Math.atan2(tan.x, tan.y);
       const base = new THREE.Mesh(new THREE.BoxGeometry(size + 0.25, 0.32, size + 0.25), new THREE.MeshStandardMaterial({ color: '#cbbf9f', roughness: 0.6 }));
@@ -250,8 +317,9 @@ export class World {
       const top = new THREE.Mesh(new THREE.BoxGeometry(size, 0.2, size), [mat('#fff8e7'), mat('#fff8e7'), new THREE.MeshStandardMaterial({ map: tileTexture(i), roughness: 0.6 }), mat('#fff8e7'), mat('#fff8e7'), mat('#fff8e7')]);
       top.position.y = 0.06; top.receiveShadow = true; g.add(top);   // 文字永遠朝北，從南方視角可讀
       this.scene.add(g); this.pickables.push(g);
+      if (this.H(p.x, p.y) < 0.2) for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const leg = C(new THREE.Group(), 0.14, 0.16, 2.2, '#6d4c41', 0, 0, 0, 6); leg.position.set(p.x + lx * size * 0.4, -1.8, p.y + lz * size * 0.4); this.scene.add(leg); }
       const t = TILES[i];
-      const lm = buildLandmark(t.type === 'prop' ? t.model : t.type);
+      const lm = buildLandmark(t.model || t.type);
       const R = 2.3; // 景點半徑
       const clear = q => !this.lmSpots.some(r => r.distanceTo(q) < R * 2) && !this.path.some(r => r.distanceTo(q) < size * 0.72 + R) && !lots.some(r => r.distanceTo(q) < R + 0.9);
       const dir = t.sea ? -1 : 1;
@@ -260,18 +328,24 @@ export class World {
       search: for (let off = t.sea ? 6.4 : 5.4; off < (t.sea ? 14 : 22); off += 0.7) {
         for (const sh of [0, 1.5, -1.5, 3, -3, 4.5, -4.5]) {
           const q = new THREE.Vector2(p.x + dir * nm.x * off, p.y + dir * nm.y * off).addScaledVector(tan, sh);
-          if (!t.sea && (heightAt(q.x, q.y) > 2.2 || heightAt(q.x, q.y) < 0.25)) continue;
-          if (t.sea && heightAt(q.x, q.y) > -0.2) continue;
+          if (!t.sea && (this.H(q.x, q.y) > 2.2 || this.H(q.x, q.y) < 0.25)) continue;
+          if (t.sea && this.H(q.x, q.y) > -0.2) continue;
           const sv = score(q);
           if (sv >= 0) { lp = q; break search; }
           if (sv > bestS) { bestS = sv; bestQ = q; }
         }
       }
       if (!lp) { lp = bestQ || new THREE.Vector2(p.x + dir * nm.x * 6, p.y + dir * nm.y * 6); sc = Math.max(0.6, 1.15 + bestS / 3); }
-      lm.position.set(lp.x, t.sea ? 0 : heightAt(lp.x, lp.y) - 0.05, lp.y);
+      lm.position.set(lp.x, t.sea ? 0 : this.H(lp.x, lp.y) - 0.05, lp.y);
       this.lmSpots.push(lp.clone());
       lm.rotation.y = Math.atan2(-nm.x, -nm.y); lm.scale.setScalar(sc);
       lm.userData.tile = i; this.scene.add(lm); this.pickables.push(lm);
+      const ISLET = ['turtle', 'sanxian', 'greenisland', 'lanyu', 'xiaoliuqiu', 'twoheart', 'phbridge', 'jibei', 'erkan', 'juguang', 'tunnel', 'windlion', 'shuitou', 'qinbi', 'seaspring', 'cave', 'airport', 'moses', 'milksea', 'bluetears', 'ferry', 'eternal', 'tamsui', 'pier', 'cliff', 'qixing', 'dragontiger', 'mangrove', 'lanternport'];
+      if (t.sea && !ISLET.includes(t.model) && !['twoheart'].includes(t.model)) {
+        const isl = new THREE.Group(); C(isl, 2.0, 2.3, 0.6, '#7cb342', 0, -0.45, 0, 14); C(isl, 2.35, 2.5, 0.3, '#f3dfa2', 0, -0.55, 0, 14);
+        isl.position.set(lp.x, 0, lp.y); isl.scale.setScalar(sc / 1.15); this.scene.add(isl);
+        if (t.sea) lm.position.y = 0.15;
+      }
       if (!t.sea && t.type === 'prop') {
         const pad = C(new THREE.Group(), 1.9, 2.1, 0.5, '#7fb862', 0, -0.45, 0, 12);
         pad.position.copy(lm.position).y -= 0.4; pad.scale.setScalar(sc / 1.15); this.scene.add(pad);
@@ -282,12 +356,12 @@ export class World {
         if (len > 0.3 && len < 5) {
           const path = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.06, len), mat('#d7c9a7'));
           const st = p.clone().addScaledVector(new THREE.Vector2().subVectors(lp, p).normalize(), size * 0.6 + len / 2);
-          path.position.set(st.x, Math.max(0.35, heightAt(st.x, st.y)) + 0.03, st.y); path.rotation.y = Math.atan2(lp.x - p.x, lp.y - p.y); path.receiveShadow = true;
+          path.position.set(st.x, Math.max(0.35, this.H(st.x, st.y)) + 0.03, st.y); path.rotation.y = Math.atan2(lp.x - p.x, lp.y - p.y); path.receiveShadow = true;
           this.scene.add(path);
         }
       }
       const lot = new THREE.Group();
-      lot.position.set(lotP.x, Math.max(0.35, heightAt(lotP.x, lotP.y)), lotP.y); lot.rotation.y = ang; this.scene.add(lot);
+      lot.position.set(lotP.x, Math.max(0.35, this.H(lotP.x, lotP.y)), lotP.y); lot.rotation.y = ang; this.scene.add(lot);
       const ring = new THREE.Mesh(new THREE.RingGeometry(size * 0.62, size * 0.74, 32), new THREE.MeshBasicMaterial({ color: '#ffeb3b', transparent: true, opacity: 0, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2; ring.position.y = 0.2; g.add(ring);
       this.tileObjs.push({ g, base, lm, lot, ring, nm, tan, ang, level: -1, owner: undefined, pos: new THREE.Vector3(p.x, y + 0.17, p.y) });
@@ -298,19 +372,23 @@ export class World {
 
   // 依狀態更新場景
   setState(s, offset) {
+    if (s.map && s.map !== this.mapId) this.loadMap(s.map);
     this.state = s; this.offset = offset || 0;
     const colors = {}; s.players.forEach(p => { colors[p.id] = (CHARS.find(c => c.id === p.char) || CHARS[0]).color; });
     this.colors = colors;
     s.tiles.forEach((t, i) => {
       if (!t) return;
       const o = this.tileObjs[i];
-      if (o.owner !== t.o) { o.owner = t.o; o.base.material.color.set(t.o ? colors[t.o] : '#cbbf9f'); o.level = -1; }
-      if (o.level !== t.l) {
-        const grew = o.level >= -1 && t.o && (o.level === -1 || t.l > o.level) && this.inited;
-        o.level = t.l; o.lot.clear();
+      if (o.owner !== t.o) { o.owner = t.o; o.base.material.color.set(t.o ? colors[t.o] : '#cbbf9f'); if (!t.o) o.level = -1; else if (o.level !== -1) o.level = 'x'; }
+      const key = t.l + ':' + (t.b || '');
+      if (o.level !== key) {
+        const grew = t.o && this.inited && o.level !== -1 && o.level !== key;
+        const first = t.o && this.inited && o.level === -1;
+        o.level = key; o.lot.clear();
         if (t.o) {
-          const h = buildHouses(t.l, colors[t.o]);
-          if (grew) { h.scale.setScalar(0.01); h.userData.growT = performance.now(); }
+          const tp = TILES[i].type;
+          const h = tp === 'company' ? buildOwnerSign(colors[t.o]) : tp === 'bigland' ? (t.b ? buildBig(t.b, colors[t.o]) : buildOwnerSign(colors[t.o])) : buildHouses(t.l, colors[t.o]);
+          if (grew || first) { h.userData.base = h.scale.x; h.scale.setScalar(0.01); h.userData.growT = performance.now(); }
           o.lot.add(h);
         }
       }
@@ -352,7 +430,8 @@ export class World {
   setFollow(v) { this.follow = v; if (!v) this.overview(); }
   overview() {
     this.follow = false;
-    this.camTo = { target: new THREE.Vector3(0, 0, 1), pos: new THREE.Vector3(0, 148, 34) };
+    const v = (this.geo || GEO.taiwan).view;
+    this.camTo = { target: new THREE.Vector3(v[3], 0, v[4]), pos: new THREE.Vector3(v[0], v[1], v[2]) };
   }
   zoomIn() {
     this.follow = true;
@@ -404,7 +483,7 @@ export class World {
     const dt = Math.min(0.05, this.clock.getDelta()), t = this.clock.elapsedTime;
     const s = this.state;
     this.scene.traverse(o => { if (o.userData.tick) o.userData.tick(t, dt); });
-    if (this.tileObjs) for (const o of this.tileObjs) { const h = o.lot.children[0]; if (h && h.userData.growT) { const f = Math.min(1, (performance.now() - h.userData.growT) / 700); const e = f < 1 ? 1 + Math.sin(f * Math.PI) * 0.25 * (1 - f) : 1; h.scale.setScalar(Math.max(0.01, f * e)); if (f >= 1) h.userData.growT = 0; } }
+    if (this.tileObjs) for (const o of this.tileObjs) { const h = o.lot.children[0]; if (h && h.userData.growT) { const f = Math.min(1, (performance.now() - h.userData.growT) / 700); const e = f < 1 ? 1 + Math.sin(f * Math.PI) * 0.25 * (1 - f) : 1; h.scale.setScalar(Math.max(0.01, f * e) * (h.userData.base || 1)); if (f >= 1) h.userData.growT = 0; } }
     this.clouds.forEach((c, i) => { c.position.x += dt * (0.6 + i * 0.05); if (c.position.x > 90) c.position.x = -90; });
     if (s) {
       const now = Date.now() - this.offset;

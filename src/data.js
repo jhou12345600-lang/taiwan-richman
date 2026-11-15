@@ -22,9 +22,19 @@ const CH = { type: 'chance', name: '機會', icon: '❓' };
 const NEWS = { type: 'news', name: '新聞', icon: '📰' };
 const BANK = { type: 'bank', name: '銀行', icon: '🏦', desc: '經過或停下都可以存款、提款。每月 1 日發 10% 存款利息，存款不怕查稅、均富。' };
 const P = (g, name, price, model, desc, sea) => ({ type: 'prop', g, name, price, model, desc, sea });
+const LOT = { type: 'lottery', name: '彩券行', icon: '🎰', desc: '買一張 $500 的樂透（號碼 1–20），每 7 天開獎一次，沒人中就累積彩金！' };
+const GAME = { type: 'game', name: '小遊戲', icon: '🕹️', desc: '玩接金幣小遊戲賺點券。' };
+const CAR = { type: 'carshop', name: '車行', icon: '🛵', desc: '買機車（擲 2 顆骰）或汽車（擲 3 顆骰）。' };
+const MAGIC = { type: 'magic', name: '魔法屋', icon: '🔮', desc: '神秘的魔法屋，會發生意想不到的事。' };
+const HOSP = { type: 'hospital', name: '醫院', icon: '🏥', desc: '住院的玩家會在這裡休養。' };
+const POL = { type: 'police', name: '警察局', icon: '🚓', desc: '被抓的玩家會在這裡拘留。' };
+const TEMPLE = name => ({ type: 'temple', name, icon: '⛩️', desc: '隨機請到一位神明附身。' });
+const CO = (name, price, model, desc) => ({ type: 'company', name, price, model, desc: desc + '（投資公司：別人停下時，付「骰子點數 × $200 × 你擁有的公司數」）' });
+const BL = (name, model, desc) => ({ type: 'bigland', name, price: 6000, model, desc: desc + '（大型建地：買下後可蓋加油站、研究所或度假飯店）' });
+const START = (name, desc) => ({ type: 'start', name, icon: '🚉', desc: desc || '起點。每次經過領獎金 $1000、點券 +10。' });
 
 // type: start prop chance news shop temple hospital police lottery bank（順時針環島 72 格）
-export const TILES = [
+const TW_TILES = [
   { type: 'start', name: '台北車站', icon: '🚉', desc: '起點。每次經過領環島獎金 $1000、點券 +10。' },
   P('tp', '台北101', 4400, 't101', '台北信義區地標，508 公尺高，曾是世界第一高樓。'),
   P('tp', '中正紀念堂', 3800, 'cks', '藍瓦白牆的八角屋頂，自由廣場的牌樓非常壯觀。'),
@@ -99,7 +109,189 @@ export const TILES = [
   P('ty', '淡水漁人碼頭', 3000, 'tamsui', '情人橋與淡水夕照。'),
 ];
 
-export const N_TILES = TILES.length;
+{
+  const at = n => TW_TILES.findIndex(t => t.name === n);
+  TW_TILES[TW_TILES.findIndex((t, i) => i > at('蘭陽博物館') && t.type === 'chance')] = GAME;
+  TW_TILES.splice(at('西門町') - 0, 0);
+  TW_TILES.splice(at('小琉球') + 1, 0, BL('墾丁度假園區', 'resortland', '恆春半島上的大片海景建地'));
+  TW_TILES.splice(at('高雄85大樓') + 1, 0, CO('台灣高鐵公司', 4400, 'hsr', '南北一日生活圈的高速鐵路'));
+  TW_TILES.splice(at('警察局') + 1, 0, CAR);
+  TW_TILES.splice(at('高美濕地') + 1, 0, BL('台中創意園區', 'creative', '舊酒廠改造的大型園區'));
+  TW_TILES.splice(at('艋舺龍山寺') + 1, 0, CO('台北捷運公司', 4000, 'metro', '台北人每天都在搭的捷運'));
+}
+
+// ===== 台北城市地圖 =====
+Object.assign(GROUPS, {
+  t_xy: { name: '信義', color: '#e53935' }, t_zz: { name: '中正', color: '#1e88e5' }, t_wh: { name: '萬華', color: '#ff7043' },
+  t_dt: { name: '大同', color: '#8d6e63' }, t_sl: { name: '士林', color: '#43a047' }, t_bt: { name: '北投', color: '#00897b' },
+  t_ss: { name: '松山', color: '#8e24aa' }, t_da: { name: '大安', color: '#fdd835' }, t_ws: { name: '文山', color: '#7cb342' },
+  t_ts: { name: '淡水', color: '#3949ab' },
+});
+const TP_TILES = [
+  START('台北車站', '起點：台北車站。每次經過領獎金 $1000、點券 +10。'),
+  P('t_zz', '總統府', 4000, 'presidential', '紅磚與白色飾帶的百年建築，中央高塔非常醒目。'),
+  P('t_zz', '中正紀念堂', 3800, 'cks', '藍瓦白牆的八角屋頂與自由廣場。'),
+  CH,
+  P('t_zz', '二二八和平公園', 3400, 'park', '台北市中心的大公園，有台灣博物館。'),
+  SHOP,
+  P('t_wh', '西門紅樓', 3000, 'ximen', '八角形紅磚建築，西門町的地標。'),
+  P('t_wh', '艋舺龍山寺', 3200, 'longshan', '近 300 年歷史的古剎。'),
+  P('t_wh', '剝皮寮老街', 2600, 'daxi', '清代街屋保存完整的老街。'),
+  NEWS,
+  CO('台北捷運公司', 4000, 'metro', '台北人每天都在搭的捷運'),
+  P('t_dt', '大稻埕碼頭', 2800, 'pier', '淡水河畔看夕陽、吃小吃的好地方。'),
+  P('t_dt', '迪化街', 2800, 'dihua', '年貨大街，南北貨與巴洛克立面。'),
+  P('t_dt', '寧夏夜市', 2600, 'nightmarket', '圓環邊的美食夜市。'),
+  TEMPLE('霞海城隍廟'),
+  P('t_sl', '圓山大飯店', 3600, 'grandhotel', '紅柱金瓦的宮殿式大飯店。'),
+  P('t_sl', '故宮博物院', 4000, 'npm', '收藏翠玉白菜、肉形石。'),
+  P('t_sl', '士林夜市', 3200, 'shilin', '台北最大夜市。'),
+  GAME,
+  P('t_bt', '北投溫泉', 2800, 'onsen', '日式溫泉旅館林立的溫泉鄉。'),
+  P('t_bt', '地熱谷', 2600, 'thermal', '冒著白煙的翠綠溫泉湖。'),
+  P('t_bt', '陽明山', 3000, 'yangming', '海芋季與冒煙的小油坑。'),
+  HOSP,
+  P('t_ts', '淡水紅毛城', 2800, 'fortsd', '紅色的西班牙、荷蘭古城堡。'),
+  P('t_ts', '淡水老街', 2600, 'jiufen', '阿給、鐵蛋與河岸夕陽。'),
+  P('t_ts', '漁人碼頭', 3000, 'tamsui', '情人橋與淡水夕照。'),
+  LOT,
+  BL('大直重劃區', 'riverside', '河畔的大型建地'),
+  CH,
+  P('t_ss', '松山文創園區', 3000, 'songshan', '菸廠改造的文創園區。'),
+  P('t_ss', '台北小巨蛋', 3400, 'dome', '演唱會與溜冰的巨蛋。'),
+  P('t_ss', '饒河夜市', 3000, 'nightmarket2', '慈祐宮前的老字號夜市。'),
+  P('t_ss', '大直摩天輪', 3200, 'wheel', '可以眺望台北盆地的摩天輪。'),
+  POL,
+  CAR,
+  P('t_xy', '台北101', 4400, 't101', '508 公尺高的台北地標。'),
+  P('t_xy', '象山步道', 3600, 'xiangshan', '看 101 夜景的最佳角度。'),
+  P('t_xy', '國父紀念館', 3800, 'yatsen', '黃色飛簷屋頂的紀念館。'),
+  NEWS,
+  BANK,
+  P('t_ws', '貓空纜車', 3000, 'maokong', '坐纜車上山喝鐵觀音。'),
+  P('t_ws', '台北動物園', 3200, 'zoo', '有無尾熊和企鵝館的大動物園。'),
+  P('t_ws', '指南宮', 2600, 'templehill', '山上的大廟，俯瞰台北。'),
+  MAGIC,
+  CO('台北電力公司', 3600, 'power', '點亮整個台北的電力公司'),
+  P('t_da', '大安森林公園', 3400, 'park2', '台北的都市之肺。'),
+  P('t_da', '師大夜市', 3000, 'nightmarket3', '學生最愛的平價夜市。'),
+  P('t_da', '永康街', 3200, 'oldstreet', '芒果冰與小籠包的美食街。'),
+  P('t_da', '台大椰林大道', 3400, 'campus', '大王椰子夾道的校園大道。'),
+  TEMPLE('行天宮'),
+  CH,
+];
+
+// ===== 台南府城地圖 =====
+Object.assign(GROUPS, {
+  n_zx: { name: '中西區', color: '#e53935' }, n_kz: { name: '孔廟文化區', color: '#fb8c00' }, n_ap: { name: '安平', color: '#1e88e5' },
+  n_hx: { name: '海線', color: '#00acc1' }, n_dq: { name: '東區', color: '#8e24aa' }, n_sx: { name: '山線', color: '#43a047' },
+  n_ys: { name: '鹽水新營', color: '#6d4c41' },
+});
+const TN_TILES = [
+  START('台南車站', '起點：台南車站。每次經過領獎金 $1000、點券 +10。'),
+  P('n_zx', '赤崁樓', 3600, 'chihkan', '府城古蹟，紅牆飛簷。'),
+  P('n_zx', '大天后宮', 3200, 'longshan', '台灣第一座官建媽祖廟。'),
+  CH,
+  P('n_zx', '祀典武廟', 3200, 'chenghuang', '紅色長牆的關帝廟。'),
+  P('n_zx', '林百貨', 3400, 'hayashi', '日治時期的百貨公司，頂樓有神社。'),
+  SHOP,
+  P('n_kz', '台南孔廟', 3000, 'confucius', '全台首學。'),
+  P('n_kz', '台南市美術館', 3200, 'museum2', '白色碎形屋頂的美術館。'),
+  P('n_kz', '神農街', 2800, 'oldstreet', '燈籠高掛的老街。'),
+  NEWS,
+  CO('府城客運公司', 3600, 'bus', '帶遊客走遍府城的客運'),
+  P('n_ap', '安平古堡', 3200, 'anping', '台灣最古老的城堡。'),
+  P('n_ap', '安平樹屋', 3000, 'treehouse', '被榕樹吞沒的老倉庫。'),
+  P('n_ap', '億載金城', 3000, 'eternal', '有護城河的西式砲台。'),
+  P('n_ap', '漁光島', 2600, 'yuguang', '木麻黃林與海灘藝術節。'),
+  TEMPLE('鹿耳門天后宮'),
+  HOSP,
+  P('n_hx', '四草綠色隧道', 2400, 'mangrove', '坐竹筏穿過紅樹林隧道。'),
+  P('n_hx', '七股鹽山', 2400, 'saltmtn', '白色的鹽堆成一座山。'),
+  P('n_hx', '北門水晶教堂', 2600, 'crystal', '玻璃打造的夢幻教堂。'),
+  GAME,
+  BL('七股濱海建地', 'resortland', '濱海的大型建地'),
+  LOT,
+  P('n_ys', '鹽水月津港', 2200, 'lanternport', '水面上的燈節裝置藝術。'),
+  P('n_ys', '新營糖廠', 2200, 'sugar', '坐五分車吃冰棒。'),
+  P('n_ys', '南鯤鯓代天府', 2400, 'templehill', '王爺信仰總廟。'),
+  POL,
+  CH,
+  P('n_sx', '關子嶺溫泉', 2600, 'mudspring', '世界少見的泥漿溫泉。'),
+  P('n_sx', '烏山頭水庫', 2600, 'reservoir', '珊瑚潭與八田與一。'),
+  P('n_sx', '走馬瀨農場', 2400, 'cingjing', '大草原與熱氣球。'),
+  CAR,
+  MAGIC,
+  P('n_dq', '奇美博物館', 3800, 'chimei', '白色宮殿式博物館。'),
+  P('n_dq', '花園夜市', 3400, 'nightmarket', '台南最大夜市。'),
+  P('n_dq', '藍晒圖文創園區', 3000, 'blueprint', '藍色牆上的白線房子。'),
+  NEWS,
+  CO('府城觀光公司', 3600, 'power', '經營府城觀光的公司'),
+  BANK,
+  CH,
+];
+
+// ===== 離島海洋地圖 =====
+Object.assign(GROUPS, {
+  i_ph: { name: '澎湖本島', color: '#00acc1' }, i_ph2: { name: '澎湖北海', color: '#26a69a' }, i_km: { name: '金門', color: '#e53935' },
+  i_mz: { name: '馬祖', color: '#3949ab' }, i_gr: { name: '綠島蘭嶼', color: '#43a047' }, i_lq: { name: '小琉球', color: '#fbc02d' },
+  i_gs: { name: '龜山島', color: '#8d6e63' },
+});
+const IS_TILES = [
+  START('澎湖馬公港', '起點：澎湖馬公港。每次經過領獎金 $1000、點券 +10。'),
+  P('i_ph', '澎湖天后宮', 3200, 'longshan', '台灣最古老的媽祖廟。', true),
+  P('i_ph', '澎湖跨海大橋', 3000, 'phbridge', '連接白沙與西嶼的大橋。', true),
+  CH,
+  P('i_ph', '二崁聚落', 2800, 'erkan', '玄武岩砌成的古厝。', true),
+  P('i_ph', '奎壁山摩西分海', 3000, 'moses', '退潮時出現的海上步道。', true),
+  SHOP,
+  P('i_ph2', '吉貝沙尾', 2600, 'jibei', '白沙延伸入海的沙嘴。', true),
+  P('i_ph2', '七美雙心石滬', 3000, 'twoheart', '雙心形的捕魚石滬。', true),
+  P('i_ph2', '望安綠蠵龜保育區', 2600, 'turtlebeach', '綠蠵龜上岸產卵的沙灘。', true),
+  NEWS,
+  CO('澎湖航運公司', 3600, 'ferry', '往來各島的渡輪公司'),
+  TEMPLE('金門城隍廟'),
+  P('i_km', '莒光樓', 3400, 'juguang', '金門的精神地標。', true),
+  P('i_km', '翟山坑道', 3000, 'tunnel', '藏在花崗岩裡的戰備水道。', true),
+  P('i_km', '風獅爺', 2800, 'windlion', '守護村莊的石獅爺。', true),
+  P('i_km', '水頭聚落', 3000, 'shuitou', '燕尾脊的閩南古厝。', true),
+  GAME,
+  HOSP,
+  P('i_mz', '芹壁聚落', 3000, 'qinbi', '石頭屋層層疊疊的漁村。', true),
+  P('i_mz', '北海坑道', 2800, 'tunnel', '人工開鑿的海上坑道。', true),
+  P('i_mz', '藍眼淚', 3400, 'bluetears', '夜光藻讓海浪發出藍光。', true),
+  P('i_mz', '東引燈塔', 2800, 'eluanbi', '國之北疆的白色燈塔。', true),
+  LOT,
+  BL('馬祖度假島', 'resortland', '海上的大型建地'),
+  CH,
+  POL,
+  P('i_gs', '龜山島', 2400, 'turtle', '蘭陽外海的火山島。', true),
+  P('i_gs', '牛奶海', 2400, 'milksea', '海水像牛奶一樣的乳藍色。', true),
+  CAR,
+  P('i_gr', '綠島燈塔', 2800, 'greenisland', '白色燈塔與海底溫泉。', true),
+  P('i_gr', '朝日溫泉', 2800, 'seaspring', '海邊的天然溫泉池。', true),
+  P('i_gr', '蘭嶼拼板舟', 3000, 'lanyu', '達悟族的拼板舟。', true),
+  NEWS,
+  MAGIC,
+  P('i_lq', '花瓶岩', 2600, 'xiaoliuqiu', '小琉球的地標奇岩。', true),
+  P('i_lq', '美人洞', 2400, 'cave', '珊瑚礁岩洞步道。', true),
+  P('i_lq', '海龜浮潛', 2600, 'turtlebeach', '和海龜一起游泳。', true),
+  CO('離島航空公司', 4000, 'airport', '飛往各離島的小飛機'),
+  BANK,
+  CH,
+];
+
+export const MAPS = {
+  taiwan: { name: '台灣環島', icon: '🏝️', desc: '繞台灣一圈，北中南東 53 個景點', tiles: TW_TILES },
+  taipei: { name: '台北城市', icon: '🏙️', desc: '台北 12 區的地標、夜市與老街', tiles: TP_TILES },
+  tainan: { name: '台南府城', icon: '🏯', desc: '古蹟、廟宇、鹽田與海線', tiles: TN_TILES },
+  islands: { name: '離島海洋', icon: '🌊', desc: '澎湖、金門、馬祖、綠島蘭嶼、小琉球', tiles: IS_TILES },
+};
+export let MAP_ID = 'taiwan';
+export let TILES = TW_TILES;
+export let N_TILES = TW_TILES.length;
+export function useMap(id) { if (!MAPS[id]) id = 'taiwan'; MAP_ID = id; TILES = MAPS[id].tiles; N_TILES = TILES.length; }
+
 export const LEVEL_NAMES = ['空地', '平房', '二層樓', '透天厝', '公寓', '摩天大樓'];
 export const TOLL_MUL = [0.2, 0.5, 1.0, 1.7, 2.6, 3.8];
 export const UPGRADE_RATE = 0.55; // 每升一級花費 = 地價 × 0.55

@@ -36,7 +36,7 @@ export class MqttNet {
     });
   }
   pub(k, obj, retain = false) {
-    if (!this.c) return;
+    if (!this.c || !this.c.connected) return;
     this.c.publish(BASE + this.room + '/' + k, JSON.stringify(obj), { qos: k === 'hi' ? 0 : 1, retain });
   }
   close() { try { this.c && this.c.end(true); } catch (e) {} }

@@ -581,8 +581,10 @@ export class World {
     this.state = s; this.offset = offset || 0;
     const colors = {}; s.players.forEach(p => { colors[p.id] = (CHARS.find(c => c.id === p.char) || CHARS[0]).color; });
     this.colors = colors;
+    const hold = this.hold || {}, hnow = performance.now();
     s.tiles.forEach((t, i) => {
       if (!t) return;
+      if (hold['t' + i] && hnow < hold['t' + i]) return;   // 飛彈還沒落地，先保留原本的房子
       const o = this.tileObjs[i];
       if (o.owner !== t.o) { o.owner = t.o; o.base.material.color.set(t.o ? colors[t.o] : '#cbbf9f'); if (!t.o) o.level = -1; else if (o.level !== -1) o.level = 'x'; }
       const key = t.l + ':' + (t.b || '') + ':' + (t.bl || 0);
@@ -676,6 +678,89 @@ export class World {
     }
   }
 
+  anim(dur, upd, end, delay = 0) { (this.anims = this.anims || []).push({ t0: performance.now() + delay, dur, upd, end }); }
+  holdForMissile(tile, pid) {
+    this.hold = this.hold || {};
+    const until = performance.now() + 1750;
+    this.hold['t' + tile] = until; if (pid) this.hold['p' + pid] = until;
+  }
+  // 飛彈：從發射者飛到目標土地，劃出弧線、拖著煙，落地爆炸
+  missile(fromPid, tile, onHit, blocked) {
+    const tok = this.tokens[fromPid], to = this.tilePos(tile).clone();
+    const from = tok ? tok.position.clone().add(new THREE.Vector3(0, 2.2, 0)) : to.clone().add(new THREE.Vector3(-25, 30, 0));
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.5, 12), mat('#eceff1'));
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.6, 12), mat('#e53935')); nose.position.y = 1.05;
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.23, 0.2, 12), mat('#e53935')); band.position.y = 0.3;
+    g.add(body, nose, band);
+    for (let k = 0; k < 4; k++) { const fin = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.45), mat('#c62828')); fin.position.set(Math.cos(k * Math.PI / 2) * 0.24, -0.55, Math.sin(k * Math.PI / 2) * 0.24); fin.rotation.y = -k * Math.PI / 2; g.add(fin); }
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.8, 10), new THREE.MeshBasicMaterial({ color: '#ffab00', transparent: true, opacity: 0.9 }));
+    flame.position.y = -1.15; flame.rotation.x = Math.PI; g.add(flame);
+    const inner = g; const holder = new THREE.Group(); inner.rotation.x = Math.PI / 2; holder.add(inner);
+    holder.position.copy(from); holder.scale.setScalar(2.2); this.scene.add(holder);
+    const dist = from.distanceTo(to), H = Math.min(9, Math.max(5, dist * 0.35)), dur = 1500;
+    const P = f => { const q = from.clone().lerp(to, f); q.y += Math.sin(f * Math.PI) * H; return q; };
+    { const mid = from.clone().lerp(to, 0.55); mid.y = 0; const d = Math.max(16, Math.min(34, dist * 0.9 + 12));
+      this.camTo = { target: mid, pos: mid.clone().add(new THREE.Vector3(0, d * 0.95, d * 0.8)) }; this.userMoved = 0; }
+    let lastPuff = 0;
+    this.anim(dur, f => {
+      const e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+      const pos = P(e), nxt = P(Math.min(1, e + 0.02));
+      holder.position.copy(pos); holder.lookAt(nxt);
+      flame.scale.setScalar(0.8 + Math.random() * 0.6);
+      if (performance.now() - lastPuff > 40) {
+        lastPuff = performance.now();
+        const sm = new THREE.Mesh(new THREE.SphereGeometry(0.45 + Math.random() * 0.25, 8, 6), new THREE.MeshBasicMaterial({ color: '#cfd8dc', transparent: true, opacity: 0.7, depthWrite: false }));
+        sm.position.copy(pos); this.scene.add(sm);
+        this.anim(900, k => { sm.scale.setScalar(1 + k * 2.2); sm.material.opacity = 0.7 * (1 - k); sm.position.y += 0.01; }, () => { this.scene.remove(sm); sm.geometry.dispose(); sm.material.dispose(); });
+      }
+      if (f > 0.6) { this.focusAt = to.clone(); this.focusUntil = performance.now() + 2500; }
+    }, () => {
+      this.scene.remove(holder);
+      this.explode(tile, blocked);
+      if (this.hold) { delete this.hold['t' + tile]; for (const k of Object.keys(this.hold)) if (performance.now() >= this.hold[k] - 400) delete this.hold[k]; }
+      if (this.state) this.setState(this.state, this.offset);
+      if (onHit) onHit();
+    });
+  }
+  // 爆炸：閃光火球、衝擊波、碎片、濃煙、鏡頭震動
+  explode(tile, small) {
+    const c = this.tilePos(tile).clone(); c.y += 0.4;
+    const S0 = small ? 0.5 : 1;
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshBasicMaterial({ color: '#fff59d', transparent: true, opacity: 1, depthWrite: false, depthTest: false }));
+    ball.renderOrder = 20; ball.position.copy(c); this.scene.add(ball);
+    const core = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 1, depthWrite: false, depthTest: false }));
+    core.renderOrder = 21; core.position.copy(c); this.scene.add(core);
+    this.anim(350, f => { core.scale.setScalar((0.8 + f * 2.5) * S0); core.material.opacity = 1 - f; }, () => { this.scene.remove(core); core.geometry.dispose(); core.material.dispose(); });
+    this.anim(900, f => { const e = 1 - Math.pow(1 - f, 3); ball.scale.setScalar((1 + e * 5.5) * S0); ball.position.y = c.y + e * 1.5; ball.material.color.setHSL(0.11 - f * 0.1, 1, 0.6 - f * 0.25); ball.material.opacity = f < 0.4 ? 1 : 1 - (f - 0.4) / 0.6; }, () => { this.scene.remove(ball); ball.geometry.dispose(); ball.material.dispose(); });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.2, 40), new THREE.MeshBasicMaterial({ color: '#ffccbc', transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.copy(c); ring.position.y = c.y - 0.25; this.scene.add(ring);
+    this.anim(900, f => { ring.scale.setScalar((1 + f * 9) * S0); ring.material.opacity = 0.9 * (1 - f); }, () => { this.scene.remove(ring); ring.geometry.dispose(); ring.material.dispose(); });
+    const light = new THREE.PointLight('#ff9100', 60, 30); light.position.copy(c).y += 2; this.scene.add(light);
+    this.anim(600, f => { light.intensity = 60 * (1 - f); }, () => this.scene.remove(light));
+    for (let i = 0; i < (small ? 6 : 14); i++) {
+      const sm = new THREE.Mesh(new THREE.SphereGeometry(0.6 + Math.random() * 0.6, 8, 6), new THREE.MeshBasicMaterial({ color: Math.random() < 0.5 ? '#9e9e9e' : '#757575', transparent: true, opacity: 0.7, depthWrite: false }));
+      const v = new THREE.Vector3((Math.random() - 0.5) * 2.5, 1.5 + Math.random() * 2.5, (Math.random() - 0.5) * 2.5);
+      sm.position.copy(c); this.scene.add(sm);
+      this.anim(1800 + Math.random() * 800, f => { sm.position.addScaledVector(v, 0.016 * (1 - f * 0.7)); sm.scale.setScalar(1 + f * 2.5); sm.material.opacity = 0.7 * (1 - f); }, () => { this.scene.remove(sm); sm.geometry.dispose(); sm.material.dispose(); }, 450);
+    }
+    this.burst(tile, '#ff3d00', small ? 14 : 30); this.burst(tile, '#ffd600', small ? 8 : 18); this.burst(tile, '#5d4037', small ? 6 : 14);
+    this.shakeUntil = performance.now() + 700;
+  }
+  // 金幣從付錢的人飛到收錢的人
+  coinFlow(fromPid, toPid, amt) {
+    const A = this.tokens[fromPid], B = this.tokens[toPid]; if (!A || !B || A === B) return;
+    const n = Math.min(12, 3 + Math.floor(Math.log10(Math.max(10, amt)) * 2));
+    for (let i = 0; i < n; i++) {
+      const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 16), mat('#ffd600', { e: '#ffab00', ei: 0.5 }));
+      coin.rotation.x = Math.PI / 2; this.scene.add(coin);
+      this.anim(900, f => {
+        const a = A.position.clone(), b = B.position.clone(); a.y += 1.6; b.y += 1.6;
+        const q = a.lerp(b, f); q.y += Math.sin(f * Math.PI) * (3 + i * 0.15); coin.position.copy(q); coin.rotation.z += 0.3;
+      }, () => { this.scene.remove(coin); coin.geometry.dispose(); }, i * 70);
+    }
+  }
+
   tokenTarget(p, idxOnTile, countOnTile) {
     const o = this.tileObjs[p.pos], base = o.pos.clone();
     if (countOnTile > 1) {
@@ -697,6 +782,7 @@ export class World {
       s.players.forEach(p => { if (!p.out) (occ[p.pos] = occ[p.pos] || []).push(p.id); });
       s.players.forEach(p => {
         const tok = this.tokens[p.id]; if (!tok) return;
+        if (this.hold && this.hold['p' + p.id] && performance.now() < this.hold['p' + p.id]) { animateToken(tok, 'idle', t, dt); return; }
         let target, jump = 0, face = null;
         const an = s.anim;
         if (an && an.pid === p.id && s.step === 'move') {
@@ -752,6 +838,21 @@ export class World {
       if (this.camera.position.distanceTo(this.camTo.pos) < 0.3) this.camTo = null;
     }
     const nowp = performance.now();
+    if (this.anims && this.anims.length) {
+      const list = this.anims; this.anims = [];
+      const keep = list.filter(a => {
+        const f = Math.min(1, (nowp - a.t0) / a.dur);
+        if (f < 0) return true;
+        a.upd(f, dt);
+        if (f >= 1) { if (a.end) a.end(); return false; }
+        return true;
+      });
+      this.anims = keep.concat(this.anims);
+    }
+    if (this.shakeUntil && nowp < this.shakeUntil) {
+      const k = (this.shakeUntil - nowp) / 700 * 0.6;
+      this.camera.position.x += (Math.random() - 0.5) * k; this.camera.position.y += (Math.random() - 0.5) * k * 0.6;
+    }
     this.floaters = this.floaters.filter(f => {
       const age = (nowp - f.t0) / 1000;
       if (f.sp) { f.sp.position.y += dt * 1.2; f.sp.material.opacity = Math.max(0, 1 - age / 1.8); if (age > 1.8) { this.scene.remove(f.sp); return false; } }

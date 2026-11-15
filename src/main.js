@@ -1,6 +1,6 @@
 // ===== 寶島富翁 3D：主程式（房主 / 玩家 / 介面）=====
 import { MAPS, useMap, TILES, N_TILES, GROUPS, CHARS, CARDS, GODS, STOCKS, EMOTES, LEVEL_NAMES, TOLL_MUL } from './data.js';
-import { BIG, BIG_MAX, bigUpCost, bigFee, VEH, companyCount, companyFee, diceCount, chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T } from './engine.js';
+import { BIG, BIG_MAX, bigUpCost, bigFee, VEH, companyCount, companyFee, diceCount, chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T, sellables, sellValue } from './engine.js';
 import { World } from './world.js';
 import { MqttNet, LocalNet, BROKERS } from './net.js';
 
@@ -379,6 +379,7 @@ function applyState(s) {
   // 遊戲中
   if (G.seenFx < 0) G.seenFx = s.fxn;
   if (!s.players.find(p => p.ctl === myId) && !G.claimAsked) tryClaimSeat(s);
+  for (const f of s.fx) if (f.n > G.seenFx && f.k === 'missile') world.holdForMissile(f.tile, f.to);
   world.setState(s, G.offset);
   for (const [id, img] of Object.entries(G.avatars)) world.setAvatar(id, img);
   if ($('#hud').classList.contains('hidden')) enterGame();
@@ -605,11 +606,37 @@ function playFx(s, f) {
     case 'card': world.floatText(f.pid, CARDS[f.card].icon + CARDS[f.card].name, '#ffe082'); break;
     case 'buy': world.burst(f.tile, world.colors[f.pid] || '#ffcc00', 18); world.react(f.pid, 'cheer', 1400); beep('build'); break;
     case 'build': world.burst(f.tile, '#ffd54f', 20); beep('build'); break;
-    case 'boom': world.burst(f.tile, f.m === 'block' ? '#ff9800' : '#ff1744', 34); beep('boom'); break;
+    case 'boom':
+      if (f.big) { world.explode(f.tile); world.focusTile(f.tile); setTimeout(() => beep('boom'), 0); if (f.pid) world.react(f.pid, 'sad', 2200); }
+      else world.burst(f.tile, f.m === 'block' ? '#ff9800' : '#ff1744', 34);
+      beep('boom'); break;
+    case 'missile': {
+      const o = pl(s, f.to);
+      world.missile(f.pid, f.tile, () => { beep('boom'); setTimeout(() => beep('boom'), 120); if (o) world.react(o.id, 'sad', 2400); }, f.blocked);
+      showNotice('🚀 飛彈來襲！', `${p ? p.name : ''} 發射飛彈 ➜ ${o ? o.name : ''} 的 ${TILES[f.tile].name}${f.blocked ? '\n（被穿山甲鱗甲擋住）' : ''}`, 'evil');
+      beep('notice'); break;
+    }
+    case 'xfer': showXfer(s, f); world.coinFlow(f.from, f.to, f.amt); break;
+    case 'sold': world.burst(f.tile, '#9e9e9e', 22); world.floatText(f.pid, '🏚️ 變賣 ' + TILES[f.tile].name, '#ffcc80'); break;
     case 'emote': world.floatText(f.pid, f.e, '#ffffff'); world.react(f.pid, 'wave', 1500); break;
     case 'bankrupt': showNotice('💸 破產', `${p ? p.name : ''} 破產出局了！`, 'evil'); break;
     case 'mark': world.burst(f.tile, '#ff9800', 10); break;
   }
+}
+// 轉帳橫幅：清楚顯示誰付給誰、多少錢、為什麼
+let xferT, xferAt = 0;
+function showXfer(s, f) {
+  const box = $('#xfer'), a = pl(s, f.from), b = pl(s, f.to); if (!a || !b) return;
+  const col = id => (world.colors && world.colors[id]) || '#795548';
+  if (performance.now() - xferAt > 2600) box.innerHTML = '';
+  xferAt = performance.now();
+  while (box.children.length >= 3) box.firstChild.remove();
+  const d = document.createElement('div'); d.className = 'xl';
+  const icon = /過路費|收費/.test(f.why) ? '💵' : /強制/.test(f.why) ? '🏠' : '💸';
+  d.innerHTML = `<div class="xr"><span class="who" style="--c:${col(a.id)}">${esc(a.name)}</span><span class="arr">${icon} 付給 ➜</span><span class="who" style="--c:${col(b.id)}">${esc(b.name)}</span><b class="amt">${money(f.amt)}</b></div>` +
+    (f.why ? `<div class="why">${esc(f.why)}</div>` : '') + (f.short ? `<div class="bad">應付 ${money(f.short)}，錢不夠全部付完 → 破產！</div>` : '');
+  box.appendChild(d); box.classList.add('show');
+  clearTimeout(xferT); xferT = setTimeout(() => box.classList.remove('show'), 3400);
 }
 function showNotice(title, text, kind) {
   const n = $('#notice'); n.querySelector('.nb').className = 'nb k-' + (kind || 'chance');
@@ -711,6 +738,16 @@ function openDecide(refresh = false) {
     h = `<h3>🎰 樂透彩券行</h3><p>目前彩金 <b style="color:#e53935">${money(L.pool)}</b>，${7 - (s.round % 7)} 天後開獎。花 $500 選一個號碼（1–20）：</p>
       <div class="choice">${Array.from({ length: 20 }, (_, k) => k + 1).map(n => `<button class="pri" style="flex:1 1 17%" data-pick="${n}">${n}</button>`).join('')}</div>
       <button class="ghost" style="width:100%;margin-top:8px" data-a="no">不玩</button>`;
+  } else if (pd.type === 'sell') {
+    const o = pl(s, pd.to), sv = sellables(s, p), short = pd.amt - p.cash;
+    const lv = i => { const t = TILES[i], st = s.tiles[i]; return t.type === 'prop' ? LEVEL_NAMES[st.l] : t.type === 'company' ? '公司' : (st.b ? BIG[st.b].name : '建地'); };
+    h = `<h3>💸 現金不夠付錢！</h3>
+      <div class="kv"><b>要付給</b><span><b>${esc(o.name)}</b>　<b style="color:#d50000">${money(pd.amt)}</b></span><b>原因</b><span>${esc(pd.why)}</span>
+      <b>你的現金</b><span>${money(p.cash)}</span><b>還差</b><span style="color:#d50000;font-weight:900">${money(short)}</span></div>
+      <p class="note">自己挑要賣哪些財產（土地以半價賣回銀行，股票照市價賣出）。湊夠錢就會自動付款。</p>` +
+      (sv.stocks.length ? `<b>📈 股票</b><div class="sellgrid">${sv.stocks.map(k => { const v = Math.round(p.stocks[k] * s.market[k].p); return `<button class="${v >= short ? 'green' : 'blue'}" data-sellk="${k}">📈 ${STOCKS[k].name} ${p.stocks[k]} 股<br><small>賣得 ${money(v)}${v >= short ? '　✔ 賣這個就夠' : ''}</small></button>`; }).join('')}</div>` : '') +
+      (sv.tiles.length ? `<b>🏠 土地</b><div class="sellgrid">${sv.tiles.sort((x, y) => sellValue(s, x) - sellValue(s, y)).map(i => `<button class="${sellValue(s, i) >= short ? 'green' : 'pri'}" data-sellt="${i}"><span style="color:${GROUPS[TILES[i].g] ? GROUPS[TILES[i].g].color : 'inherit'}">■</span> ${esc(TILES[i].name)}・${lv(i)}<br><small>賣得 ${money(sellValue(s, i))}${sellValue(s, i) >= short ? '　✔ 賣這塊就夠' : ''}</small></button>`).join('')}</div>` : '') +
+      `<button class="ghost" style="width:100%;margin-top:6px" data-a="auto">🤖 交給電腦自動變賣（從最便宜的開始）</button>`;
   } else if (pd.type === 'bank') {
     h = `<h3>🏦 ${pd.pass ? '經過銀行' : '銀行'}</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
       <p class="note">每月 1 日存款發 10% 利息，存款不會被查稅、均富卡拿走。</p>
@@ -728,6 +765,8 @@ function openDecide(refresh = false) {
   sh.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => send(id, { type: 'buyCard', card: b.dataset.buy }));
   sh.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { send(id, { type: 'pick', num: +b.dataset.pick }); closeSheet(); });
   sh.querySelectorAll('[data-bank]').forEach(b => b.onclick = () => send(id, { type: 'bank', amount: +b.dataset.bank }));
+  sh.querySelectorAll('[data-sellt]').forEach(b => b.onclick = () => { sh.querySelectorAll('button').forEach(x => x.disabled = true); send(id, { type: 'sell', tile: +b.dataset.sellt }); });
+  sh.querySelectorAll('[data-sellk]').forEach(b => b.onclick = () => { sh.querySelectorAll('button').forEach(x => x.disabled = true); send(id, { type: 'sell', stock: +b.dataset.sellk }); });
 }
 
 function openBank() {
@@ -938,4 +977,4 @@ $('#helpBtn').onclick = () => openSheet(`<button class="x" data-close>✕</butto
   }
 })();
 
-window.__G = G; window.__world = world;
+window.__G = G; window.__world = world; window.__pickTile = i => onTileClick(i);

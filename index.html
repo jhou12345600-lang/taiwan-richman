@@ -6409,7 +6409,7 @@ var MqttNet = class {
           rej(e);
         }
       });
-      c.on("message", (topic, payload) => {
+      c.on("message", (topic, payload, packet) => {
         const k = topic.slice((BASE + this.room + "/").length);
         let m;
         try {
@@ -6417,6 +6417,7 @@ var MqttNet = class {
         } catch (e) {
           return;
         }
+        if (packet && packet.retain && m && typeof m === "object") m._old = 1;
         if (k.startsWith("av/")) this.h.av?.(m);
         else this.h[k]?.(m);
       });
@@ -6518,7 +6519,36 @@ var G = {
   sound: LS.get("tr3d-snd", true),
   lastAnim: 0
 };
-var hnow = () => Date.now() - G.offset;
+var hnow = () => Date.now() - hostOff();
+function hostOff() {
+  return G.isHost || G.solo ? 0 : G.offset;
+}
+function sampleOffset(host, sent) {
+  const now = Date.now();
+  if (G.offHost !== host) {
+    G.offHost = host;
+    G.offS = [];
+  }
+  G.offS = (G.offS || []).filter((x) => now - x[0] < 3e4).slice(-40);
+  G.offS.push([now, now - sent]);
+  G.offset = Math.min(...G.offS.map((x) => x[1]));
+}
+function becomeHost(fromOther) {
+  const d = fromOther ? G.offset || 0 : 0, s = G.s;
+  if (d && s) {
+    for (const k of ["deadline", "botAt", "until"]) if (typeof s[k] === "number") s[k] += d;
+    if (s.anim && typeof s.anim.t0 === "number") s.anim.t0 += d;
+    if (s.auction) {
+      if (s.auction.until) s.auction.until += d;
+      if (s.auction.botT) s.auction.botT += d;
+    }
+  }
+  G.offset = 0;
+  G.offS = [];
+  G.offHost = myId;
+  G.isHost = true;
+  G.hostStart = Date.now();
+}
 var world;
 try {
   world = new World($("#cv"), { onTileClick: (i) => onTileClick(i) });
@@ -6900,16 +6930,16 @@ function onStateMsg(m) {
   if (G.isHost && s.host === myId && G.s && s.v <= G.s.v) return;
   G.lastStateAt = Date.now();
   G.hostSeenAt = Date.now();
-  G.offset = Date.now() - m.now;
-  if (G.s && !G.isHost && s.v === G.s.v && s.host === G.s.host && s.phase === G.s.phase) return;
+  if (s.host !== myId && (!m._old || !(G.offS && G.offS.length) || G.offHost !== s.host)) sampleOffset(s.host, m.now);
+  if (G.s && !G.isHost && s.v === G.s.v && s.host === G.s.host && s.phase === G.s.phase) {
+    world.offset = hostOff();
+    return;
+  }
   if (G.isHost && s.host !== myId) {
     G.isHost = false;
     toast("房主已交給 " + (nameOf(s, s.host) || "其他玩家"));
   }
-  if (!G.isHost && s.host === myId && G.s == null) {
-    G.isHost = true;
-    G.hostStart = Date.now();
-  }
+  if (!G.isHost && s.host === myId && G.s == null) becomeHost(false);
   applyState(s);
 }
 function nameOf(s, id) {
@@ -6924,8 +6954,7 @@ function checkHostAlive() {
   if (!cands.includes(myId)) cands.push(myId);
   cands.sort();
   if (cands[0] === myId) {
-    G.isHost = true;
-    G.hostStart = Date.now();
+    becomeHost(true);
     s.host = myId;
     s.v += 1e3;
     toast("原房主斷線，由你接手主持遊戲");
@@ -7038,7 +7067,7 @@ function applyState(s) {
   if (G.seenFx < 0) G.seenFx = s.fxn;
   if (!s.players.find((p) => p.ctl === myId) && !G.claimAsked) tryClaimSeat(s);
   for (const f of s.fx) if (f.n > G.seenFx && f.k === "missile") world.holdForMissile(f.tile, f.to);
-  world.setState(s, G.offset);
+  world.setState(s, hostOff());
   for (const [id, img] of Object.entries(G.avatars)) world.setAvatar(id, img);
   if ($("#hud").classList.contains("hidden")) enterGame();
   for (const f of s.fx) if (f.n > G.seenFx) {
@@ -7060,10 +7089,7 @@ function tryClaimSeat(s) {
   if (p && !online(p.ctl)) {
     myId = saved;
     SS.set("tr3d-sid", myId);
-    if (s.host === myId) {
-      G.isHost = true;
-      G.hostStart = Date.now();
-    }
+    if (s.host === myId) becomeHost(false);
     toast("已重新回到座位：" + p.name);
     if (G.net) G.net.pub("hi", { from: myId, t: "ping" });
     return;
@@ -7908,9 +7934,8 @@ $("#helpBtn").onclick = () => openSheet(`<button class="x" data-close>✕</butto
       }
       myId = seat;
       SS.set("tr3d-sid", myId);
-      G.isHost = true;
-      G.hostStart = Date.now();
       G.s = saved.s;
+      becomeHost(false);
       G.s.v += 500;
       if (G.s.step === "move") G.s.until = Date.now();
       if (G.s.phase === "play") {
@@ -7927,9 +7952,8 @@ $("#helpBtn").onclick = () => openSheet(`<button class="x" data-close>✕</butto
         $("#homeMsg").textContent = "❌ 連線失敗，請重新整理。";
         return;
       }
-      G.isHost = true;
-      G.hostStart = Date.now();
       G.s = saved.s;
+      becomeHost(false);
       G.s.v += 500;
       if (G.s.step === "move") G.s.until = Date.now();
       if (G.s.phase === "play") G.s.deadline = Date.now() + PRE_T;

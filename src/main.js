@@ -26,7 +26,28 @@ const G = {
   isHost: false, offset: 0, seen: {}, hostSeenAt: 0, lastStateAt: 0, seenFx: -1, hostStart: 0,
   dirty: false, ui: { mode: null }, sound: LS.get('tr3d-snd', true), lastAnim: 0,
 };
-const hnow = () => Date.now() - G.offset; // 房主時間
+const hnow = () => Date.now() - hostOff(); // 房主時間
+// 和房主時鐘的差：房主自己永遠是 0；其他人取最近 30 秒內「延遲最小」的那則訊息來估算，
+// 這樣手機休眠醒來、斷線重連收到的舊訊息，不會把時間算歪（否則角色移動動畫會整段被跳過）
+function hostOff() { return G.isHost || G.solo ? 0 : G.offset; }
+function sampleOffset(host, sent) {
+  const now = Date.now();
+  if (G.offHost !== host) { G.offHost = host; G.offS = []; }
+  G.offS = (G.offS || []).filter(x => now - x[0] < 30000).slice(-40);
+  G.offS.push([now, now - sent]);
+  G.offset = Math.min(...G.offS.map(x => x[1]));
+}
+// 接手當房主：把狀態裡用「前任房主時鐘」記的時間換成自己的時鐘
+function becomeHost(fromOther) {
+  const d = fromOther ? G.offset || 0 : 0, s = G.s;
+  if (d && s) {
+    for (const k of ['deadline', 'botAt', 'until']) if (typeof s[k] === 'number') s[k] += d;
+    if (s.anim && typeof s.anim.t0 === 'number') s.anim.t0 += d;
+    if (s.auction) { if (s.auction.until) s.auction.until += d; if (s.auction.botT) s.auction.botT += d; }
+  }
+  G.offset = 0; G.offS = []; G.offHost = myId;
+  G.isHost = true; G.hostStart = Date.now();
+}
 
 // ---------- 3D 世界 ----------
 let world;
@@ -269,10 +290,10 @@ function onStateMsg(m) {
   if (G.s && s.v < G.s.v && s.host === G.s.host) return;
   if (G.isHost && s.host === myId && G.s && s.v <= G.s.v) return; // 自己的回音
   G.lastStateAt = Date.now(); G.hostSeenAt = Date.now();
-  G.offset = Date.now() - m.now;
-  if (G.s && !G.isHost && s.v === G.s.v && s.host === G.s.host && s.phase === G.s.phase) return;   // 房主定期重送的同一份狀態，不必重畫
+  if (s.host !== myId && (!m._old || !(G.offS && G.offS.length) || G.offHost !== s.host)) sampleOffset(s.host, m.now);
+  if (G.s && !G.isHost && s.v === G.s.v && s.host === G.s.host && s.phase === G.s.phase) { world.offset = hostOff(); return; }   // 房主定期重送的同一份狀態，不必重畫
   if (G.isHost && s.host !== myId) { G.isHost = false; toast('房主已交給 ' + (nameOf(s, s.host) || '其他玩家')); }
-  if (!G.isHost && s.host === myId && G.s == null) { G.isHost = true; G.hostStart = Date.now(); }
+  if (!G.isHost && s.host === myId && G.s == null) becomeHost(false);
   applyState(s);
 }
 function nameOf(s, id) { const a = (s.players || s.seats || []).find(p => p.id === id || p.ctl === id); return a && a.name; }
@@ -285,7 +306,7 @@ function checkHostAlive() {
   if (!cands.includes(myId)) cands.push(myId);
   cands.sort();
   if (cands[0] === myId) {
-    G.isHost = true; G.hostStart = Date.now();
+    becomeHost(true);
     s.host = myId; s.v += 1000;
     toast('原房主斷線，由你接手主持遊戲');
     publish(true);
@@ -381,7 +402,7 @@ function applyState(s) {
   if (G.seenFx < 0) G.seenFx = s.fxn;
   if (!s.players.find(p => p.ctl === myId) && !G.claimAsked) tryClaimSeat(s);
   for (const f of s.fx) if (f.n > G.seenFx && f.k === 'missile') world.holdForMissile(f.tile, f.to);
-  world.setState(s, G.offset);
+  world.setState(s, hostOff());
   for (const [id, img] of Object.entries(G.avatars)) world.setAvatar(id, img);
   if ($('#hud').classList.contains('hidden')) enterGame();
   for (const f of s.fx) if (f.n > G.seenFx) { G.seenFx = f.n; playFx(s, f); }
@@ -391,7 +412,7 @@ function tryClaimSeat(s) {
   if (!G.solo && !canJudge()) { if (!G.claimTimer) G.claimTimer = setTimeout(() => { G.claimTimer = null; if (G.s && G.s.players && !G.s.players.find(p => p.ctl === myId)) tryClaimSeat(G.s); }, 2000); return; }
   const saved = LS.get('tr3d-seat-' + s.room, null);
   const p = saved && s.players.find(x => x.ctl === saved && !x.bot);
-  if (p && !online(p.ctl)) { myId = saved; SS.set('tr3d-sid', myId); if (s.host === myId) { G.isHost = true; G.hostStart = Date.now(); } toast('已重新回到座位：' + p.name); if (G.net) G.net.pub('hi', { from: myId, t: 'ping' }); return; }
+  if (p && !online(p.ctl)) { myId = saved; SS.set('tr3d-sid', myId); if (s.host === myId) becomeHost(false); toast('已重新回到座位：' + p.name); if (G.net) G.net.pub('hi', { from: myId, t: 'ping' }); return; }
   G.claimAsked = true;
   const offl = s.players.filter(x => !x.bot && !x.out && !online(x.ctl));
   if (!offl.length) { toast('遊戲已開始，你目前是觀戰模式'); return; }
@@ -965,7 +986,7 @@ $('#helpBtn').onclick = () => openSheet(`<button class="x" data-close>✕</butto
       G.probe = false;
       if (G.seen[seat] && Date.now() - G.seen[seat] < 6000) { $('#homeMsg').textContent = ''; G.net.pub('hi', { from: myId, t: 'hello' }); return; }
       myId = seat; SS.set('tr3d-sid', myId);
-      G.isHost = true; G.hostStart = Date.now(); G.s = saved.s; G.s.v += 500;
+      G.s = saved.s; becomeHost(false); G.s.v += 500;
       if (G.s.step === 'move') G.s.until = Date.now();
       if (G.s.phase === 'play') { G.s.deadline = Date.now() + PRE_T; }
       publish(true);
@@ -974,7 +995,7 @@ $('#helpBtn').onclick = () => openSheet(`<button class="x" data-close>✕</butto
     }
     if (saved && saved.s && saved.s.host === seat && seat === myId) {
       try { await connectNet(); } catch (e) { $('#homeMsg').textContent = '❌ 連線失敗，請重新整理。'; return; }
-      G.isHost = true; G.hostStart = Date.now(); G.s = saved.s; G.s.v += 500;
+      G.s = saved.s; becomeHost(false); G.s.v += 500;
       if (G.s.step === 'move') G.s.until = Date.now();
       if (G.s.phase === 'play') G.s.deadline = Date.now() + PRE_T;
       publish(true); if (G.s.phase === 'lobby') enterLobby();

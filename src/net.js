@@ -28,9 +28,10 @@ export class MqttNet {
       c.on('reconnect', () => { this.status = 'reconnecting'; this.h.status?.('reconnecting'); });
       c.on('offline', () => { this.status = 'offline'; this.h.status?.('offline'); });
       c.on('error', e => { if (first) { first = false; clearTimeout(to); rej(e); } });
-      c.on('message', (topic, payload) => {
+      c.on('message', (topic, payload, packet) => {
         const k = topic.slice((BASE + this.room + '/').length);
         let m; try { m = JSON.parse(new TextDecoder().decode(payload)); } catch (e) { return; }
+        if (packet && packet.retain && m && typeof m === 'object') m._old = 1;   // 保留訊息：可能是很久以前的，不拿來對時
         if (k.startsWith('av/')) this.h.av?.(m); else this.h[k]?.(m);
       });
     });

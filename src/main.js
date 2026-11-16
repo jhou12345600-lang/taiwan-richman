@@ -270,6 +270,7 @@ function onStateMsg(m) {
   if (G.isHost && s.host === myId && G.s && s.v <= G.s.v) return; // 自己的回音
   G.lastStateAt = Date.now(); G.hostSeenAt = Date.now();
   G.offset = Date.now() - m.now;
+  if (G.s && !G.isHost && s.v === G.s.v && s.host === G.s.host && s.phase === G.s.phase) return;   // 房主定期重送的同一份狀態，不必重畫
   if (G.isHost && s.host !== myId) { G.isHost = false; toast('房主已交給 ' + (nameOf(s, s.host) || '其他玩家')); }
   if (!G.isHost && s.host === myId && G.s == null) { G.isHost = true; G.hostStart = Date.now(); }
   applyState(s);
@@ -924,6 +925,15 @@ $('#camBtn').onclick = () => { if (world.follow) { world.overview(); toast('全�
 $('#stockBtn').onclick = () => openStock();
 $('#logBtn').onclick = () => { if (!G.s) return; openSheet(`<button class="x" data-close>✕</button><h3>📜 遊戲紀錄</h3><div class="note" style="font-size:13px;color:#333">${G.s.log.slice().reverse().map(esc).join('<br>')}</div>`); };
 $('#emoBtn').onclick = () => $('#emotes').classList.toggle('hidden');
+// 畫質切換：高畫質 → 標準 → 省電
+const Q_NAME = { high: '高畫質', std: '標準', saver: '省電模式' };
+const Q_DESC = { high: '畫面最細緻、最流暢，比較耗電', std: '畫質與耗電平衡（手機預設）', saver: '降低解析度、關閉陰影、降低更新率，最省電不發燙' };
+function qIcon() { $('#qBtn').textContent = world.quality === 'saver' ? '🔋' : world.quality === 'high' ? '✨' : '⚡'; }
+$('#qBtn').onclick = () => {
+  const order = ['high', 'std', 'saver'], q = order[(order.indexOf(world.quality) + 1) % 3];
+  world.setQuality(q); qIcon(); toast(`${Q_NAME[q]}：${Q_DESC[q]}`);
+};
+qIcon();
 $('#sndBtn').onclick = () => { G.sound = !G.sound; LS.set('tr3d-snd', G.sound); $('#sndBtn').textContent = G.sound ? '🔊' : '🔇'; };
 $('#sndBtn').textContent = G.sound ? '🔊' : '🔇';
 $('#helpBtn').onclick = () => openSheet(`<button class="x" data-close>✕</button><h3>❔ 玩法說明</h3><div class="note" style="font-size:14px;color:#333">

@@ -216,7 +216,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
     <button id="stockBtn" title="股市">📈</button>
     <button id="logBtn" title="紀錄">📜</button>
     <button id="emoBtn" title="表情">😀</button>
-    <button id="sndBtn" title="音效">🔊</button>
+    <button id="qBtn" title="畫質／省電">⚡</button><button id="sndBtn" title="音效">🔊</button>
     <button id="helpBtn" title="說明">❔</button>
   </div>
   <div id="emotes" class="hidden"></div>
@@ -4741,11 +4741,23 @@ for (const k of ["taipei", "tainan", "islands"]) {
   g.view = g.view.map((v) => v * MAPK);
   g.path = () => ellipsePath(g.a, g.b);
 }
-function tileTexture(i) {
-  const t = TILES[i];
-  const cv = document.createElement("canvas");
-  cv.width = cv.height = 256;
+function tileAtlas(n) {
+  const cols = Math.ceil(Math.sqrt(n)), cv = document.createElement("canvas");
+  cv.width = cv.height = cols * 256;
   const x = cv.getContext("2d");
+  for (let i = 0; i < n; i++) if (TILES[i]) {
+    x.save();
+    x.translate(i % cols * 256, Math.floor(i / cols) * 256);
+    drawTile(x, i);
+    x.restore();
+  }
+  const tex = new THREE2.CanvasTexture(cv);
+  tex.colorSpace = THREE2.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return { tex, cols, mat: new THREE2.MeshStandardMaterial({ map: tex, roughness: 0.6 }) };
+}
+function drawTile(x, i) {
+  const t = TILES[i];
   const gc = t.g ? GROUPS[t.g].color : t.type === "company" ? "#455a64" : t.type === "bigland" ? "#795548" : "#f9a825";
   x.fillStyle = t.type === "prop" || t.type === "company" || t.type === "bigland" ? "#fffaf0" : "#fff3c4";
   x.fillRect(0, 0, 256, 256);
@@ -4783,10 +4795,6 @@ function tileTexture(i) {
   x.strokeStyle = gc;
   x.lineWidth = 10;
   x.strokeRect(5, 5, 246, 246);
-  const tex = new THREE2.CanvasTexture(cv);
-  tex.colorSpace = THREE2.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
 }
 function textSprite(text, color = "#fff", bg = "rgba(0,0,0,0.55)", size = 44, k = 0.012) {
   const cv = document.createElement("canvas");
@@ -4867,7 +4875,56 @@ var World = class {
     });
     this.resize();
     addEventListener("resize", () => this.resize());
-    this.renderer.setAnimationLoop(() => this.frame());
+    this.controls.addEventListener("change", () => {
+      this.lastChange = performance.now();
+    });
+    let q = null;
+    try {
+      q = localStorage.getItem("tr3d-q");
+    } catch (e) {
+    }
+    this.setQuality(q || (mobile ? "std" : "high"));
+    this.lastTs = 0;
+    this.renderer.setAnimationLoop((ts) => {
+      const fps = this.targetFps();
+      if (fps < 58 && ts - this.lastTs < 1e3 / fps - 4) return;
+      this.lastTs = ts;
+      this.frame();
+    });
+  }
+  setQuality(q) {
+    if (!["high", "std", "saver"].includes(q)) q = "std";
+    this.quality = q;
+    try {
+      localStorage.setItem("tr3d-q", q);
+    } catch (e) {
+    }
+    const dpr = devicePixelRatio || 1;
+    this.renderer.setPixelRatio(q === "high" ? Math.min(dpr, 2) : q === "std" ? Math.min(dpr, this.mobile ? 1.35 : 1.5) : Math.min(dpr, this.mobile ? 1 : 1.25));
+    this.applyShadow();
+    this.resize();
+  }
+  applyShadow() {
+    if (!this.sun) return;
+    const q = this.quality, n = q === "high" ? this.mobile ? 1536 : 2048 : 1024;
+    this.sun.castShadow = q !== "saver";
+    if (this.sun.shadow.mapSize.x !== n) {
+      this.sun.shadow.mapSize.set(n, n);
+      if (this.sun.shadow.map) {
+        this.sun.shadow.map.dispose();
+        this.sun.shadow.map = null;
+      }
+    }
+  }
+  busy() {
+    const now = performance.now(), s = this.state;
+    return now - (this.lastChange || 0) < 1200 || now - (this.userMoved || 0) < 1500 || this.anims && this.anims.length > 0 || this.floaters.length > 0 || !!this.camTo || s && s.step === "move" || now - (this.stateAt || 0) < 2500;
+  }
+  targetFps() {
+    const b = this.busy(), q = this.quality;
+    if (q === "high") return b || !this.mobile ? 60 : 30;
+    if (q === "std") return this.mobile ? b ? 30 : 20 : b ? 60 : 30;
+    return b ? 24 : 12;
   }
   loadMap(id) {
     if (this.mapId === id && this.scene) return;
@@ -4884,12 +4941,13 @@ var World = class {
     const sun = this.sun = new THREE2.DirectionalLight("#fff4e0", 2);
     sun.position.set(-55, 110, 40);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(this.mobile ? 1024 : 2048, this.mobile ? 1024 : 2048);
+    sun.shadow.mapSize.set(1024, 1024);
     Object.assign(sun.shadow.camera, { left: -110, right: 110, top: 115, bottom: -115, near: 1, far: 320 });
     sun.shadow.bias = -8e-4;
     sun.shadow.normalBias = 0.03;
     sc.add(sun);
     sc.add(sun.target);
+    if (this.quality) this.applyShadow();
     this.H = this.geo.height;
     this.buildTerrain();
     const { pts, spacing } = this.geo.path();
@@ -4903,17 +4961,279 @@ var World = class {
     } catch (e) {
       console.warn("scenery", e);
     }
+    try {
+      this.bakeStatic();
+    } catch (e) {
+      console.warn("bake", e);
+    }
     this.tokens = {};
     this.marks = {};
     this.floaters = [];
     this.arrow = null;
     this.inited = false;
     this.state = null;
+    this.tickDirty = true;
     this.overview();
     this.camTo = null;
     const v = this.geo.view;
     this.camera.position.set(v[0], v[1], v[2]);
     this.controls.target.set(v[3], 0, v[4]);
+  }
+  // 效能：把不會動的模型依「材質 + 區塊」合併成少數幾個大網格，大幅減少每畫面的繪製次數
+  bakeStatic() {
+    const sc = this.scene;
+    sc.updateMatrixWorld(true);
+    const skip = /* @__PURE__ */ new Set([this.sea, ...this.clouds || []]);
+    for (const o of this.tileObjs) {
+      skip.add(o.ring);
+      skip.add(o.lot);
+    }
+    this.tileObjs.forEach((o, i) => {
+      o.base.userData.baseOf = i;
+    });
+    this.baseRefs = [];
+    const snap = (root2) => {
+      const a = [];
+      root2.traverse((c) => {
+        const m = c.material && !Array.isArray(c.material) ? c.material : null;
+        a.push([c, [
+          c.position.x,
+          c.position.y,
+          c.position.z,
+          c.quaternion.x,
+          c.quaternion.y,
+          c.quaternion.z,
+          c.quaternion.w,
+          c.scale.x,
+          c.scale.y,
+          c.scale.z,
+          c.visible ? 1 : 0,
+          m && m.color ? m.color.getHex() : 0,
+          m && m.emissive ? m.emissive.getHex() : 0,
+          m ? m.emissiveIntensity || 0 : 0,
+          m ? m.opacity : 0
+        ].join()]);
+      });
+      return a;
+    };
+    const tickers = [], moved = /* @__PURE__ */ new Set();
+    sc.traverse((o) => {
+      if (o.userData.tick && !skip.has(o)) tickers.push(o);
+    });
+    for (const r of tickers) {
+      const before = snap(r);
+      try {
+        for (const t of [0.37, 1.91, 4.43, 7.7]) r.userData.tick(t, 0.33);
+      } catch (e) {
+        r.userData.noBake = true;
+        continue;
+      }
+      const after = snap(r);
+      before.forEach(([c, v], k) => {
+        if (!after[k] || after[k][1] !== v) {
+          c.userData.noBake = true;
+          moved.add(c);
+        }
+      });
+    }
+    for (const j of moved) if (!j.isMesh || j.children.length) {
+      try {
+        this.mergeJoints(j, [j], moved);
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    for (const c of this.clouds || []) this.mergeJoints(c, [c]);
+    sc.updateMatrixWorld(true);
+    const CH2 = 48, buckets = /* @__PURE__ */ new Map(), mats = /* @__PURE__ */ new Map(), victims = [];
+    const keyOf = (m) => m.type === "MeshStandardMaterial" && !m.map && !m.vertexColors ? ["S", m.roughness, m.metalness, m.flatShading ? 1 : 0, m.transparent ? m.opacity.toFixed(2) : 1, m.emissive.getHexString(), m.emissiveIntensity, m.side].join("|") : "U" + m.uuid;
+    const wp = new THREE2.Vector3();
+    const visit = (o, dyn) => {
+      dyn = dyn || skip.has(o) || o.userData.noBake || o.isLight || o.visible === false;
+      if (o.isMesh && !dyn && !o.isInstancedMesh && !o.isSkinnedMesh && !Array.isArray(o.material) && !o.material.vertexColors && !o.geometry.attributes.color && o.geometry.attributes.position && o.geometry.attributes.normal) {
+        const m = o.material, mk = keyOf(m);
+        o.getWorldPosition(wp);
+        const k = mk + "#" + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + "#" + Math.floor(wp.x / CH2) + "," + Math.floor(wp.z / CH2);
+        if (!buckets.has(k)) buckets.set(k, { mk, mat: m, cast: o.castShadow, recv: o.receiveShadow, list: [] });
+        buckets.get(k).list.push(o);
+        victims.push(o);
+      }
+      for (const c of o.children) visit(c, dyn);
+    };
+    for (const c of [...sc.children]) visit(c, false);
+    const root = new THREE2.Group();
+    root.matrixAutoUpdate = false;
+    let made = 0;
+    for (const b of buckets.values()) {
+      const shared = b.mk[0] === "S";
+      const useUv = !shared && b.list.every((o) => o.geometry.attributes.uv);
+      const parts = b.list.map((o) => {
+        let g2 = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        g2.applyMatrix4(o.matrixWorld);
+        if (!g2.attributes.normal) g2.computeVertexNormals();
+        return { g: g2, c: o.material.color, bi: o.userData.baseOf };
+      });
+      const n = parts.reduce((a, q) => a + q.g.attributes.position.count, 0);
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = shared ? new Float32Array(n * 3) : null, uv = useUv ? new Float32Array(n * 2) : null;
+      let off = 0;
+      for (const q of parts) {
+        const P2 = q.g.attributes.position, N = q.g.attributes.normal, cnt = P2.count;
+        for (let i = 0; i < cnt; i++) {
+          pos[(off + i) * 3] = P2.getX(i);
+          pos[(off + i) * 3 + 1] = P2.getY(i);
+          pos[(off + i) * 3 + 2] = P2.getZ(i);
+          nor[(off + i) * 3] = N.getX(i);
+          nor[(off + i) * 3 + 1] = N.getY(i);
+          nor[(off + i) * 3 + 2] = N.getZ(i);
+          if (col) {
+            col[(off + i) * 3] = q.c.r;
+            col[(off + i) * 3 + 1] = q.c.g;
+            col[(off + i) * 3 + 2] = q.c.b;
+          }
+          if (uv) {
+            const U = q.g.attributes.uv;
+            uv[(off + i) * 2] = U.getX(i);
+            uv[(off + i) * 2 + 1] = U.getY(i);
+          }
+        }
+        if (q.bi != null) this.baseRefs[q.bi] = { b, start: off, cnt };
+        off += cnt;
+        q.g.dispose();
+      }
+      const g = new THREE2.BufferGeometry();
+      g.setAttribute("position", new THREE2.BufferAttribute(pos, 3));
+      g.setAttribute("normal", new THREE2.BufferAttribute(nor, 3));
+      if (col) g.setAttribute("color", new THREE2.BufferAttribute(col, 3));
+      if (uv) g.setAttribute("uv", new THREE2.BufferAttribute(uv, 2));
+      g.computeBoundingSphere();
+      g.computeBoundingBox();
+      let m = b.mat;
+      if (shared) {
+        if (!mats.has(b.mk)) {
+          const o = b.mat;
+          mats.set(b.mk, new THREE2.MeshStandardMaterial({
+            vertexColors: true,
+            color: "#ffffff",
+            roughness: o.roughness,
+            metalness: o.metalness,
+            flatShading: o.flatShading,
+            transparent: o.transparent,
+            opacity: o.opacity,
+            emissive: o.emissive,
+            emissiveIntensity: o.emissiveIntensity,
+            side: o.side,
+            depthWrite: o.depthWrite
+          }));
+        }
+        m = mats.get(b.mk);
+      }
+      const mesh = new THREE2.Mesh(g, m);
+      mesh.castShadow = b.cast;
+      mesh.receiveShadow = b.recv;
+      mesh.matrixAutoUpdate = false;
+      root.add(mesh);
+      made++;
+      b.mesh = mesh;
+    }
+    for (const o of victims) {
+      let a = o.parent, pick2 = false;
+      while (a) {
+        if (a.userData.tile != null) {
+          pick2 = true;
+          break;
+        }
+        a = a.parent;
+      }
+      if (pick2) o.visible = false;
+      else o.parent && o.parent.remove(o);
+    }
+    sc.add(root);
+    this.baked = root;
+    this.baseRefs = this.baseRefs.map((r) => r && { mesh: r.b.mesh, start: r.start, cnt: r.cnt });
+    this.bakeInfo = { meshes: victims.length, merged: made };
+  }
+  // 角色：每個會動的關節（身體、頭、手腳、尾巴）底下的固定零件合併成一個網格
+  mergeToken(root) {
+    const u = root.userData;
+    if (!u.body) return;
+    this.mergeJoints(root, [u.body, u.torso, u.head, u.legL, u.legR, u.armL, u.armR, u.tail].filter(Boolean));
+  }
+  // 在每個「會動的節點」底下，把相對它固定不動的零件合併
+  mergeJoints(root, joints, stop = new Set(joints)) {
+    root.updateMatrixWorld(true);
+    const cache = this.tokMats || (this.tokMats = /* @__PURE__ */ new Map());
+    for (const j of joints) {
+      const inv = j.matrixWorld.clone().invert(), groups = /* @__PURE__ */ new Map(), list = [];
+      const walk = (o) => {
+        for (const c of [...o.children]) {
+          if (stop.has(c)) continue;
+          if (c.isMesh && !Array.isArray(c.material) && c.material.type === "MeshStandardMaterial" && !c.material.map && !c.material.vertexColors && !c.geometry.attributes.color && c.visible) list.push(c);
+          walk(c);
+        }
+      };
+      walk(j);
+      for (const m of list) {
+        const mm = m.material, k = [mm.roughness, mm.metalness, mm.flatShading ? 1 : 0, mm.transparent ? mm.opacity.toFixed(2) : 1, mm.emissive.getHexString(), mm.emissiveIntensity, mm.side, m.castShadow ? 1 : 0].join("|");
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(m);
+      }
+      for (const [k, ms] of groups) {
+        if (ms.length < 2) continue;
+        const parts = ms.map((m) => {
+          const g2 = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+          g2.applyMatrix4(inv.clone().multiply(m.matrixWorld));
+          if (!g2.attributes.normal) g2.computeVertexNormals();
+          return { g: g2, c: m.material.color };
+        });
+        const n = parts.reduce((a, q) => a + q.g.attributes.position.count, 0);
+        const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3);
+        let off = 0;
+        for (const q of parts) {
+          const P2 = q.g.attributes.position, N = q.g.attributes.normal;
+          for (let i = 0; i < P2.count; i++) {
+            const o3 = (off + i) * 3;
+            pos[o3] = P2.getX(i);
+            pos[o3 + 1] = P2.getY(i);
+            pos[o3 + 2] = P2.getZ(i);
+            nor[o3] = N.getX(i);
+            nor[o3 + 1] = N.getY(i);
+            nor[o3 + 2] = N.getZ(i);
+            col[o3] = q.c.r;
+            col[o3 + 1] = q.c.g;
+            col[o3 + 2] = q.c.b;
+          }
+          off += P2.count;
+          q.g.dispose();
+        }
+        const g = new THREE2.BufferGeometry();
+        g.setAttribute("position", new THREE2.BufferAttribute(pos, 3));
+        g.setAttribute("normal", new THREE2.BufferAttribute(nor, 3));
+        g.setAttribute("color", new THREE2.BufferAttribute(col, 3));
+        g.computeBoundingSphere();
+        if (!cache.has(k)) {
+          const o = ms[0].material;
+          cache.set(k, new THREE2.MeshStandardMaterial({ vertexColors: true, roughness: o.roughness, metalness: o.metalness, flatShading: o.flatShading, transparent: o.transparent, opacity: o.opacity, emissive: o.emissive, emissiveIntensity: o.emissiveIntensity, side: o.side }));
+        }
+        const mesh = new THREE2.Mesh(g, cache.get(k));
+        mesh.castShadow = ms[0].castShadow;
+        mesh.receiveShadow = ms[0].receiveShadow;
+        mesh.userData.noBake = true;
+        for (const m of ms) {
+          for (const c of [...m.children]) j.attach(c);
+          m.parent.remove(m);
+        }
+        j.add(mesh);
+      }
+    }
+  }
+  tintBase(i, color) {
+    const o = this.tileObjs[i];
+    o.base.material.color.set(color);
+    const r = this.baseRefs && this.baseRefs[i];
+    if (!r) return;
+    const c = o.base.material.color, a = r.mesh.geometry.attributes.color;
+    for (let k = r.start; k < r.start + r.cnt; k++) a.setXYZ(k, c.r, c.g, c.b);
+    a.needsUpdate = true;
   }
   buildCity(n) {
     const cs = ["#eceff1", "#cfd8dc", "#ffe0b2", "#d7ccc8", "#b3e5fc", "#f8bbd0"];
@@ -5261,6 +5581,11 @@ var World = class {
     this.tileObjs = [];
     this.pickables = [];
     this.lmSpots = [];
+    if (this.atlas) {
+      this.atlas.tex.dispose();
+      this.atlas.mat.dispose();
+    }
+    this.atlas = tileAtlas(this.path.length);
     const n = this.path.length, size0 = Math.min(3.5, this.spacing * 0.9), size = size0;
     this.tileSize = size0;
     const info = [];
@@ -5304,10 +5629,20 @@ var World = class {
       base.receiveShadow = true;
       base.castShadow = true;
       g.add(base);
-      const top = new THREE2.Mesh(new THREE2.BoxGeometry(size2, 0.2, size2), [mat("#fff8e7"), mat("#fff8e7"), new THREE2.MeshStandardMaterial({ map: tileTexture(i), roughness: 0.6 }), mat("#fff8e7"), mat("#fff8e7"), mat("#fff8e7")]);
+      const top = new THREE2.Mesh(new THREE2.BoxGeometry(size2, 0.2, size2), mat("#fff8e7"));
       top.position.y = 0.06;
       top.receiveShadow = true;
       g.add(top);
+      {
+        const A = this.atlas, cu = i % A.cols / A.cols, cv = Math.floor(i / A.cols) / A.cols, d = 1 / A.cols, e = d * 8e-3;
+        const pg = new THREE2.PlaneGeometry(size2, size2), uv = pg.attributes.uv;
+        for (let k = 0; k < uv.count; k++) uv.setXY(k, cu + e + uv.getX(k) * (d - 2 * e), 1 - (cv + d) + e + uv.getY(k) * (d - 2 * e));
+        const face = new THREE2.Mesh(pg, A.mat);
+        face.rotation.x = -Math.PI / 2;
+        face.position.y = 0.161;
+        face.receiveShadow = true;
+        g.add(face);
+      }
       this.scene.add(g);
       this.pickables.push(g);
       if (this.H(p.x, p.y) < 0.2) for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
@@ -5397,6 +5732,7 @@ var World = class {
       const ring = new THREE2.Mesh(new THREE2.RingGeometry(size2 * 0.62, size2 * 0.74, 32), new THREE2.MeshBasicMaterial({ color: "#ffeb3b", transparent: true, opacity: 0, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = 0.2;
+      ring.visible = false;
       g.add(ring);
       this.tileObjs.push({ g, base, lm, lot, ring, nm, tan, ang, level: -1, owner: void 0, pos: new THREE2.Vector3(p.x, y + 0.17, p.y) });
     }
@@ -5478,6 +5814,7 @@ var World = class {
   }
   // 依狀態更新場景
   setState(s, offset) {
+    this.stateAt = performance.now();
     if (s.map && s.map !== this.mapId) this.loadMap(s.map);
     this.state = s;
     this.offset = offset || 0;
@@ -5493,7 +5830,7 @@ var World = class {
       const o = this.tileObjs[i];
       if (o.owner !== t.o) {
         o.owner = t.o;
-        o.base.material.color.set(t.o ? colors[t.o] : "#cbbf9f");
+        this.tintBase(i, t.o ? colors[t.o] : "#cbbf9f");
         if (!t.o) o.level = -1;
         else if (o.level !== -1) o.level = "x";
       }
@@ -5503,6 +5840,7 @@ var World = class {
         const first = t.o && this.inited && o.level === -1;
         o.level = key;
         o.lot.clear();
+        this.tickDirty = true;
         if (t.o) {
           const tp = TILES[i].type;
           const h = tp === "company" ? buildOwnerSign(colors[t.o]) : tp === "bigland" ? t.b ? buildBig(t.b, colors[t.o]) : buildOwnerSign(colors[t.o]) : buildHouses(t.l, colors[t.o]);
@@ -5557,6 +5895,11 @@ var World = class {
         t.userData.label = lab;
         const tp = this.tilePos(p.pos);
         t.position.copy(tp);
+        try {
+          this.mergeToken(t);
+        } catch (e) {
+          console.warn("mergeToken", e);
+        }
         this.scene.add(t);
         this.tokens[p.id] = t;
       }
@@ -5574,7 +5917,9 @@ var World = class {
   setHighlight(list) {
     this.hl = list ? new Set(list) : null;
     this.tileObjs.forEach((o, i) => {
-      o.ring.material.opacity = this.hl && this.hl.has(i) ? 0.9 : 0;
+      const on = !!(this.hl && this.hl.has(i));
+      o.ring.material.opacity = on ? 0.9 : 0;
+      o.ring.visible = on;
     });
   }
   focusTile(i) {
@@ -5842,11 +6187,16 @@ var World = class {
     return base;
   }
   frame() {
-    const dt = Math.min(0.05, this.clock.getDelta()), t = this.clock.elapsedTime;
+    const dt = Math.min(0.1, this.clock.getDelta()), t = this.clock.elapsedTime;
     const s = this.state;
-    this.scene.traverse((o) => {
-      if (o.userData.tick) o.userData.tick(t, dt);
-    });
+    if (this.tickDirty || !this.tickers) {
+      this.tickers = [];
+      this.scene.traverse((o) => {
+        if (o.userData.tick) this.tickers.push(o);
+      });
+      this.tickDirty = false;
+    }
+    for (const o of this.tickers) o.userData.tick(t, dt);
     if (this.tileObjs) for (const o of this.tileObjs) {
       const h = o.lot.children[0];
       if (h && h.userData.growT) {
@@ -6551,6 +6901,7 @@ function onStateMsg(m) {
   G.lastStateAt = Date.now();
   G.hostSeenAt = Date.now();
   G.offset = Date.now() - m.now;
+  if (G.s && !G.isHost && s.v === G.s.v && s.host === G.s.host && s.phase === G.s.phase) return;
   if (G.isHost && s.host !== myId) {
     G.isHost = false;
     toast("房主已交給 " + (nameOf(s, s.host) || "其他玩家"));
@@ -7503,6 +7854,18 @@ $("#logBtn").onclick = () => {
   openSheet(`<button class="x" data-close>✕</button><h3>📜 遊戲紀錄</h3><div class="note" style="font-size:13px;color:#333">${G.s.log.slice().reverse().map(esc).join("<br>")}</div>`);
 };
 $("#emoBtn").onclick = () => $("#emotes").classList.toggle("hidden");
+var Q_NAME = { high: "高畫質", std: "標準", saver: "省電模式" };
+var Q_DESC = { high: "畫面最細緻、最流暢，比較耗電", std: "畫質與耗電平衡（手機預設）", saver: "降低解析度、關閉陰影、降低更新率，最省電不發燙" };
+function qIcon() {
+  $("#qBtn").textContent = world.quality === "saver" ? "🔋" : world.quality === "high" ? "✨" : "⚡";
+}
+$("#qBtn").onclick = () => {
+  const order = ["high", "std", "saver"], q = order[(order.indexOf(world.quality) + 1) % 3];
+  world.setQuality(q);
+  qIcon();
+  toast(`${Q_NAME[q]}：${Q_DESC[q]}`);
+};
+qIcon();
 $("#sndBtn").onclick = () => {
   G.sound = !G.sound;
   LS.set("tr3d-snd", G.sound);

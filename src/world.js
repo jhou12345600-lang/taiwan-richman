@@ -140,10 +140,16 @@ for (const k of ['taipei', 'tainan', 'islands']) {
   g.path = () => ellipsePath(g.a, g.b);
 }
 
-function tileTexture(i) {
-  const t = TILES[i];
-  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+// 所有格子的字卡畫在同一張大貼圖上，格子頂面才能合併成一次繪製
+function tileAtlas(n) {
+  const cols = Math.ceil(Math.sqrt(n)), cv = document.createElement('canvas'); cv.width = cv.height = cols * 256;
   const x = cv.getContext('2d');
+  for (let i = 0; i < n; i++) if (TILES[i]) { x.save(); x.translate((i % cols) * 256, Math.floor(i / cols) * 256); drawTile(x, i); x.restore(); }
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  return { tex, cols, mat: new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }) };
+}
+function drawTile(x, i) {
+  const t = TILES[i];
   const gc = t.g ? GROUPS[t.g].color : t.type === 'company' ? '#455a64' : t.type === 'bigland' ? '#795548' : '#f9a825';
   x.fillStyle = (t.type === 'prop' || t.type === 'company' || t.type === 'bigland') ? '#fffaf0' : '#fff3c4'; x.fillRect(0, 0, 256, 256);
   x.textAlign = 'center'; x.textBaseline = 'middle';
@@ -162,8 +168,6 @@ function tileTexture(i) {
     x.fillText(t.name, 128, 200);
   }
   x.strokeStyle = gc; x.lineWidth = 10; x.strokeRect(5, 5, 246, 246);
-  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  return tex;
 }
 function textSprite(text, color = '#fff', bg = 'rgba(0,0,0,0.55)', size = 44, k = 0.012) {
   const cv = document.createElement('canvas'); const x = cv.getContext('2d');
@@ -211,7 +215,41 @@ export class World {
       if (hits.length) { let o = hits[0].object; while (o && o.userData.tile == null) o = o.parent; if (o) this.opts.onTileClick?.(o.userData.tile); }
     });
     this.resize(); addEventListener('resize', () => this.resize());
-    this.renderer.setAnimationLoop(() => this.frame());
+    this.controls.addEventListener('change', () => { this.lastChange = performance.now(); });
+    let q = null; try { q = localStorage.getItem('tr3d-q'); } catch (e) {}
+    this.setQuality(q || (mobile ? 'std' : 'high'));
+    // 依畫質限制每秒畫面數；沒有東西在動時再降低，手機比較不燙
+    this.lastTs = 0;
+    this.renderer.setAnimationLoop(ts => {
+      const fps = this.targetFps();
+      if (fps < 58 && ts - this.lastTs < 1000 / fps - 4) return;
+      this.lastTs = ts; this.frame();
+    });
+  }
+  setQuality(q) {
+    if (!['high', 'std', 'saver'].includes(q)) q = 'std';
+    this.quality = q; try { localStorage.setItem('tr3d-q', q); } catch (e) {}
+    const dpr = devicePixelRatio || 1;
+    this.renderer.setPixelRatio(q === 'high' ? Math.min(dpr, 2) : q === 'std' ? Math.min(dpr, this.mobile ? 1.35 : 1.5) : Math.min(dpr, this.mobile ? 1 : 1.25));
+    this.applyShadow();
+    this.resize();
+  }
+  applyShadow() {
+    if (!this.sun) return;
+    const q = this.quality, n = q === 'high' ? (this.mobile ? 1536 : 2048) : 1024;
+    this.sun.castShadow = q !== 'saver';
+    if (this.sun.shadow.mapSize.x !== n) { this.sun.shadow.mapSize.set(n, n); if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; } }
+  }
+  busy() {
+    const now = performance.now(), s = this.state;
+    return now - (this.lastChange || 0) < 1200 || now - (this.userMoved || 0) < 1500 || (this.anims && this.anims.length > 0) || this.floaters.length > 0 || !!this.camTo ||
+      (s && s.step === 'move') || now - (this.stateAt || 0) < 2500;
+  }
+  targetFps() {
+    const b = this.busy(), q = this.quality;
+    if (q === 'high') return b || !this.mobile ? 60 : 30;
+    if (q === 'std') return this.mobile ? (b ? 30 : 20) : (b ? 60 : 30);
+    return b ? 24 : 12;
   }
   loadMap(id) {
     if (this.mapId === id && this.scene) return;
@@ -222,10 +260,10 @@ export class World {
     sc.add(new THREE.HemisphereLight('#dff4ff', '#4b6b3a', 0.9));
     const sun = this.sun = new THREE.DirectionalLight('#fff4e0', 2.0);
     sun.position.set(-55, 110, 40); sun.castShadow = true;
-    sun.shadow.mapSize.set(this.mobile ? 1024 : 2048, this.mobile ? 1024 : 2048);
+    sun.shadow.mapSize.set(1024, 1024);
     Object.assign(sun.shadow.camera, { left: -110, right: 110, top: 115, bottom: -115, near: 1, far: 320 });
     sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
-    sc.add(sun); sc.add(sun.target);
+    sc.add(sun); sc.add(sun.target); if (this.quality) this.applyShadow();
     this.H = this.geo.height;
     this.buildTerrain();
     const { pts, spacing } = this.geo.path();
@@ -234,9 +272,142 @@ export class World {
     this.buildTiles();
     if (this.geo.city) this.buildCity(this.geo.city);
     try { this.buildScenery(id); } catch (e) { console.warn('scenery', e); }
-    this.tokens = {}; this.marks = {}; this.floaters = []; this.arrow = null; this.inited = false; this.state = null;
+    try { this.bakeStatic(); } catch (e) { console.warn('bake', e); }
+    this.tokens = {}; this.marks = {}; this.floaters = []; this.arrow = null; this.inited = false; this.state = null; this.tickDirty = true;
     this.overview(); this.camTo = null;
     const v = this.geo.view; this.camera.position.set(v[0], v[1], v[2]); this.controls.target.set(v[3], 0, v[4]);
+  }
+  // 效能：把不會動的模型依「材質 + 區塊」合併成少數幾個大網格，大幅減少每畫面的繪製次數
+  bakeStatic() {
+    const sc = this.scene; sc.updateMatrixWorld(true);
+    const skip = new Set([this.sea, ...(this.clouds || [])]);
+    for (const o of this.tileObjs) { skip.add(o.ring); skip.add(o.lot); }
+    this.tileObjs.forEach((o, i) => { o.base.userData.baseOf = i; });
+    this.baseRefs = [];
+    // 有動畫的模型：實際跑幾次動畫，找出真的會動的零件，其餘照樣合併
+    const snap = root => { const a = []; root.traverse(c => { const m = c.material && !Array.isArray(c.material) ? c.material : null;
+      a.push([c, [c.position.x, c.position.y, c.position.z, c.quaternion.x, c.quaternion.y, c.quaternion.z, c.quaternion.w, c.scale.x, c.scale.y, c.scale.z, c.visible ? 1 : 0,
+        m && m.color ? m.color.getHex() : 0, m && m.emissive ? m.emissive.getHex() : 0, m ? m.emissiveIntensity || 0 : 0, m ? m.opacity : 0].join()]); }); return a; };
+    const tickers = [], moved = new Set(); sc.traverse(o => { if (o.userData.tick && !skip.has(o)) tickers.push(o); });
+    for (const r of tickers) {
+      const before = snap(r);
+      try { for (const t of [0.37, 1.91, 4.43, 7.7]) r.userData.tick(t, 0.33); } catch (e) { r.userData.noBake = true; continue; }
+      const after = snap(r);
+      before.forEach(([c, v], k) => { if (!after[k] || after[k][1] !== v) { c.userData.noBake = true; moved.add(c); } });
+    }
+    // 會動的物件（火車、船、風車葉片…）：它底下相對固定的零件先在本地合併
+    for (const j of moved) if (!j.isMesh || j.children.length) { try { this.mergeJoints(j, [j], moved); } catch (e) { console.warn(e); } }
+    for (const c of this.clouds || []) this.mergeJoints(c, [c]);
+    sc.updateMatrixWorld(true);
+    const CH = 48, buckets = new Map(), mats = new Map(), victims = [];
+    const keyOf = m => (m.type === 'MeshStandardMaterial' && !m.map && !m.vertexColors)
+      ? ['S', m.roughness, m.metalness, m.flatShading ? 1 : 0, m.transparent ? m.opacity.toFixed(2) : 1, m.emissive.getHexString(), m.emissiveIntensity, m.side].join('|')
+      : 'U' + m.uuid;
+    const wp = new THREE.Vector3();
+    const visit = (o, dyn) => {
+      dyn = dyn || skip.has(o) || o.userData.noBake || o.isLight || o.visible === false;
+      if (o.isMesh && !dyn && !o.isInstancedMesh && !o.isSkinnedMesh && !Array.isArray(o.material) && !o.material.vertexColors && !o.geometry.attributes.color && o.geometry.attributes.position && o.geometry.attributes.normal) {
+        const m = o.material, mk = keyOf(m);
+        o.getWorldPosition(wp);
+        const k = mk + '#' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + '#' + Math.floor(wp.x / CH) + ',' + Math.floor(wp.z / CH);
+        if (!buckets.has(k)) buckets.set(k, { mk, mat: m, cast: o.castShadow, recv: o.receiveShadow, list: [] });
+        buckets.get(k).list.push(o); victims.push(o);
+      }
+      for (const c of o.children) visit(c, dyn);
+    };
+    for (const c of [...sc.children]) visit(c, false);
+    const root = new THREE.Group(); root.matrixAutoUpdate = false;
+    let made = 0;
+    for (const b of buckets.values()) {
+      const shared = b.mk[0] === 'S';
+      const useUv = !shared && b.list.every(o => o.geometry.attributes.uv);
+      const parts = b.list.map(o => {
+        let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        g.applyMatrix4(o.matrixWorld);
+        if (!g.attributes.normal) g.computeVertexNormals();
+        return { g, c: o.material.color, bi: o.userData.baseOf };
+      });
+      const n = parts.reduce((a, q) => a + q.g.attributes.position.count, 0);
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = shared ? new Float32Array(n * 3) : null, uv = useUv ? new Float32Array(n * 2) : null;
+      let off = 0;
+      for (const q of parts) {
+        const P = q.g.attributes.position, N = q.g.attributes.normal, cnt = P.count;
+        for (let i = 0; i < cnt; i++) {
+          pos[(off + i) * 3] = P.getX(i); pos[(off + i) * 3 + 1] = P.getY(i); pos[(off + i) * 3 + 2] = P.getZ(i);
+          nor[(off + i) * 3] = N.getX(i); nor[(off + i) * 3 + 1] = N.getY(i); nor[(off + i) * 3 + 2] = N.getZ(i);
+          if (col) { col[(off + i) * 3] = q.c.r; col[(off + i) * 3 + 1] = q.c.g; col[(off + i) * 3 + 2] = q.c.b; }
+          if (uv) { const U = q.g.attributes.uv; uv[(off + i) * 2] = U.getX(i); uv[(off + i) * 2 + 1] = U.getY(i); }
+        }
+        if (q.bi != null) this.baseRefs[q.bi] = { b, start: off, cnt };
+        off += cnt; q.g.dispose();
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      if (col) g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      if (uv) g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      g.computeBoundingSphere(); g.computeBoundingBox();
+      let m = b.mat;
+      if (shared) {
+        if (!mats.has(b.mk)) {
+          const o = b.mat;
+          mats.set(b.mk, new THREE.MeshStandardMaterial({ vertexColors: true, color: '#ffffff', roughness: o.roughness, metalness: o.metalness, flatShading: o.flatShading,
+            transparent: o.transparent, opacity: o.opacity, emissive: o.emissive, emissiveIntensity: o.emissiveIntensity, side: o.side, depthWrite: o.depthWrite }));
+        }
+        m = mats.get(b.mk);
+      }
+      const mesh = new THREE.Mesh(g, m); mesh.castShadow = b.cast; mesh.receiveShadow = b.recv; mesh.matrixAutoUpdate = false;
+      root.add(mesh); made++; b.mesh = mesh;
+    }
+    // 原本的物件：可點選的（格子、景點）留著但隱藏，好讓點擊判定照常；其餘直接移除
+    for (const o of victims) {
+      let a = o.parent, pick = false;
+      while (a) { if (a.userData.tile != null) { pick = true; break; } a = a.parent; }
+      if (pick) o.visible = false; else o.parent && o.parent.remove(o);
+    }
+    sc.add(root); this.baked = root;
+    this.baseRefs = this.baseRefs.map(r => r && { mesh: r.b.mesh, start: r.start, cnt: r.cnt });
+    this.bakeInfo = { meshes: victims.length, merged: made };
+  }
+  // 角色：每個會動的關節（身體、頭、手腳、尾巴）底下的固定零件合併成一個網格
+  mergeToken(root) {
+    const u = root.userData; if (!u.body) return;
+    this.mergeJoints(root, [u.body, u.torso, u.head, u.legL, u.legR, u.armL, u.armR, u.tail].filter(Boolean));
+  }
+  // 在每個「會動的節點」底下，把相對它固定不動的零件合併
+  mergeJoints(root, joints, stop = new Set(joints)) {
+    root.updateMatrixWorld(true);
+    const cache = this.tokMats || (this.tokMats = new Map());
+    for (const j of joints) {
+      const inv = j.matrixWorld.clone().invert(), groups = new Map(), list = [];
+      const walk = o => { for (const c of [...o.children]) { if (stop.has(c)) continue; if (c.isMesh && !Array.isArray(c.material) && c.material.type === 'MeshStandardMaterial' && !c.material.map && !c.material.vertexColors && !c.geometry.attributes.color && c.visible) list.push(c); walk(c); } };
+      walk(j);
+      for (const m of list) {
+        const mm = m.material, k = [mm.roughness, mm.metalness, mm.flatShading ? 1 : 0, mm.transparent ? mm.opacity.toFixed(2) : 1, mm.emissive.getHexString(), mm.emissiveIntensity, mm.side, m.castShadow ? 1 : 0].join('|');
+        if (!groups.has(k)) groups.set(k, []); groups.get(k).push(m);
+      }
+      for (const [k, ms] of groups) {
+        if (ms.length < 2) continue;
+        const parts = ms.map(m => { const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone(); g.applyMatrix4(inv.clone().multiply(m.matrixWorld)); if (!g.attributes.normal) g.computeVertexNormals(); return { g, c: m.material.color }; });
+        const n = parts.reduce((a, q) => a + q.g.attributes.position.count, 0);
+        const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3); let off = 0;
+        for (const q of parts) { const P = q.g.attributes.position, N = q.g.attributes.normal;
+          for (let i = 0; i < P.count; i++) { const o3 = (off + i) * 3; pos[o3] = P.getX(i); pos[o3 + 1] = P.getY(i); pos[o3 + 2] = P.getZ(i); nor[o3] = N.getX(i); nor[o3 + 1] = N.getY(i); nor[o3 + 2] = N.getZ(i); col[o3] = q.c.r; col[o3 + 1] = q.c.g; col[o3 + 2] = q.c.b; }
+          off += P.count; q.g.dispose(); }
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeBoundingSphere();
+        if (!cache.has(k)) { const o = ms[0].material; cache.set(k, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: o.roughness, metalness: o.metalness, flatShading: o.flatShading, transparent: o.transparent, opacity: o.opacity, emissive: o.emissive, emissiveIntensity: o.emissiveIntensity, side: o.side })); }
+        const mesh = new THREE.Mesh(g, cache.get(k)); mesh.castShadow = ms[0].castShadow; mesh.receiveShadow = ms[0].receiveShadow; mesh.userData.noBake = true;
+        // 被合併掉的零件若底下還有子物件（例如其他關節），先搬到關節底下保持原位置
+        for (const m of ms) { for (const c of [...m.children]) j.attach(c); m.parent.remove(m); }
+        j.add(mesh);
+      }
+    }
+  }
+  tintBase(i, color) {
+    const o = this.tileObjs[i]; o.base.material.color.set(color);
+    const r = this.baseRefs && this.baseRefs[i]; if (!r) return;
+    const c = o.base.material.color, a = r.mesh.geometry.attributes.color;
+    for (let k = r.start; k < r.start + r.cnt; k++) a.setXYZ(k, c.r, c.g, c.b);
+    a.needsUpdate = true;
   }
   buildCity(n) {
     const cs = ['#eceff1', '#cfd8dc', '#ffe0b2', '#d7ccc8', '#b3e5fc', '#f8bbd0'];
@@ -429,6 +600,8 @@ export class World {
 
   buildTiles() {
     this.tileObjs = []; this.pickables = []; this.lmSpots = [];
+    if (this.atlas) { this.atlas.tex.dispose(); this.atlas.mat.dispose(); }
+    this.atlas = tileAtlas(this.path.length);
     const n = this.path.length, size0 = Math.min(3.5, this.spacing * 0.9), size = size0;
     this.tileSize = size0;
     // 第一輪：每格的方向與「蓋房子的空地」位置
@@ -462,8 +635,14 @@ export class World {
       const ang = Math.atan2(tan.x, tan.y);
       const base = new THREE.Mesh(new THREE.BoxGeometry(size + 0.25, 0.32, size + 0.25), new THREE.MeshStandardMaterial({ color: '#cbbf9f', roughness: 0.6 }));
       base.position.y = -0.1; base.receiveShadow = true; base.castShadow = true; g.add(base);
-      const top = new THREE.Mesh(new THREE.BoxGeometry(size, 0.2, size), [mat('#fff8e7'), mat('#fff8e7'), new THREE.MeshStandardMaterial({ map: tileTexture(i), roughness: 0.6 }), mat('#fff8e7'), mat('#fff8e7'), mat('#fff8e7')]);
-      top.position.y = 0.06; top.receiveShadow = true; g.add(top);   // 文字永遠朝北，從南方視角可讀
+      const top = new THREE.Mesh(new THREE.BoxGeometry(size, 0.2, size), mat('#fff8e7'));
+      top.position.y = 0.06; top.receiveShadow = true; g.add(top);
+      { // 文字面：從共用大貼圖取這一格（文字永遠朝北，從南方視角可讀）
+        const A = this.atlas, cu = (i % A.cols) / A.cols, cv = Math.floor(i / A.cols) / A.cols, d = 1 / A.cols, e = d * 0.008;
+        const pg = new THREE.PlaneGeometry(size, size), uv = pg.attributes.uv;
+        for (let k = 0; k < uv.count; k++) uv.setXY(k, cu + e + uv.getX(k) * (d - 2 * e), 1 - (cv + d) + e + uv.getY(k) * (d - 2 * e));
+        const face = new THREE.Mesh(pg, A.mat); face.rotation.x = -Math.PI / 2; face.position.y = 0.161; face.receiveShadow = true; g.add(face);
+      }
       this.scene.add(g); this.pickables.push(g);
       if (this.H(p.x, p.y) < 0.2) for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const leg = C(new THREE.Group(), 0.14, 0.16, 2.2, '#6d4c41', 0, 0, 0, 6); leg.position.set(p.x + lx * size * 0.4, -1.8, p.y + lz * size * 0.4); this.scene.add(leg); }
       const t = TILES[i];
@@ -524,7 +703,7 @@ export class World {
       const lot = new THREE.Group();
       lot.position.set(lotP.x, Math.max(0.35, this.H(lotP.x, lotP.y)), lotP.y); lot.rotation.y = ang; this.scene.add(lot);
       const ring = new THREE.Mesh(new THREE.RingGeometry(size * 0.62, size * 0.74, 32), new THREE.MeshBasicMaterial({ color: '#ffeb3b', transparent: true, opacity: 0, depthWrite: false }));
-      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.2; g.add(ring);
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.2; ring.visible = false; g.add(ring);
       this.tileObjs.push({ g, base, lm, lot, ring, nm, tan, ang, level: -1, owner: undefined, pos: new THREE.Vector3(p.x, y + 0.17, p.y) });
     }
     // 格子之間鋪一條路
@@ -577,6 +756,7 @@ export class World {
 
   // 依狀態更新場景
   setState(s, offset) {
+    this.stateAt = performance.now();
     if (s.map && s.map !== this.mapId) this.loadMap(s.map);
     this.state = s; this.offset = offset || 0;
     const colors = {}; s.players.forEach(p => { colors[p.id] = (CHARS.find(c => c.id === p.char) || CHARS[0]).color; });
@@ -586,12 +766,12 @@ export class World {
       if (!t) return;
       if (hold['t' + i] && hnow < hold['t' + i]) return;   // 飛彈還沒落地，先保留原本的房子
       const o = this.tileObjs[i];
-      if (o.owner !== t.o) { o.owner = t.o; o.base.material.color.set(t.o ? colors[t.o] : '#cbbf9f'); if (!t.o) o.level = -1; else if (o.level !== -1) o.level = 'x'; }
+      if (o.owner !== t.o) { o.owner = t.o; this.tintBase(i, t.o ? colors[t.o] : '#cbbf9f'); if (!t.o) o.level = -1; else if (o.level !== -1) o.level = 'x'; }
       const key = t.l + ':' + (t.b || '') + ':' + (t.bl || 0);
       if (o.level !== key) {
         const grew = t.o && this.inited && o.level !== -1 && o.level !== key;
         const first = t.o && this.inited && o.level === -1;
-        o.level = key; o.lot.clear();
+        o.level = key; o.lot.clear(); this.tickDirty = true;
         if (t.o) {
           const tp = TILES[i].type;
           const h = tp === 'company' ? buildOwnerSign(colors[t.o]) : tp === 'bigland' ? (t.b ? buildBig(t.b, colors[t.o]) : buildOwnerSign(colors[t.o])) : buildHouses(t.l, colors[t.o]);
@@ -617,6 +797,7 @@ export class World {
         const lab = textSprite(p.name, colors[p.id], 'rgba(0,0,0,0.55)', 40, 0.0075); lab.position.y = 1.65; t.add(lab);
         t.userData.label = lab;
         const tp = this.tilePos(p.pos); t.position.copy(tp);
+        try { this.mergeToken(t); } catch (e) { console.warn('mergeToken', e); }
         this.scene.add(t); this.tokens[p.id] = t;
       }
       this.tokens[p.id].visible = !p.out;
@@ -632,7 +813,7 @@ export class World {
 
   setHighlight(list) {
     this.hl = list ? new Set(list) : null;
-    this.tileObjs.forEach((o, i) => { o.ring.material.opacity = this.hl && this.hl.has(i) ? 0.9 : 0; });
+    this.tileObjs.forEach((o, i) => { const on = !!(this.hl && this.hl.has(i)); o.ring.material.opacity = on ? 0.9 : 0; o.ring.visible = on; });
   }
   focusTile(i) { this.focusAt = this.tilePos(i).clone(); this.focusUntil = performance.now() + 4000; }
   setFollow(v) { this.follow = v; if (!v) this.overview(); }
@@ -771,9 +952,10 @@ export class World {
   }
 
   frame() {
-    const dt = Math.min(0.05, this.clock.getDelta()), t = this.clock.elapsedTime;
+    const dt = Math.min(0.1, this.clock.getDelta()), t = this.clock.elapsedTime;
     const s = this.state;
-    this.scene.traverse(o => { if (o.userData.tick) o.userData.tick(t, dt); });
+    if (this.tickDirty || !this.tickers) { this.tickers = []; this.scene.traverse(o => { if (o.userData.tick) this.tickers.push(o); }); this.tickDirty = false; }
+    for (const o of this.tickers) o.userData.tick(t, dt);
     if (this.tileObjs) for (const o of this.tileObjs) { const h = o.lot.children[0]; if (h && h.userData.growT) { const f = Math.min(1, (performance.now() - h.userData.growT) / 700); const e = f < 1 ? 1 + Math.sin(f * Math.PI) * 0.25 * (1 - f) : 1; h.scale.setScalar(Math.max(0.01, f * e) * (h.userData.base || 1)); if (f >= 1) h.userData.growT = 0; } }
     this.clouds.forEach((c, i) => { c.position.x += dt * (0.6 + i * 0.05); if (c.position.x > 90) c.position.x = -90; });
     if (s) {

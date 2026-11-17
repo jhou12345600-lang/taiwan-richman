@@ -879,6 +879,21 @@ export class World {
       const tp = this.tileObjs[k].pos; const off = this.tileObjs[k].tan;
       g.position.set(tp.x + off.x * 1.1, tp.y, tp.z + off.y * 1.1); this.scene.add(g); this.marks[k] = g;
     }
+    // 路上的寶物：點券、寶箱、錢袋（會轉、會上下飄）
+    this.items = this.items || {};
+    const items = s.items || {};
+    for (const k of Object.keys(this.items)) if (items[k] !== this.items[k].userData.kind) { this.scene.remove(this.items[k]); delete this.items[k]; this.tickDirty = true; }
+    for (const [k, v] of Object.entries(items)) {
+      if (this.items[k] || !this.tileObjs[k]) continue;
+      const g = new THREE.Group(); g.userData.kind = v; const inner = new THREE.Group(); g.add(inner);
+      if (v === 'chest') { B(inner, 0.6, 0.38, 0.42, '#8d6e63'); B(inner, 0.62, 0.14, 0.44, '#ffd600', 0, 0.38, 0, { e: '#ffab00', ei: 0.4 }); B(inner, 0.1, 0.16, 0.02, '#ffd600', 0, 0.26, 0.22); }
+      else if (v === 'bag') { S(inner, 0.32, '#43a047', 0, 0.3, 0, undefined, 10, 8); C(inner, 0.08, 0.14, 0.18, '#2e7d32', 0, 0.55, 0, 8); S(inner, 0.1, '#ffd600', 0, 0.32, 0.28, { e: '#ffab00', ei: 0.5 }, 6, 5); }
+      else { const c = v === 'pts50' ? '#e91e63' : v === 'pts30' ? '#ff9800' : '#fdd835'; B(inner, 0.62, 0.36, 0.05, c, 0, 0.15, 0, { e: c, ei: 0.35 }); B(inner, 0.12, 0.36, 0.06, '#ffffff', 0.18, 0.15, 0); }
+      const tp = this.tileObjs[k].pos, off = this.tileObjs[k].tan;
+      g.position.set(tp.x, tp.y + 0.9, tp.z); g.scale.setScalar(1.7);
+      const ph = Math.random() * 6; g.userData.tick = t => { inner.rotation.y = t * 1.6 + ph; inner.position.y = Math.sin(t * 2.4 + ph) * 0.15; };
+      this.scene.add(g); this.items[k] = g; this.tickDirty = true;
+    }
     s.players.forEach((p, idx) => {
       if (!this.tokens[p.id]) {
         const t = buildToken(p.char, colors[p.id]); t.scale.setScalar(1.7);
@@ -954,7 +969,7 @@ export class World {
     this.hold['t' + tile] = until; if (pid) this.hold['p' + pid] = until;
   }
   // 飛彈：從發射者飛到目標土地，劃出弧線、拖著煙，落地爆炸
-  missile(fromPid, tile, onHit, blocked) {
+  missile(fromPid, tile, onHit, blocked, nuke) {
     const tok = this.tokens[fromPid], to = this.tilePos(tile).clone();
     const from = tok ? tok.position.clone().add(new THREE.Vector3(0, 2.2, 0)) : to.clone().add(new THREE.Vector3(-25, 30, 0));
     const g = new THREE.Group();
@@ -987,6 +1002,7 @@ export class World {
     }, () => {
       this.scene.remove(holder);
       this.explode(tile, blocked);
+      if (nuke && this.tileObjs) { const n = this.tileObjs.length; [-2, -1, 1, 2].forEach((d, q) => setTimeout(() => this.explode((tile + d + n) % n), 120 + q * 90)); this.shakeUntil = performance.now() + 1400; }
       if (this.hold) { delete this.hold['t' + tile]; for (const k of Object.keys(this.hold)) if (performance.now() >= this.hold[k] - 400) delete this.hold[k]; }
       if (this.state) this.setState(this.state, this.offset);
       if (onHit) onHit();

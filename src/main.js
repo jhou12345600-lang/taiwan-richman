@@ -1,6 +1,6 @@
 // ===== 寶島富翁 3D：主程式（房主 / 玩家 / 介面）=====
-import { MAPS, useMap, TILES, N_TILES, GROUPS, CHARS, CARDS, GODS, STOCKS, EMOTES, LEVEL_NAMES, TOLL_MUL } from './data.js';
-import { BIG, BIG_MAX, bigUpCost, bigFee, VEH, companyCount, companyFee, diceCount, chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T, sellables, sellValue, MG, MG_MAX, mgBuildCost, mgUpCost, mgToll, mgDaily } from './engine.js';
+import { MAPS, useMap, TILES, N_TILES, GROUPS, CHARS, CARDS, GODS, STOCKS, EMOTES, LEVEL_NAMES, TOLL_MUL, GEM, HARM } from './data.js';
+import { BIG, BIG_MAX, bigUpCost, bigFee, VEH, companyCount, companyFee, diceCount, chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T, sellables, sellValue, MG, MG_MAX, mgBuildCost, mgUpCost, mgToll, mgDaily, loanMax, LOAN_DAYS, LOAN_RATE, pidx } from './engine.js';
 import { World } from './world.js';
 import { MqttNet, LocalNet, BROKERS } from './net.js';
 
@@ -61,6 +61,7 @@ $('#loading').classList.add('hidden');
 
 // ---------- 音效 ----------
 let actx;
+const rnd = n => Math.floor(Math.random() * n), pick = a => a[rnd(a.length)];
 function beep(type) {
   if (!G.sound) return;
   try {
@@ -528,7 +529,7 @@ function renderPlayers() {
   const s = G.s; if (!s || !s.players) return;
   $('#players').innerHTML = s.players.map((p, i) => {
     const c = charOf(p.char);
-    const ic = [p.veh ? VEH[p.veh].icon : '', p.god ? GODS[p.god.id].icon : '', p.st.hosp ? '🏥' : '', p.st.jail ? '🚓' : '', p.st.sleep ? '😴' : '', p.st.turtle ? '🐢' : '', p.dir < 0 ? '🔄' : ''].join('');
+    const ic = [p.veh ? VEH[p.veh].icon : '', p.god ? GODS[p.god.id].icon : '', p.st.inv > 0 ? '🛡️' : '', p.loan ? '💳' : '', p.st.hosp ? '🏥' : '', p.st.jail ? '🚓' : '', p.st.sleep ? '😴' : '', p.st.turtle ? '🐢' : '', p.dir < 0 ? '🔄' : ''].join('');
     const off = p.left ? '<span class="off">🚪 已離開</span>' : !p.bot && s.phase === 'play' && !p.out ? (p.away ? '<span class="off">☕暫離・託管</span>' : !online(p.ctl) ? '<span class="off">離線・託管</span>' : '') : '';
     return `<div class="pc ${i === s.turn && s.phase === 'play' ? 'cur' : ''} ${p.out ? 'out' : ''}" data-p="${esc(p.id)}">
       <div class="av" style="background:${c.color}33">${avHtml(p.ctl === p.id || p.bot ? p.id : '', c.emoji)}</div>
@@ -541,7 +542,7 @@ function renderPlayers() {
 function renderHud() {
   const s = G.s; if (!s || !s.players) return;
   renderPlayers();
-  $('#roundinfo').textContent = `📅 ${s.month || 1}月${s.day || 1}日・第 ${s.settings.maxRounds ? Math.min(s.round, s.settings.maxRounds) : s.round}${s.settings.maxRounds ? '/' + s.settings.maxRounds : ''} 回合`;
+  $('#roundinfo').textContent = `📅 ${s.month || 1}月${s.day || 1}日・第 ${s.settings.maxRounds ? Math.min(s.round, s.settings.maxRounds) : s.round}${s.settings.maxRounds ? '/' + s.settings.maxRounds : ''} 回合${pidx(s) > 1 ? `・📊物價×${pidx(s)}` : ''}`;
   const feed = s.log.slice(-4);
   $('#feed').innerHTML = feed.map(l => `<div>${esc(l)}</div>`).join('');
   renderNet();
@@ -638,11 +639,12 @@ function playFx(s, f) {
       beep('boom'); break;
     case 'missile': {
       const o = pl(s, f.to);
-      world.missile(f.pid, f.tile, () => { beep('boom'); setTimeout(() => beep('boom'), 120); if (o) world.react(o.id, 'sad', 2400); }, f.blocked);
-      showNotice('🚀 飛彈來襲！', `${p ? p.name : ''} 發射飛彈 ➜ ${o ? o.name : ''} 的 ${TILES[f.tile].name}${f.blocked ? '\n（被穿山甲鱗甲擋住）' : ''}`, 'evil');
+      world.missile(f.pid, f.tile, () => { beep('boom'); setTimeout(() => beep('boom'), 120); if (f.nuke) setTimeout(() => beep('boom'), 300); if (o) world.react(o.id, 'sad', 2400); }, f.blocked, f.nuke);
+      showNotice(f.nuke ? '☢️ 核彈來襲！' : '🚀 飛彈來襲！', f.nuke ? `${p ? p.name : ''} 發射核彈 ➜ ${TILES[f.tile].name} 一帶` : `${p ? p.name : ''} 發射飛彈 ➜ ${o ? o.name : ''} 的 ${TILES[f.tile].name}${f.blocked ? '\n（被穿山甲鱗甲擋住）' : ''}`, 'evil');
       beep('notice'); break;
     }
     case 'xfer': showXfer(s, f); world.coinFlow(f.from, f.to, f.amt); break;
+    case 'item': if (f.got) { world.burst(f.tile, '#ffd600', 16); beep('coin'); } break;
     case 'sold': world.burst(f.tile, '#9e9e9e', 22); world.floatText(f.pid, '🏚️ 變賣 ' + TILES[f.tile].name, '#ffcc80'); break;
     case 'emote': world.floatText(f.pid, f.e, '#ffffff'); world.react(f.pid, 'wave', 1500); break;
     case 'bankrupt':
@@ -761,10 +763,10 @@ function openDecide(refresh = false) {
     h = tileInfoHtml(i) + `<p>要把${K.icon}${K.name}擴建到 <b>${m.lv + 1} 級</b>嗎？費用 <b>${money(c)}</b>（你有 ${money(p.cash)}）</p>
       <div class="choice"><button class="green" data-a="yes">🏗️ 擴建</button><button class="ghost" data-a="no">不用</button></div>`;
   } else if (pd.type === 'shop') {
-    h = `<h3>🏪 道具店</h3><p>你的點券：<b>${p.points}</b>　道具卡 ${p.cards.length}/${cardLimit(p)}</p><div class="cards">` +
-      Object.entries(CARDS).map(([k, c]) => `<div class="card"><div class="t">${c.icon} ${c.name}</div><div class="d">${c.desc}</div>
-      <button class="${p.points >= cardCost(p, k) ? 'pri' : 'ghost'}" data-buy="${k}" ${p.points < cardCost(p, k) || p.cards.length >= cardLimit(p) ? 'disabled' : ''}>${cardCost(p, k)} 點</button></div>`).join('') +
-      `</div><button class="blue" style="width:100%;margin-top:10px" data-a="done">離開商店</button>`;
+    h = `<h3>🏪 道具店</h3><p>你的點券：<b>${p.points}</b>　道具卡 ${p.cards.length}/${cardLimit(p)}</p>` +
+      CARD_CATS.map(([cn, ks]) => `<div class="ccat">${cn}</div><div class="cards">` + ks.filter(k => CARDS[k]).map(k => { const c = CARDS[k]; return `<div class="card ${HARM.includes(k) ? 'atk' : ''} ${GEM[k] ? 'gemok' : ''}"><div class="t">${c.icon} ${c.name}${c.rare ? ' <span class="rare">稀有</span>' : ''}</div><div class="d">${c.desc}</div>
+      <button class="${p.points >= cardCost(p, k) ? 'pri' : 'ghost'}" data-buy="${k}" ${p.points < cardCost(p, k) || p.cards.length >= cardLimit(p) ? 'disabled' : ''}>${cardCost(p, k)} 點</button></div>`; }).join('') + '</div>').join('') +
+      `<button class="blue" style="width:100%;margin-top:10px" data-a="done">離開商店</button>`;
   } else if (pd.type === 'car') {
     h = `<h3>🛵 車行</h3><p>現在的交通工具：<b>${VEH[p.veh].icon}${VEH[p.veh].name}</b>（擲 ${VEH[p.veh].dice} 顆骰）　現金 ${money(p.cash)}</p><div class="choice">` +
       [1, 2].filter(v => v > p.veh).map(v => `<button class="green" data-veh="${v}" ${p.cash < VEH[v].price ? 'disabled' : ''}>${VEH[v].icon} ${VEH[v].name} ${money(VEH[v].price)}<br><small>擲 ${VEH[v].dice} 顆骰子</small></button>`).join('') +
@@ -778,8 +780,9 @@ function openDecide(refresh = false) {
     h = tileInfoHtml(pd.tile) + `<p>要把${b.icon}<b>${b.name}</b>從 ${st.bl || 1} 級擴建到 <b>${(st.bl || 1) + 1} 級</b>嗎？花費 <b>${c1 ? money(c1) : '免費（福神）'}</b>，收費會提高到 ${money(Math.round(b.fee * (1 + (st.bl || 1) * 0.6) / 10) * 10)}</p>
       <div class="choice"><button class="green" data-a="yes">🏗️ 擴建</button><button class="ghost" data-a="no">不用</button></div>`;
   } else if (pd.type === 'minigame') {
-    h = `<h3>🕹️ 小遊戲：接金幣</h3><p>10 秒內點掉落的金幣，接到幾枚就送幾點點券（最多 60）！小心炸彈💣會扣分。</p><div id="mg" style="position:relative;height:300px;background:linear-gradient(#81d4fa,#e1f5fe);border-radius:14px;overflow:hidden;touch-action:none"></div>
-      <div class="row" style="margin-top:8px"><b id="mgScore">0 枚</b><button class="pri" id="mgStart">開始！</button></div>`;
+    const g = MG_INFO[pd.game || 'coin'];
+    h = `<h3>🕹️ 小遊戲：${g.name}</h3><p>${g.rule}</p><div id="mg" style="position:relative;height:300px;background:${g.bg};border-radius:14px;overflow:hidden;touch-action:none;user-select:none"></div>
+      <div class="row" style="margin-top:8px"><b id="mgScore">0 分</b><button class="pri" id="mgStart">開始！</button></div>`;
   } else if (pd.type === 'lottery') {
     const L = s.lotto || { pool: 0 };
     h = `<h3>🎰 樂透彩券行</h3><p>目前彩金 <b style="color:#e53935">${money(L.pool)}</b>，${7 - (s.round % 7)} 天後開獎。花 $5,000 選一個號碼（1–20）：</p>
@@ -800,6 +803,7 @@ function openDecide(refresh = false) {
       <p class="note">每月 1 日存款發 10% 利息，存款不會被查稅、均富卡拿走。</p>
       <div class="choice"><button class="green" data-bank="10000">存 $1萬</button><button class="green" data-bank="50000">存 $5萬</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
       <div class="choice"><button class="blue" data-bank="-10000">領 $1萬</button><button class="blue" data-bank="-50000">領 $5萬</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
+      ${loanHtml(s, p, !pd.pass)}
       <button class="ghost" style="width:100%;margin-top:10px" data-a="done">完成</button>`;
   }
   openSheet(h, 'decide');
@@ -807,48 +811,117 @@ function openDecide(refresh = false) {
   sh.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { send(id, { type: b.dataset.a }); closeSheet(); });
   sh.querySelectorAll('[data-veh]').forEach(b => b.onclick = () => { send(id, { type: 'veh', v: +b.dataset.veh }); closeSheet(); });
   sh.querySelectorAll('[data-big]').forEach(b => b.onclick = () => { send(id, { type: 'build', kind: b.dataset.big }); closeSheet(); });
-  if (pd.type === 'minigame' && !refresh) setupMinigame(id);
+  if (pd.type === 'minigame' && !refresh) setupMinigame(id, pd.game || 'coin');
   sh.querySelectorAll('[data-mg]').forEach(b => b.onclick = () => { send(id, { type: 'merge', kind: b.dataset.mg }); closeSheet(); });
   sh.querySelectorAll('[data-n2]').forEach(b => b.onclick = () => { send(id, { type: 'yes', n: 2 }); closeSheet(); });
   sh.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => send(id, { type: 'buyCard', card: b.dataset.buy }));
   sh.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { send(id, { type: 'pick', num: +b.dataset.pick }); closeSheet(); });
   sh.querySelectorAll('[data-bank]').forEach(b => b.onclick = () => send(id, { type: 'bank', amount: +b.dataset.bank }));
+  sh.querySelectorAll('[data-loan]').forEach(b => b.onclick = () => send(id, { type: 'loan', amount: +b.dataset.loan }));
+  sh.querySelectorAll('[data-repay]').forEach(b => b.onclick = () => send(id, { type: 'repay' }));
   sh.querySelectorAll('[data-sellt]').forEach(b => b.onclick = () => { sh.querySelectorAll('button').forEach(x => x.disabled = true); send(id, { type: 'sell', tile: +b.dataset.sellt }); });
   sh.querySelectorAll('[data-sellk]').forEach(b => b.onclick = () => { sh.querySelectorAll('button').forEach(x => x.disabled = true); send(id, { type: 'sell', stock: +b.dataset.sellk }); });
 }
 
+function loanHtml(s, p, canBorrow) {
+  if (p.loan) return `<div class="mgbox" style="border-color:#ef5350;background:#fff3f3"><b>💳 貸款中</b>：要還 <b style="color:#d50000">${money(p.loan.owe)}</b>，還有 ${Math.max(0, p.loan.due - s.round)} 天到期（到期會自動扣款，不夠會變賣財產）
+    <button class="red" style="width:100%;margin-top:6px" data-repay ${p.cash + p.deposit < p.loan.owe ? 'disabled' : ''}>💸 現在還清</button></div>`;
+  if (!canBorrow) return '<p class="note">停在銀行格上才能申請貸款。</p>';
+  const mx = loanMax(s, p);
+  if (mx < 10000) return '<p class="note">你的資產太少，銀行不借錢。</p>';
+  const opts = [100000, 300000, mx].filter((v, i, a) => v <= mx && a.indexOf(v) === i);
+  return `<div class="mgbox"><b>💳 銀行貸款</b>（最多 ${money(mx)}）：${LOAN_DAYS} 天後連本帶利 ${Math.round(LOAN_RATE * 100)}% 還款，到期自動扣款。<div class="choice">` +
+    opts.map(v => `<button class="blue" data-loan="${v}">借 ${wan(v)}</button>`).join('') + '</div></div>';
+}
 function openBank() {
   const s = G.s, p = cur(s);
   openSheet(`<button class="x" data-close>✕</button><h3>🏦 銀行</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
     <p class="note">每月 1 日存款發 10% 利息，存款不會被查稅、均富卡拿走。</p>
     <div class="choice"><button class="green" data-bank="10000">存 $1萬</button><button class="green" data-bank="50000">存 $5萬</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
     <div class="choice"><button class="blue" data-bank="-10000">領 $1萬</button><button class="blue" data-bank="-50000">領 $5萬</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
+    ${p.loan ? loanHtml(s, p, false) : ''}
     <button class="ghost" style="width:100%;margin-top:10px" data-close>完成</button>`, 'bankpre');
+  $('#sheet').querySelectorAll('[data-repay]').forEach(b => b.onclick = () => { send(p.id, { type: 'repay' }); setTimeout(() => { if (G.ui.mode === 'bankpre') openBank(); }, 350); });
   $('#sheet').querySelectorAll('[data-bank]').forEach(b => b.onclick = () => { send(p.id, { type: 'bank', amount: +b.dataset.bank }); setTimeout(() => { if (G.ui.mode === 'bankpre') openBank(); }, 350); });
 }
-// 小遊戲：接金幣
-function setupMinigame(pid) {
-  const box = $('#mg'); let score = 0, running = false;
-  $('#mgStart').onclick = () => {
-    if (running) return; running = true; $('#mgStart').disabled = true;
-    const end = Date.now() + 10000;
-    const spawn = setInterval(() => {
-      if (Date.now() > end) return;
-      const bomb = Math.random() < 0.18;
-      const c = document.createElement('div');
-      c.textContent = bomb ? '💣' : '🪙';
-      c.style.cssText = `position:absolute;left:${Math.random() * 85}%;top:-40px;font-size:34px;cursor:pointer;user-select:none;transition:top ${1.6 + Math.random()}s linear`;
-      box.appendChild(c); requestAnimationFrame(() => requestAnimationFrame(() => { c.style.top = '320px'; }));
-      const hit = e => { e.preventDefault(); if (c.dataset.done) return; c.dataset.done = 1; score = Math.max(0, score + (bomb ? -5 : 1)); $('#mgScore').textContent = score + ' 枚'; beep(bomb ? 'pay' : 'coin'); c.style.transform = 'scale(1.6)'; c.style.opacity = 0; };
-      c.addEventListener('pointerdown', hit);
-      setTimeout(() => c.remove(), 3000);
-    }, 260);
-    const t = setInterval(() => {
-      const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
-      $('#mgStart').textContent = left + ' 秒';
-      if (Date.now() > end) { clearInterval(t); clearInterval(spawn); setTimeout(() => { send(pid, { type: 'mg', score }); closeSheet(); }, 600); }
-    }, 200);
+// ---------- 小遊戲（每次隨機一種，得分 = 點券，最多 60） ----------
+const MG_INFO = {
+  coin: { name: '接金幣', bg: 'linear-gradient(#81d4fa,#e1f5fe)', rule: '10 秒內點掉落的金幣🪙，每枚 +1；小心炸彈💣扣 5 分。' },
+  mole: { name: '打地鼠', bg: 'linear-gradient(#aed581,#7cb342)', rule: '12 秒內打冒出來的石虎🐯 +3、黃金石虎🌟 +8；別打到刺蝟🦔（-4）。' },
+  balloon: { name: '戳氣球', bg: 'linear-gradient(#b3e5fc,#fff8e1)', rule: '10 秒內戳破往上飄的氣球🎈 +2，金色⭐ +6；炸彈💣 -5。' },
+  memory: { name: '翻牌記憶', bg: 'linear-gradient(#ffe0b2,#ffcc80)', rule: '翻開兩張一樣的台灣小吃就配對成功，每對 +5；越快完成獎勵越多（30 秒）。' },
+  rps: { name: '猜拳大賽', bg: 'linear-gradient(#e1bee7,#f3e5f5)', rule: '跟電腦猜拳 5 次：贏 +12、平手 +4、輸 0。' },
+  dice: { name: '骰子比大小', bg: 'linear-gradient(#ffcdd2,#fff3e0)', rule: '猜三顆骰子總和「大」(11–18) 還是「小」(3–10)，5 局，猜中一次 +12。' },
+};
+function setupMinigame(pid, game) {
+  const box = $('#mg'); let score = 0, running = false, finished = false;
+  const setScore = v => { score = Math.max(0, Math.min(60, v)); $('#mgScore').textContent = score + ' 分'; };
+  const finish = () => { if (finished) return; finished = true; $('#mgStart').textContent = '完成！'; setTimeout(() => { send(pid, { type: 'mg', score }); closeSheet(); }, 900); };
+  const timer = (sec, onEnd) => { const end = Date.now() + sec * 1000; const t = setInterval(() => { const left = Math.max(0, Math.ceil((end - Date.now()) / 1000)); if (!finished) $('#mgStart').textContent = left + ' 秒'; if (Date.now() > end) { clearInterval(t); onEnd(); } }, 200); return end; };
+  const el = (txt, css) => { const d = document.createElement('div'); d.textContent = txt; d.style.cssText = 'position:absolute;cursor:pointer;user-select:none;' + css; box.appendChild(d); return d; };
+  const tap = (d, fn) => d.addEventListener('pointerdown', e => { e.preventDefault(); if (d.dataset.done) return; d.dataset.done = 1; fn(); });
+  const pop = d => { d.style.transition = 'transform .15s, opacity .15s'; d.style.transform = 'scale(1.7)'; d.style.opacity = 0; setTimeout(() => d.remove(), 200); };
+  const games = {
+    coin() {
+      const end = timer(10, () => { clearInterval(sp); finish(); });
+      const sp = setInterval(() => { if (Date.now() > end) return; const bomb = Math.random() < 0.18;
+        const c = el(bomb ? '💣' : '🪙', `left:${Math.random() * 85}%;top:-40px;font-size:34px;transition:top ${1.6 + Math.random()}s linear`);
+        requestAnimationFrame(() => requestAnimationFrame(() => { c.style.top = '320px'; }));
+        tap(c, () => { setScore(score + (bomb ? -5 : 1)); beep(bomb ? 'pay' : 'coin'); pop(c); }); setTimeout(() => c.remove(), 3000); }, 260);
+    },
+    mole() {
+      const holes = []; for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) { const h = el('', `left:${8 + c * 31}%;top:${18 + r * 30}%;width:24%;height:22%;border-radius:50%;background:#5d4037;box-shadow:inset 0 6px 0 #3e2723;cursor:default`); holes.push(h); }
+      const end = timer(12, () => { clearInterval(sp); finish(); });
+      const sp = setInterval(() => { if (Date.now() > end) return; const h = pick(holes); if (h.firstChild) return;
+        const r = Math.random(), kind = r < 0.12 ? 'gold' : r < 0.32 ? 'bad' : 'cat';
+        const a = document.createElement('div'); a.textContent = kind === 'bad' ? '🦔' : kind === 'gold' ? '🌟' : '🐯'; a.style.cssText = 'font-size:38px;text-align:center;line-height:1;margin-top:-14px;cursor:pointer;transition:transform .12s'; h.appendChild(a);
+        tap(a, () => { setScore(score + (kind === 'bad' ? -4 : kind === 'gold' ? 8 : 3)); beep(kind === 'bad' ? 'pay' : 'coin'); a.style.transform = 'scale(.3)'; setTimeout(() => a.remove(), 120); });
+        setTimeout(() => a.remove(), 700 + Math.random() * 400); }, 420);
+    },
+    balloon() {
+      const end = timer(10, () => { clearInterval(sp); finish(); });
+      const sp = setInterval(() => { if (Date.now() > end) return; const r = Math.random(), kind = r < 0.1 ? 'gold' : r < 0.25 ? 'bomb' : 'b';
+        const d = el(kind === 'gold' ? '⭐' : kind === 'bomb' ? '💣' : '🎈', `left:${Math.random() * 85}%;top:320px;font-size:${kind === 'b' ? 40 : 34}px;transition:top ${2.2 + Math.random() * 1.2}s linear;filter:hue-rotate(${Math.random() * 360}deg)`);
+        requestAnimationFrame(() => requestAnimationFrame(() => { d.style.top = '-60px'; }));
+        tap(d, () => { setScore(score + (kind === 'bomb' ? -5 : kind === 'gold' ? 6 : 2)); beep(kind === 'bomb' ? 'pay' : 'coin'); pop(d); }); setTimeout(() => d.remove(), 3800); }, 330);
+    },
+    memory() {
+      const foods = ['🧋', '🥟', '🍜', '🍡', '🍧', '🍢', '🍙', '🥭'], deck = [...foods, ...foods].sort(() => Math.random() - 0.5);
+      let open = [], pairs = 0, lock = false;
+      const end = timer(30, () => finish());
+      deck.forEach((f, i) => { const c = el('❓', `left:${4 + (i % 4) * 24}%;top:${4 + Math.floor(i / 4) * 24}%;width:21%;height:21%;border-radius:10px;background:#fff;font-size:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.2)`);
+        c.addEventListener('pointerdown', e => { e.preventDefault(); if (lock || c.dataset.done || open.includes(c) || finished) return; c.textContent = f; open.push(c); beep('step');
+          if (open.length === 2) { const [a, b] = open; if (a.textContent === b.textContent) { a.dataset.done = b.dataset.done = 1; a.style.background = b.style.background = '#c8e6c9'; open = []; pairs++; setScore(score + 5); beep('coin');
+              if (pairs === 8) { setScore(score + Math.round(Math.max(0, end - Date.now()) / 1000)); finish(); } }
+            else { lock = true; setTimeout(() => { a.textContent = b.textContent = '❓'; open = []; lock = false; }, 650); } } }); });
+    },
+    rps() {
+      const hands = ['✊', '✌️', '🖐️'], names = ['石頭', '剪刀', '布']; let round = 0;
+      const info = el('第 1 局：出拳吧！', 'left:0;right:0;top:18px;text-align:center;font-size:18px;font-weight:900;cursor:default');
+      const vs = el('', 'left:0;right:0;top:70px;text-align:center;font-size:56px;cursor:default');
+      hands.forEach((h, k) => { const b = el(h, `left:${8 + k * 31}%;bottom:18px;width:24%;height:80px;border-radius:16px;background:#fff;font-size:44px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.2)`);
+        b.addEventListener('pointerdown', e => { e.preventDefault(); if (finished || round >= 5 || b.dataset.busy) return; const c = rnd(3), r = (k - c + 3) % 3;   // 0 平 1 輸 2 贏
+          round++; vs.textContent = `${h} vs ${hands[c]}`; info.textContent = `第 ${round} 局：你出${names[k]}，電腦出${names[c]} → ${r === 0 ? '平手 +4' : r === 2 ? '你贏了！+12' : '輸了'}`;
+          setScore(score + (r === 0 ? 4 : r === 2 ? 12 : 0)); beep(r === 2 ? 'coin' : 'step'); if (round >= 5) setTimeout(finish, 600); }); });
+      $('#mgStart').textContent = '5 局';
+    },
+    dice() {
+      let round = 0;
+      const info = el('第 1 局：猜大還是小？', 'left:0;right:0;top:18px;text-align:center;font-size:18px;font-weight:900;cursor:default');
+      const dd = el('🎲 🎲 🎲', 'left:0;right:0;top:70px;text-align:center;font-size:46px;cursor:default');
+      const faces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+      [['大', 1], ['小', 0]].forEach(([t, big], k) => { const b = el(t, `left:${12 + k * 44}%;bottom:22px;width:32%;height:76px;border-radius:16px;background:${big ? '#ef5350' : '#42a5f5'};color:#fff;font-size:36px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.25)`);
+        b.addEventListener('pointerdown', e => { e.preventDefault(); if (finished || round >= 5 || box.dataset.rolling) return; box.dataset.rolling = 1; let n = 0;
+          const spin = setInterval(() => { dd.textContent = [0, 1, 2].map(() => faces[rnd(6)]).join(' '); if (++n > 8) { clearInterval(spin);
+            const v = [rnd(6), rnd(6), rnd(6)], sum = v[0] + v[1] + v[2] + 3, isBig = sum >= 11, ok = isBig === !!big; round++;
+            dd.textContent = v.map(x => faces[x]).join(' '); info.textContent = `第 ${round} 局：${sum} 點（${isBig ? '大' : '小'}）→ ${ok ? '猜中！+12' : '沒猜中'}`;
+            if (ok) setScore(score + 12); beep(ok ? 'coin' : 'step'); delete box.dataset.rolling; if (round >= 5) setTimeout(finish, 700); } }, 70); }); });
+      $('#mgStart').textContent = '5 局';
+    },
   };
+  const go = () => { if (running) return; running = true; $('#mgStart').disabled = true; (games[game] || games.coin)(); };
+  $('#mgStart').onclick = go;
+  if (game === 'rps' || game === 'dice' || game === 'memory') go();   // 這三種直接開始
 }
 // 拍賣
 function renderAuction() {
@@ -869,6 +942,15 @@ function renderAuction() {
 setInterval(() => { if (G.s && G.s.step === 'auction') renderAuction(); }, 500);
 
 // 道具卡
+// 道具店分類（仿大富翁6：移動、建設、攻擊、神明、經濟、特殊）
+const CARD_CATS = [
+  ['🚶 移動卡', ['step1', 'step2', 'step3', 'step4', 'step5', 'remote', 'rush', 'turn', 'stay']],
+  ['🏗️ 建設卡', ['build', 'angel', 'buyland', 'tudic', 'priceup', 'pricedown']],
+  ['💥 攻擊卡', ['block', 'mine', 'robot', 'monster', 'devilc', 'missile', 'nuke', 'turtle', 'frame', 'sleep']],
+  ['🙏 神明卡', ['caishenc', 'fushenc', 'qiongc', 'shuaic', 'sendgod', 'kidnap', 'blame']],
+  ['💰 經濟卡', ['free', 'tax', 'rob', 'equal', 'red', 'black']],
+  ['✨ 特殊卡', ['invinc', 'copy', 'gem']],
+];
 function openCards() {
   const s = G.s, p = cur(s);
   if (!p.cards.length) { toast('你沒有道具卡，到道具店用點券買吧'); return; }
@@ -882,7 +964,7 @@ function useCardFlow(k) {
   const s = G.s, p = cur(s), c = CARDS[k];
   const tg = cardTargets(s, p, k);
   if (c.target === 'none' || c.target === 'here') {
-    if (tg && !tg.length) { toast('現在不能用：' + (c.target === 'here' ? '腳下不是別人的地或錢不夠' : '')); return; }
+    if (tg && !tg.length) { toast('現在不能用：' + (c.target === 'here' ? (k === 'tudic' ? '腳下不是別人的地' : '腳下不是別人的地或錢不夠') : '')); return; }
     closeSheet(); send(p.id, { type: 'card', card: k }); return;
   }
   if (c.target === 'dice') {
@@ -892,8 +974,21 @@ function useCardFlow(k) {
     $('#sheet').querySelectorAll('[data-v]').forEach(b => b.onclick = () => { closeSheet(); send(p.id, { type: 'card', card: k, value: +b.dataset.v }); });
     return;
   }
-  if (c.target === 'player' || c.target === 'godplayer') {
-    if (!tg.length) { toast(c.target === 'godplayer' ? '目前沒有人被神明附身' : '沒有可以選的玩家'); return; }
+  if (c.target === 'stock') {
+    openSheet(`<h3>${c.icon} ${c.name}</h3><p>選一支股票：</p>` + STOCKS.map((st, j) => `<button class="ghost" style="width:100%;margin:4px 0" data-sid="${j}">${st.icon || '📈'} ${esc(st.name)}　現價 ${s.market[j].p}　你持有 ${p.stocks[j]} 股</button>`).join('') +
+      `<button class="ghost" style="width:100%;margin-top:6px" data-close>取消</button>`);
+    $('#sheet').querySelectorAll('[data-sid]').forEach(b => b.onclick = () => { closeSheet(); send(p.id, { type: 'card', card: k, sid: +b.dataset.sid }); });
+    return;
+  }
+  if (c.target === 'mycard') {
+    if (!tg.length) { toast(k === 'gem' ? '手上沒有可以合成的卡（怪獸、加蓋、購地、免費、飛彈、烏龜、查稅）' : '手上沒有其他卡可以複製'); return; }
+    openSheet(`<h3>${c.icon} ${c.name}</h3><p>${k === 'gem' ? '選一張卡和寶石合成：' : '選一張要複製的卡：'}</p>` + tg.map(x => `<button class="ghost" style="width:100%;margin:4px 0;text-align:left" data-with="${x}">${CARDS[x].icon} ${CARDS[x].name}${k === 'gem' ? `　➜　${CARDS[GEM[x]].icon} <b>${CARDS[GEM[x]].name}</b>` : ''}</button>`).join('') +
+      `<button class="ghost" style="width:100%;margin-top:6px" data-close>取消</button>`);
+    $('#sheet').querySelectorAll('[data-with]').forEach(b => b.onclick = () => { closeSheet(); send(p.id, { type: 'card', card: k, with: b.dataset.with }); });
+    return;
+  }
+  if (c.target === 'player' || c.target === 'godplayer' || c.target === 'kidnap') {
+    if (!tg.length) { toast(c.target === 'godplayer' ? '目前沒有人被神明附身' : c.target === 'kidnap' ? '沒有對手身上有好神明' : k === 'blame' ? '你身上沒有壞神明可以嫁禍' : '沒有可以選的玩家'); return; }
     openSheet(`<h3>${c.icon} ${c.name}</h3><p>選擇對象：</p>` + tg.map(id => { const o = pl(s, id); return `<button class="ghost" style="width:100%;margin:4px 0" data-t="${esc(id)}">${charOf(o.char).emoji} ${esc(o.name)}　${o.god ? GODS[o.god.id].icon + GODS[o.god.id].name : money(o.cash) + '・' + o.cards.length + ' 張卡'}</button>`; }).join('') +
       `<button class="ghost" style="width:100%;margin-top:6px" data-close>取消</button>`);
     $('#sheet').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { closeSheet(); send(p.id, { type: 'card', card: k, target: b.dataset.t }); });
@@ -1012,6 +1107,8 @@ $('#helpBtn').onclick = () => openSheet(`<button class="x" data-close>✕</butto
   <p>🏢 投資公司：別人停下要付「骰子點數 × $2,000 × 你的公司數」。🏗️ 大型建地：可蓋主題公園、加油站、研究所、購物中心、度假飯店、遊樂園，再停到可以擴建到 3 級。</p>
   <p>🏦 經過或停在銀行後，下次擲骰前可以按「銀行」存提款。買完地可以按「⏭ 換下一位」馬上換人。</p>
   <p>🔨 有人放棄買地時，其他玩家可以出價拍賣。🎰 樂透每 7 天開獎、沒人中就累積。🕹️ 小遊戲接金幣賺點券。🔮魔法屋、👼天使、😈惡魔隨機出現。</p>
+  <p>🃏 大富翁6 卡片：步數卡、暴走卡、財神／福神／窮神／衰神卡、土神卡、無敵卡、誘拐卡、核彈卡。💎 寶石卡可以把卡合成更強的版本（怪獸→惡魔、飛彈→核彈…），📑 複製卡可以複製手上的卡。</p>
+  <p>📊 物價指數：大家平均資產每翻一倍，地價、過路費、建築費和起點獎金都會上漲。💳 停在銀行可以貸款，${'30'} 天後連本帶利 10% 自動還款。🎁 路上會出現點券、寶箱、錢袋，經過就撿起來。🕹️ 小遊戲有接金幣、打地鼠、戳氣球、翻牌記憶、猜拳、骰子比大小。</p>
   <p>🚉 經過台北車站領環島獎金 $10,000、點券 +10；經過或停在🏦銀行可以存提款，每月 1 日發存款利息 10%。</p>
   <p>🏪 道具店用點券買卡；⛩️ 廟會請到神明附身 5 回合（財神、福神、土地公、媽祖是好神，衰神、窮神是壞神）。</p>
   <p>❓ 機會、📰 新聞會發生隨機事件；🏦 銀行可存提款；🎰 彩券行猜點數。</p>

@@ -1,5 +1,5 @@
 // ===== 寶島富翁 3D：遊戲規則引擎（只在房主端執行，狀態可 JSON 化）=====
-import { TILES, N_TILES, useMap, MAP_ID, GROUPS, TOLL_MUL, UPGRADE_RATE, SALARY, CARDS, CARD_IDS, GODS, STOCKS, LEVEL_NAMES, hasSkill } from './data.js';
+import { TILES, N_TILES, useMap, MAP_ID, GROUPS, TOLL_MUL, UPGRADE_RATE, SALARY, CARDS, CARD_IDS, GODS, STOCKS, LEVEL_NAMES, GEM, HARM, hasSkill } from './data.js';
 
 export const PRE_T = 40000, DEC_T = 25000;
 const HOSPI = () => TILES.findIndex(t => t.type === 'hospital');
@@ -26,7 +26,8 @@ export const money = n => '$' + Math.round(n).toLocaleString('en-US');
 export function cur(s) { return s.players[s.turn]; }
 export function pl(s, id) { return s.players.find(p => p.id === id); }
 export function alive(s) { return s.players.filter(p => !p.out); }
-export function price(s, i) { const t = TILES[i]; return r100(t.price * (s.gprice[t.g] || 1)); }
+export const pidx = s => s.pidx || 1;   // 物價指數
+export function price(s, i) { const t = TILES[i]; return r100(t.price * (s.gprice[t.g] || 1) * pidx(s)); }
 export function upCost(s, i) { return r100(price(s, i) * UPGRADE_RATE); }
 export function upCostFor(s, i, p) { if (p.god && p.god.id === 'fushen') return 0; return r100(upCost(s, i) * (hasSkill(p, 'builder') ? 0.8 : 1)); }
 export function cardCost(p, k) { return Math.round(CARDS[k].cost * (hasSkill(p, 'bargain') ? 0.7 : 1)); }
@@ -88,8 +89,8 @@ export function propValue(s, i) {
   return price(s, i) + st.l * upCost(s, i);
 }
 export function companyCount(s, pid) { return s.tiles.filter((x, i) => x && x.o === pid && TILES[i].type === 'company').length; }
-export function companyFee(s, i, dice) { const st = s.tiles[i]; return Math.max(4000, (dice || 7) * 2000 * companyCount(s, st.o)); }
-export function bigFee(s, i) { const st = s.tiles[i]; return st.b ? r10(BIG[st.b].fee * (1 + ((st.bl || 1) - 1) * 0.6)) : 5000; }
+export function companyFee(s, i, dice) { const st = s.tiles[i]; return r10(Math.max(4000, (dice || 7) * 2000 * companyCount(s, st.o)) * pidx(s)); }
+export function bigFee(s, i) { const st = s.tiles[i]; return r10((st.b ? BIG[st.b].fee * (1 + ((st.bl || 1) - 1) * 0.6) : 5000) * pidx(s)); }
 export function bigUpCost(s, i) { const st = s.tiles[i]; return st.b ? r100(BIG[st.b].cost * 0.6) : 0; }
 export function ownsGroup(s, g, pid) {
   return TILES.every((t, i) => t.g !== g || s.tiles[i].o === pid);
@@ -121,7 +122,7 @@ export function toll(s, i) {
 }
 export function stockValue(s, p) { return p.stocks.reduce((a, q, k) => a + q * s.market[k].p, 0); }
 export function assets(s, p) {
-  let v = p.cash + p.deposit + stockValue(s, p);
+  let v = p.cash + p.deposit + stockValue(s, p) - (p.loan ? p.loan.owe : 0);
   s.tiles.forEach((t, i) => { if (t && t.o === p.id) v += propValue(s, i); });
   return Math.round(v);
 }
@@ -141,7 +142,7 @@ export function createGame(players, settings, now) {
     v: 0, phase: 'play', settings, round: 1, month: 1, day: 1, turn: 0, step: 'pre', pending: null, anim: null,
     until: 0, deadline: 0, botAt: 0, botUses: 0,
     tiles: TILES.map(t => (OWNABLE(t) ? { o: null, l: 0, b: null } : null)),
-    marks: {}, gmod: {}, gprice: {},
+    marks: {}, items: {}, gmod: {}, gprice: {}, pidx: 1,
     market: STOCKS.map(x => ({ p: x.p, h: [x.p] })),
     players: players.map(p => ({
       id: p.id, name: p.name, char: p.char, bot: !!p.bot,
@@ -168,6 +169,7 @@ function done(s, now, delay = 800) { s.step = 'done'; s.pending = null; s.until 
 function beginTurn(s, now) {
   const p = cur(s);
   s.pending = null; s.anim = null; s.botUses = 0;
+  if (p.out) { done(s, now, 100); return; }   // 例如換日時貸款到期而破產
   if (!p.out && hasSkill(p, 'pointsday')) addPts(p, 5);
   if (!p.out && hasSkill(p, 'autosave') && p.cash > 0) { const v = r10(p.cash * 0.05); p.cash -= v; p.deposit += v; }
   if (hasSkill(p, 'mischief') && !p.out && Math.random() < 0.15) { log(s, `🐒 ${p.name} 調皮地撿到一張卡`); giveCard(s, p); }
@@ -179,6 +181,7 @@ function beginTurn(s, now) {
     p.god.t--;
     if (p.god.t <= 0) { log(s, `${GODS[p.god.id].icon} ${GODS[p.god.id].name}離開了 ${p.name}`); p.god = null; }
   }
+  if (p.st.inv > 0 && --p.st.inv === 0) log(s, `🛡️ ${p.name} 的無敵狀態結束了`);
   for (const [k, txt] of [['hosp', '🏥 住院休養中'], ['jail', '🚓 拘留中'], ['sleep', '😴 冬眠中']]) {
     if (p.st[k] > 0) {
       p.st[k]--;
@@ -211,8 +214,10 @@ function newRound(s) {
   s.day++;
   mgDailyPay(s);
   if (s.round % 7 === 0) drawLotto(s);
+  dailyRich(s);
   if (s.day > 30) {
     s.day = 1; s.month = s.month % 12 + 1;
+    priceIndex(s);
     log(s, `🗓️ ${s.month} 月 1 日：銀行發放存款利息 10%`);
     alive(s).forEach(p => { const it = r10(p.deposit * (hasSkill(p, 'interest') ? 0.2 : 0.1)); if (it > 0) { p.deposit += it; fx(s, { k: 'money', pid: p.id, d: it }); } });
     alive(s).forEach(p => {
@@ -269,9 +274,10 @@ function finishMove(s, now) {
   const { pass, mark } = s.moveInfo || {};
   s.moveInfo = null;
   // 大富翁6：經過銀行可以存提款
+  pickItems(s, p, path);
   if (path.slice(1).some(i => TILES[i].type === 'bank')) { p.bankOk = true; log(s, `🏦 ${p.name} 經過銀行，下回合擲骰前可以存提款`); }
   for (let k = 0; k < (pass || 0); k++) {
-    const sal = hasSkill(p, 'salary') ? SALARY * 1.5 : SALARY;
+    const sal = r100((hasSkill(p, 'salary') ? SALARY * 1.5 : SALARY) * pidx(s));
     p.cash += sal; addPts(p, 10);
     log(s, `🚉 ${p.name} 經過台北車站，領環島獎金 ${money(sal)}、點券 +${hasSkill(p, 'pointsx') ? 20 : 10}`);
     fx(s, { k: 'money', pid: p.id, d: sal });
@@ -281,6 +287,7 @@ function finishMove(s, now) {
     if (mark === 'block') { log(s, `🚧 ${p.name} 被路障擋下了！`); fx(s, { k: 'boom', tile: p.pos, m: 'block' }); }
     else {
       fx(s, { k: 'boom', tile: p.pos, m: 'mine', big: 1, pid: p.id });
+      if (p.st.inv > 0) { log(s, `🛡️ ${p.name} 踩到地雷，但是無敵狀態毫髮無傷！`); land(s, now); return; }
       log(s, `💣 轟！${p.name} 踩到地雷！`);
       if (p.veh) { log(s, `💥 ${p.name} 的${VEH[p.veh].name}被炸毀了`); p.veh = 0; }
       if (sendHospital(s, p, 2)) { done(s, now, 1800); return; }
@@ -346,9 +353,68 @@ function pay(s, p, to, amt, why) {
   return paid;
 }
 function gain(s, p, amt) { if (s.chanceCtx === p.id && hasSkill(p, 'lucky')) amt = r10(amt * 1.5); p.cash += amt; fx(s, { k: 'money', pid: p.id, d: amt }); }
+// ---------- 大富翁6：物價指數 ----------
+// 所有人平均資產每翻一倍，物價指數就上升一級（地價、過路費、建築費、薪水一起漲）
+function priceIndex(s) {
+  const al = alive(s); if (!al.length) return;
+  const avg = al.reduce((a, p) => a + assets(s, p), 0) / al.length;
+  const ratio = avg / (s.settings.startCash || 300000);
+  const lv = ratio >= 2 ? Math.floor(Math.log2(ratio)) : 0;
+  const ni = Math.min(3, 1 + lv * 0.5);
+  if (ni > pidx(s)) {
+    s.pidx = ni;
+    log(s, `📊 物價指數上升到 ×${ni}！地價、過路費、建築費和起點獎金全部上漲`);
+    fx(s, { k: 'notice', kind: 'news', title: '📊 物價上漲', text: `大家越來越有錢，物價指數上升到 ×${ni}\n地價、過路費、蓋房子和起點獎金都跟著漲` });
+  }
+}
+// ---------- 大富翁6：銀行貸款、路上寶物 ----------
+export const LOAN_DAYS = 30, LOAN_RATE = 0.1;
+export function loanMax(s, p) { return Math.max(0, Math.floor(Math.min(500000 * pidx(s), assets(s, p) * 0.5) / 10000) * 10000); }
+export const MINIGAMES = ['coin', 'mole', 'balloon', 'memory', 'rps', 'dice'];
+export const MG_NAMES = { coin: '接金幣', mole: '打地鼠', balloon: '戳氣球', memory: '翻牌記憶', rps: '猜拳大賽', dice: '骰子比大小' };
+const ITEM_KINDS = { pts10: { icon: '🎟️', name: '10 點點券' }, pts30: { icon: '🎟️', name: '30 點點券' }, pts50: { icon: '🎫', name: '50 點點券' }, chest: { icon: '🎁', name: '寶箱' }, bag: { icon: '💰', name: '錢袋' } };
+function dailyRich(s) {
+  // 貸款到期：自動從現金／存款扣，不夠就變賣，再不夠就破產
+  alive(s).forEach(p => {
+    if (!p.loan) return;
+    const left = p.loan.due - s.round;
+    if (left === 3) log(s, `⏰ ${p.name} 的貸款 ${money(p.loan.owe)} 還有 3 天到期`);
+    if (left <= 0) {
+      const owe = p.loan.owe; p.loan = null;
+      if (p.cash < owe && p.deposit > 0) { const w = Math.min(p.deposit, owe - p.cash); p.deposit -= w; p.cash += w; }
+      log(s, `🏦 ${p.name} 的貸款到期，銀行收回 ${money(owe)}`);
+      fx(s, { k: 'notice', kind: 'evil', title: '🏦 貸款到期', text: `${p.name} 還款 ${money(owe)}`, pid: p.id });
+      pay(s, p, null, owe);
+    }
+  });
+  // 路上隨機出現點券、寶箱、錢袋（經過就撿起來）
+  s.items = s.items || {};
+  const want = Math.max(3, Math.round(N_TILES / 12));
+  for (let k = 0; k < 2 && Object.keys(s.items).length < want; k++) {
+    const i = rnd(N_TILES);
+    if (i === 0 || s.items[i] || s.marks[i] || alive(s).some(p => p.pos === i)) continue;
+    const r = Math.random();
+    s.items[i] = r < 0.35 ? 'pts10' : r < 0.55 ? 'pts30' : r < 0.65 ? 'pts50' : r < 0.85 ? 'chest' : 'bag';
+    fx(s, { k: 'item', tile: i });
+  }
+}
+function pickItems(s, p, path) {
+  for (const i of path.slice(1)) {
+    const k = s.items && s.items[i]; if (!k) continue;
+    delete s.items[i]; fx(s, { k: 'item', tile: i, got: p.id });
+    let msg;
+    if (k === 'pts10' || k === 'pts30' || k === 'pts50') { const n = +k.slice(3); addPts(p, n); msg = `撿到 ${n} 點點券`; }
+    else if (k === 'chest') {
+      if (Math.random() < 0.5 && p.cards.length < cardLimit(p)) { giveCard(s, p); msg = '打開寶箱，得到一張道具卡'; }
+      else { const v = r100((10000 + rnd(5) * 10000) * pidx(s)); gain(s, p, v); msg = `打開寶箱，裡面有 ${money(v)}`; }
+    } else { const v = r100((5000 + rnd(6) * 5000) * pidx(s)); gain(s, p, v); msg = `撿到錢袋 ${money(v)}`; }
+    log(s, `${ITEM_KINDS[k].icon} ${p.name} ${msg}`);
+    fx(s, { k: 'emote', pid: p.id, e: ITEM_KINDS[k].icon });
+  }
+}
 function bankrupt(s, p) {
   if (p.out) return;
-  p.out = true; p.cash = 0; p.deposit = 0; p.cards = []; p.god = null;
+  p.out = true; p.cash = 0; p.deposit = 0; p.cards = []; p.god = null; p.loan = null;
   s.tiles.forEach(t => { if (t && t.o === p.id) { t.o = null; t.l = 0; t.b = null; t.bl = 0; t.mg = null; } });
   s.lotto.tix = s.lotto.tix.filter(x => x.pid !== p.id);
   log(s, `💸 ${p.name} 破產出局了！`);
@@ -370,7 +436,7 @@ function land(s, now) {
     case 'carshop':
       if (p.veh < 2 && p.cash >= VEH[p.veh + 1].price) return ask(s, { type: 'car' }, now);
       log(s, `🛵 ${p.name} 逛了逛車行`); return done(s, now);
-    case 'game': return ask(s, { type: 'minigame' }, now);
+    case 'game': { const r = ask(s, { type: 'minigame', game: pick(MINIGAMES) }, now); s.deadline = now + 45000; return r; }
     case 'magic': return magic(s, p, now);
     case 'shop':
       if (p.points >= 10 || hasSkill(p, 'network')) return ask(s, { type: 'shop' }, now);
@@ -711,7 +777,7 @@ function news(s, p, now) {
 }
 function giveCard(s, p) {
   if (p.cards.length >= cardLimit(p)) return;
-  const c = pick(CARD_IDS); p.cards.push(c);
+  const pool = CARD_IDS.filter(k => !CARDS[k].rare || Math.random() < 0.25); const c = pick(pool); p.cards.push(c);
   fx(s, { k: 'card', pid: p.id, card: c, got: 1 });
   log(s, `🃏 ${p.name} 獲得「${CARDS[c].name}」`);
 }
@@ -778,6 +844,7 @@ export function act(s, pid, a, now) {
     if (a.type === 'roll') return doRoll(s, p, now);
     if (a.type === 'card') return useCard(s, p, a, now);
     if (a.type === 'stock') return doStock(s, p, a);
+    if (a.type === 'repay') { if (!p.bankOk) return '要經過或停在銀行才能還款'; return repay(s, p, now); }
     if (a.type === 'bank') {
       if (!p.bankOk) return '要經過或停在銀行才能存提款';
       let amt = Math.round(a.amount || 0);
@@ -846,8 +913,9 @@ export function act(s, pid, a, now) {
     case 'minigame': {
       const sc = a.type === 'mg' ? Math.max(0, Math.min(60, a.score | 0)) : 0;
       addPts(p, sc);
-      log(s, `🕹️ ${p.name} 玩接金幣，得到 ${sc} 點券`);
-      fx(s, { k: 'notice', kind: 'god', title: '🕹️ 小遊戲', text: `${p.name} 接到 ${sc} 枚金幣，點券 +${sc}` });
+      const gname = MG_NAMES[pd.game] || '小遊戲';
+      log(s, `🕹️ ${p.name} 玩「${gname}」，得到 ${sc} 點券`);
+      fx(s, { k: 'notice', kind: 'god', title: `🕹️ ${gname}`, text: `${p.name} 得到 ${sc} 分，點券 +${sc}` });
       return done(s, now, 1600), null;
     }
     case 'mgup': {
@@ -910,6 +978,16 @@ export function act(s, pid, a, now) {
       return done(s, now, 500), null;
     }
     case 'bank': {
+      if (a.type === 'loan') {
+        if (p.loan) return '你已經有一筆貸款，先還清才能再借';
+        const amt = Math.min(Math.round(a.amount || 0), loanMax(s, p));
+        if (amt < 10000) return '可借額度不足';
+        p.loan = { amt, owe: r100(amt * (1 + LOAN_RATE)), due: s.round + LOAN_DAYS };
+        p.cash += amt; fx(s, { k: 'money', pid: p.id, d: amt });
+        log(s, `🏦 ${p.name} 向銀行貸款 ${money(amt)}，${LOAN_DAYS} 天後要還 ${money(p.loan.owe)}`);
+        s.deadline = now + DEC_T; s.botAt = now + 600; pd.did = (pd.did || 0) + 1; return null;
+      }
+      if (a.type === 'repay') return repay(s, p, now, pd);
       if (a.type === 'bank') {
         let amt = Math.round(a.amount || 0);
         if (amt > 0) { amt = Math.min(amt, p.cash); p.cash -= amt; p.deposit += amt; log(s, `🏦 ${p.name} 存入 ${money(amt)}`); }
@@ -924,6 +1002,16 @@ export function act(s, pid, a, now) {
   return '無效動作';
 }
 
+function repay(s, p, now, pd) {
+  if (!p.loan) return '你沒有貸款';
+  const owe = p.loan.owe;
+  if (p.cash + p.deposit < owe) return '現金加存款不夠還';
+  const fromCash = Math.min(p.cash, owe); p.cash -= fromCash; p.deposit -= owe - fromCash;
+  p.loan = null; fx(s, { k: 'money', pid: p.id, d: -owe });
+  log(s, `🏦 ${p.name} 還清貸款 ${money(owe)}`);
+  if (pd) { s.deadline = now + DEC_T; s.botAt = now + 600; pd.did = (pd.did || 0) + 1; }
+  return null;
+}
 function doRoll(s, p, now) {
   p.bankOk = false;
   if (p.stay) {
@@ -966,7 +1054,9 @@ function doStock(s, p, a) {
 export function cardTargets(s, p, card) {
   const c = CARDS[card];
   switch (c.target) {
-    case 'player': return alive(s).filter(o => o !== p && !((card === 'tax' || card === 'turtle') && hasSkill(o, 'protected'))).map(o => o.id);
+    case 'player':
+      if (card === 'blame' && !(p.god && !GODS[p.god.id].good)) return [];
+      return alive(s).filter(o => o !== p && !((card === 'tax' || card === 'turtle' || card === 'frame') && hasSkill(o, 'protected'))).map(o => o.id);
     case 'place': {
       const r = [];
       const R = hasSkill(p, 'range') ? 16 : 8;
@@ -974,9 +1064,17 @@ export function cardTargets(s, p, card) {
       return r;
     }
     case 'godplayer': return alive(s).filter(o => o.god).map(o => o.id);
+    case 'stock': return STOCKS.map((_, k) => k);
+    case 'anytile': return TILES.map((_, i) => i);
+    case 'kidnap': return alive(s).filter(o => o !== p && o.god && GODS[o.god.id].good && !(o.st.inv > 0)).map(o => o.id);
+    case 'mycard': {
+      const others = [...new Set(p.cards.filter(k => k !== card))];
+      return card === 'gem' ? others.filter(k => GEM[k]) : others;
+    }
+    case 'anyprop': return TILES.map((t, i) => (t.type === 'prop' ? i : -1)).filter(i => i >= 0);
     case 'oppprop': return s.tiles.map((t, i) => (t && TILES[i].type === 'prop' && t.o && t.o !== p.id && (t.l > 0 || t.mg) ? i : -1)).filter(i => i >= 0);
     case 'myprop': return s.tiles.map((t, i) => (t && TILES[i].type === 'prop' && t.o === p.id && t.l < 5 && !t.mg ? i : -1)).filter(i => i >= 0);
-    case 'here': { const t = s.tiles[p.pos]; return t && t.o && t.o !== p.id && p.cash >= propValue(s, p.pos) ? [p.pos] : []; }
+    case 'here': { const t = s.tiles[p.pos]; return t && t.o && t.o !== p.id && (card === 'tudic' || p.cash >= propValue(s, p.pos)) ? [p.pos] : []; }
     default: return null;
   }
 }
@@ -987,9 +1085,17 @@ function useCard(s, p, a, now) {
   const c = CARDS[a.card];
   if (c.target === 'auto') return '這張卡會自動使用';
   const tg = cardTargets(s, p, a.card);
-  if (tg && c.target !== 'godplayer' && !tg.includes(c.target === 'player' ? a.target : (c.target === 'here' ? p.pos : a.tile))) return '目標無效';
-  if (c.target === 'godplayer' && !tg.includes(a.target)) return '目標無效';
-  const tp = (c.target === 'player' || c.target === 'godplayer') ? pl(s, a.target) : null;
+  const key = (c.target === 'player' || c.target === 'godplayer' || c.target === 'kidnap') ? a.target : c.target === 'here' ? p.pos : c.target === 'stock' ? a.sid : c.target === 'mycard' ? a.with : a.tile;
+  if (tg && !tg.includes(key)) return '目標無效';
+  const tp = (c.target === 'player' || c.target === 'godplayer' || c.target === 'kidnap') ? pl(s, a.target) : null;
+  // 無敵卡：被攻擊的人（或土地的主人）在無敵狀態就擋下
+  if (HARM.includes(a.card)) {
+    const victim = tp || (a.tile != null && s.tiles[a.tile] && s.tiles[a.tile].o ? pl(s, s.tiles[a.tile].o) : null) || (c.target === 'here' && s.tiles[p.pos] ? pl(s, s.tiles[p.pos].o) : null);
+    if (victim && victim !== p && victim.st.inv > 0) {
+      p.cards.splice(ci, 1); fx(s, { k: 'card', pid: p.id, card: a.card }); fx(s, { k: 'emote', pid: victim.id, e: '🛡️' });
+      log(s, `${c.icon} ${p.name} 使用「${c.name}」，但 ${victim.name} 有無敵卡護身，完全沒效！`); s.botUses++; return null;
+    }
+  }
   const pre = `${c.icon} ${p.name} 使用「${c.name}」`;
   switch (a.card) {
     case 'remote': {
@@ -1037,6 +1143,68 @@ function useCard(s, p, a, now) {
       let n = 0; for (let k = 1; k <= 10; k++) { const i = (p.pos + p.dir * k + N_TILES * 2) % N_TILES; if (s.marks[i]) { delete s.marks[i]; n++; fx(s, { k: 'mark', tile: i }); } }
       log(s, `${pre}，清除了 ${n} 個障礙`); break;
     }
+    case 'step1': case 'step2': case 'step3': case 'step4': case 'step5': case 'rush': {
+      const n = a.card === 'rush' ? 12 : +a.card.slice(4);
+      s.cardMove = n; log(s, `${pre}，前進 ${n} 步`); break;
+    }
+    case 'caishenc': { setGod(s, p, 'caishen', 5); const v = r100((10000 + rnd(5) * 10000) * pidx(s)); gain(s, p, v); log(s, `${pre}，財神附身還送上 ${money(v)}！`); break; }
+    case 'fushenc': { setGod(s, p, 'fushen', 5); for (let k = 0; k < 3; k++) giveCard(s, p); log(s, `${pre}，福神附身還帶來 3 張卡！`); break; }
+    case 'qiongc': {
+      if (!setGod(s, tp, 'qiong', 5)) { log(s, `${pre}，但 ${tp.name} 有媽祖保佑`); break; }
+      const v = Math.min(tp.cash, r100((10000 + rnd(3) * 10000) * pidx(s))); tp.cash -= v; fx(s, { k: 'money', pid: tp.id, d: -v });
+      log(s, `${pre}，${tp.name} 被窮神附身，馬上損失 ${money(v)}！`); break;
+    }
+    case 'shuaic':
+      if (!setGod(s, tp, 'shuai', 5)) { log(s, `${pre}，但 ${tp.name} 有媽祖保佑`); break; }
+      log(s, `${pre}，${tp.name} 被衰神附身 5 回合，過路費要付兩倍！`); break;
+    case 'devilc': {
+      const g = TILES[a.tile].g; let n = 0;
+      TILES.forEach((t, i) => { const x = s.tiles[i]; if (t.g !== g || !x || !x.o || pl(s, x.o).st.inv > 0 || hasSkill(pl(s, x.o), 'armor')) return; if (x.mg) { mgDamage(s, i, 1); n++; } else if (x.l > 0) { x.l--; n++; } fx(s, { k: 'boom', tile: i, m: 'monster' }); });
+      log(s, `${pre}，${GROUPS[g].name}有 ${n} 塊地的房子降了一級！`); break;
+    }
+    case 'tudic': {
+      const i = p.pos, st = s.tiles[i], o = pl(s, st.o); mgBreak(s, i); st.o = p.id;
+      fx(s, { k: 'buy', tile: i, pid: p.id }); log(s, `${pre}，免費強占了 ${o.name} 的 ${TILES[i].name}！`); break;
+    }
+    case 'invinc': p.st.inv = 5; fx(s, { k: 'emote', pid: p.id, e: '🛡️' }); log(s, `${pre}，接下來 5 回合無敵！`); break;
+    case 'kidnap': { const g = tp.god; tp.god = null; p.god = { ...g }; fx(s, { k: 'emote', pid: p.id, e: GODS[g.id].icon }); log(s, `${pre}，把 ${tp.name} 身上的${GODS[g.id].icon}${GODS[g.id].name}拐走了！`); break; }
+    case 'copy': {
+      if (p.cards.length >= cardLimit(p)) return '道具卡已經滿了';
+      p.cards.push(a.with); log(s, `${pre}，複製了一張「${CARDS[a.with].name}」`); fx(s, { k: 'card', pid: p.id, card: a.with, got: 1 }); break;
+    }
+    case 'gem': {
+      const to = GEM[a.with]; p.cards.splice(p.cards.indexOf(a.with), 1); p.cards.push(to);
+      log(s, `${pre}，把「${CARDS[a.with].name}」合成為「${CARDS[to].name}」！`); fx(s, { k: 'card', pid: p.id, card: to, got: 1 }); break;
+    }
+    case 'nuke': {
+      const c0 = a.tile, hit = []; fx(s, { k: 'missile', pid: p.id, tile: c0, to: null, nuke: 1 });
+      for (let d = -2; d <= 2; d++) {
+        const i = (c0 + d + N_TILES) % N_TILES, x = s.tiles[i];
+        if (x && x.o && !(pl(s, x.o).st.inv > 0) && !hasSkill(pl(s, x.o), 'armor')) { if (x.mg) mgDamage(s, i, 2); else x.l = Math.max(0, x.l - 2); }
+        alive(s).forEach(o => { if (o.pos === i && !(o.st.inv > 0) && !hasGod(o, 'mazu') && !hit.includes(o)) { hit.push(o); sendHospital(s, o, 2); } });
+      }
+      log(s, `${pre}，${TILES[c0].name} 一帶被夷為平地！${hit.length ? hit.map(o => o.name).join('、') + ' 被炸進醫院' : ''}`); break;
+    }
+    case 'red': case 'black': {
+      const k = a.sid | 0, m = s.market[k], up = a.card === 'red';
+      m.p = Math.max(2, Math.round(m.p * (up ? 13 : 7)) / 10); m.h.push(m.p);
+      log(s, `${pre}，${STOCKS[k].name} 股價${up ? '大漲 30%' : '重挫 30%'}（${m.p}）`); break;
+    }
+    case 'priceup': case 'pricedown': {
+      const g = TILES[a.tile].g, up = a.card === 'priceup';
+      s.gprice[g] = (s.gprice[g] || 1) * (up ? 1.3 : 0.75);
+      TILES.forEach((t, i) => { if (t.g === g) fx(s, { k: 'build', tile: i }); });
+      log(s, `${pre}，${GROUPS[g].name}地價永久${up ? '上漲 30%' : '下跌 25%'}`); break;
+    }
+    case 'frame':
+      if (hasGod(tp, 'mazu')) { log(s, `${pre}，但 ${tp.name} 有媽祖保佑`); break; }
+      log(s, `${pre}，${tp.name} 被誣陷抓去警察局！`); sendJail(s, tp, 2); break;
+    case 'blame': {
+      const g = p.god; p.god = null;
+      if (hasGod(tp, 'mazu')) { log(s, `${pre}，${GODS[g.id].name}想去找 ${tp.name}，被媽祖擋下，只好離開`); break; }
+      tp.god = { id: g.id, t: Math.max(2, g.t) }; fx(s, { k: 'emote', pid: tp.id, e: GODS[g.id].icon });
+      log(s, `${pre}，把${GODS[g.id].icon}${GODS[g.id].name}轉嫁給 ${tp.name}！`); break;
+    }
     case 'sendgod': { const g = GODS[tp.god.id]; tp.god = null; log(s, `${pre}，把 ${tp.name} 身上的${g.icon}${g.name}送走了`); break; }
     case 'missile': {
       const st = s.tiles[a.tile], o = pl(s, st.o); fx(s, { k: 'missile', pid: p.id, tile: a.tile, to: o.id, blocked: hasSkill(o, 'armor') ? 1 : 0 });
@@ -1061,9 +1229,10 @@ function useCard(s, p, a, now) {
     }
   }
   if ((a.card === 'stay' || a.card === 'remote') && hasSkill(p, 'encore') && Math.random() < 0.4) log(s, `✨ ${p.name} 臨場發揮，「${c.name}」沒有用掉！`);
-  else p.cards.splice(p.cards.indexOf(a.card), 1);
+  else if (p.cards.indexOf(a.card) >= 0) p.cards.splice(p.cards.indexOf(a.card), 1);
   fx(s, { k: 'card', pid: p.id, card: a.card });
   s.botUses++;
+  if (s.cardMove) { const n = s.cardMove; s.cardMove = 0; p.bankOk = false; s.lastDice = n; startMove(s, p, n, now, null); }
   return null;
 }
 
@@ -1144,6 +1313,8 @@ export function botAction(s, p) {
     case 'bigup': return { type: p.cash - bigUpCost(s, pd.tile) > 40000 ? 'yes' : 'no' };
     case 'minigame': return { type: 'mg', score: 10 + rnd(35) };
     case 'bank':
+      if (p.loan && p.cash + p.deposit > p.loan.owe + 150000 && (pd.did || 0) < 3) return { type: 'repay' };
+      if (!p.loan && !pd.did && p.cash < 60000 && loanMax(s, p) >= 100000) return { type: 'loan', amount: Math.min(200000, loanMax(s, p)) };
       if (!pd.did && p.cash > 260000) return { type: 'bank', amount: r100(p.cash - 160000) };
       if (!pd.did && p.cash < 40000 && p.deposit > 0) return { type: 'bank', amount: -Math.min(p.deposit, 80000) };
       return { type: 'done' };
@@ -1157,6 +1328,26 @@ function botCard(s, p) {
   if (has('buyland')) { const t = cardTargets(s, p, 'buyland'); if (t.length && p.cash - propValue(s, p.pos) > 50000) return { type: 'card', card: 'buyland' }; }
   if (has('equal')) { const avg = alive(s).reduce((a, o) => a + o.cash, 0) / alive(s).length; if (p.cash < avg * 0.55) return { type: 'card', card: 'equal' }; }
   if (has('tax') && richest && richest.cash > 90000 && Math.random() < 0.6) return { type: 'card', card: 'tax', target: richest.id };
+  // 步數卡／暴走卡：算一下落點，好就用
+  for (const k of ['step1', 'step2', 'step3', 'step4', 'step5', 'rush']) if (has(k)) {
+    const n = k === 'rush' ? 12 : +k.slice(4), i = (p.pos + p.dir * n + N_TILES * 2) % N_TILES;
+    if (scoreTile(s, p, i) >= 15000 && Math.random() < 0.7) return { type: 'card', card: k };
+  }
+  for (const k of ['caishenc', 'fushenc', 'invinc']) if (has(k) && !(k === 'invinc' && p.st.inv) && !(k !== 'invinc' && p.god && GODS[p.god.id].good)) return { type: 'card', card: k };
+  if (has('qiongc') && richest && !(richest.st.inv > 0)) return { type: 'card', card: 'qiongc', target: richest.id };
+  if (has('shuaic') && richest && !(richest.st.inv > 0) && Math.random() < 0.6) return { type: 'card', card: 'shuaic', target: richest.id };
+  if (has('tudic') && cardTargets(s, p, 'tudic').length) return { type: 'card', card: 'tudic' };
+  if (has('kidnap')) { const t = cardTargets(s, p, 'kidnap'); if (t.length) return { type: 'card', card: 'kidnap', target: t[0] }; }
+  if (has('gem')) { const t = cardTargets(s, p, 'gem'); if (t.length) return { type: 'card', card: 'gem', with: t[0] }; }
+  if (has('copy') && p.cards.length < cardLimit(p)) { const t = cardTargets(s, p, 'copy').filter(k => ['missile', 'monster', 'tax', 'nuke', 'caishenc', 'build'].includes(k)); if (t.length) return { type: 'card', card: 'copy', with: t[0] }; }
+  if (has('devilc') && richest) { const th = ownProps(s, richest).filter(i => s.tiles[i].l > 0 || s.tiles[i].mg); if (th.length) return { type: 'card', card: 'devilc', tile: th[0] }; }
+  if (has('nuke') && richest) { const th = ownProps(s, richest).sort((x, y) => propValue(s, y) - propValue(s, x)); if (th.length && propValue(s, th[0]) > 80000) return { type: 'card', card: 'nuke', tile: th[0] }; }
+  if (has('blame') && p.god && !GODS[p.god.id].good && richest) return { type: 'card', card: 'blame', target: richest.id };
+  if (has('frame') && richest && !hasSkill(richest, 'protected') && Math.random() < 0.3) return { type: 'card', card: 'frame', target: richest.id };
+  if (has('red') && Math.random() < 0.4) { const k = p.stocks.indexOf(Math.max(...p.stocks)); if (p.stocks[k] > 0) return { type: 'card', card: 'red', sid: k }; }
+  if (has('black') && richest && Math.random() < 0.3) { const k = richest.stocks.indexOf(Math.max(...richest.stocks)); if (richest.stocks[k] > 0 && !p.stocks[k]) return { type: 'card', card: 'black', sid: k }; }
+  if (has('priceup') && Math.random() < 0.4) { const mine = ownProps(s, p); if (mine.length >= 2) return { type: 'card', card: 'priceup', tile: pick(mine) }; }
+  if (has('pricedown') && richest && Math.random() < 0.3) { const th = ownProps(s, richest); if (th.length >= 2) return { type: 'card', card: 'pricedown', tile: pick(th) }; }
   if (has('monster')) {
     const t = cardTargets(s, p, 'monster').filter(i => s.tiles[i].l >= 3);
     if (t.length) return { type: 'card', card: 'monster', tile: t.sort((a, b) => s.tiles[b].l - s.tiles[a].l)[0] };

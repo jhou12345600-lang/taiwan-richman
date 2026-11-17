@@ -526,7 +526,35 @@ export const CARDS = {
   robot: { name: '機器娃娃', icon: '🤖', cost: 25, target: 'none', desc: '清除前方 10 格內所有路障和地雷。' },
   missile: { name: '飛彈卡', icon: '🚀', cost: 60, target: 'oppprop', desc: '轟炸對手土地，房子少 2 層，地主住院 1 回合。' },
   sendgod: { name: '送神卡', icon: '🎐', cost: 30, target: 'godplayer', desc: '把任何一位玩家身上的神明送走。' },
+  red: { name: '紅卡', icon: '📈', cost: 40, target: 'stock', desc: '指定一支股票立刻上漲 30%。' },
+  black: { name: '黑卡', icon: '📉', cost: 40, target: 'stock', desc: '指定一支股票立刻下跌 30%。' },
+  priceup: { name: '漲價卡', icon: '⬆️', cost: 50, target: 'anyprop', desc: '選一塊地，整個區域的地價永久上漲 30%（過路費跟著漲）。' },
+  pricedown: { name: '降價卡', icon: '⬇️', cost: 40, target: 'anyprop', desc: '選一塊地，整個區域的地價永久下跌 25%。' },
+  frame: { name: '陷害卡', icon: '🚨', cost: 45, target: 'player', desc: '陷害指定玩家，被警察抓走拘留 2 回合。' },
+  blame: { name: '嫁禍卡', icon: '🎭', cost: 35, target: 'player', desc: '把自己身上的衰神、窮神或惡魔轉嫁給指定玩家。' },
+  // ===== 大富翁6 卡片 =====
+  step1: { name: '一步卡', icon: '1️⃣', cost: 8, target: 'none', desc: '不用擲骰，立刻前進 1 步。' },
+  step2: { name: '二步卡', icon: '2️⃣', cost: 10, target: 'none', desc: '不用擲骰，立刻前進 2 步。' },
+  step3: { name: '三步卡', icon: '3️⃣', cost: 12, target: 'none', desc: '不用擲骰，立刻前進 3 步。' },
+  step4: { name: '四步卡', icon: '4️⃣', cost: 14, target: 'none', desc: '不用擲骰，立刻前進 4 步。' },
+  step5: { name: '五步卡', icon: '5️⃣', cost: 16, target: 'none', desc: '不用擲骰，立刻前進 5 步。' },
+  rush: { name: '暴走卡', icon: '🏃', cost: 30, target: 'none', desc: '立刻向前狂奔 12 步。' },
+  caishenc: { name: '財神卡', icon: '💰', cost: 90, target: 'none', rare: 1, desc: '財神附身 5 回合（不付過路費、收費加倍），還馬上拿到 $1萬～5萬。' },
+  fushenc: { name: '福神卡', icon: '🍀', cost: 70, target: 'none', rare: 1, desc: '福神附身 5 回合（蓋房子免費），還馬上拿到 3 張卡。' },
+  qiongc: { name: '窮神卡', icon: '🥀', cost: 55, target: 'player', desc: '讓指定對手被窮神附身 5 回合，並馬上損失 $1萬～3萬。' },
+  shuaic: { name: '衰神卡', icon: '☠️', cost: 45, target: 'player', desc: '讓指定對手被衰神附身 5 回合（過路費加倍付）。' },
+  devilc: { name: '惡魔卡', icon: '😈', cost: 70, target: 'anyprop', rare: 1, desc: '選一條街，街上所有房子降一級。' },
+  tudic: { name: '土神卡', icon: '🏯', cost: 90, target: 'here', rare: 1, desc: '不用錢，直接強占你腳下別人的土地（連房子）。' },
+  invinc: { name: '無敵卡', icon: '🛡️', cost: 40, target: 'none', desc: '5 回合內無敵：不受飛彈、怪獸、陷害、查稅、地雷等攻擊。' },
+  kidnap: { name: '誘拐卡', icon: '🪤', cost: 35, target: 'kidnap', desc: '把對手身上的好神明（財神、福神、土地公…）拐到自己身上。' },
+  copy: { name: '複製卡', icon: '📑', cost: 40, target: 'mycard', desc: '複製手上的另一張卡。' },
+  gem: { name: '寶石卡', icon: '💎', cost: 60, target: 'mycard', desc: '和手上的卡合成更強的卡：怪獸→惡魔、加蓋→天使、購地→土神、免費→財神、飛彈→核彈、烏龜→衰神、查稅→窮神。' },
+  nuke: { name: '核彈卡', icon: '☢️', cost: 140, target: 'anytile', rare: 1, desc: '炸毀目標 2 格範圍內所有房子 2 級，範圍內的人全部住院 2 回合。' },
 };
+// 大富翁6 寶石卡合成表
+export const GEM = { monster: 'devilc', build: 'angel', buyland: 'tudic', free: 'caishenc', missile: 'nuke', turtle: 'shuaic', tax: 'qiongc' };
+// 會傷害別人的卡（無敵卡可以擋）
+export const HARM = ['tax', 'rob', 'monster', 'missile', 'turtle', 'frame', 'qiongc', 'shuaic', 'blame', 'kidnap', 'nuke', 'devilc', 'buyland', 'tudic'];
 export const CARD_IDS = Object.keys(CARDS);
 
 export const GODS = {

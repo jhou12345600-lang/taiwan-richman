@@ -245,7 +245,7 @@ function shareUrl() {
   return u.toString();
 }
 function lobbyState() {
-  return { phase: 'lobby', v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 30000, maxRounds: 50, dice: 1, map: LS.get('tr3d-map', 'taiwan'), auction: true }, fx: [], fxn: 0, log: [] };
+  return { phase: 'lobby', v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 300000, maxRounds: 50, dice: 1, map: LS.get('tr3d-map', 'taiwan'), auction: true }, fx: [], fxn: 0, log: [] };
 }
 
 // ---------- 連線 ----------
@@ -297,6 +297,8 @@ function onStateMsg(m) {
   else if (!G.isHost && s.host === myId && G.s && G.s.host !== myId && s.phase === 'play') { becomeHost(true, s); toast('原房主離開了，由你接手主持遊戲'); }
   applyState(s);
 }
+// 大富翁式金額：一萬以上用「萬」表示
+function wan(n) { n = Math.round(n); if (Math.abs(n) < 10000) return money(n); const w = n / 10000; return '$' + (Math.abs(w) >= 100 ? Math.round(w).toLocaleString('en-US') : (Math.round(w * 10) / 10)) + '萬'; }
 function nameOf(s, id) { const a = (s.players || s.seats || []).find(p => p.id === id || p.ctl === id); return a && a.name; }
 
 function checkHostAlive() {
@@ -531,7 +533,7 @@ function renderPlayers() {
     return `<div class="pc ${i === s.turn && s.phase === 'play' ? 'cur' : ''} ${p.out ? 'out' : ''}" data-p="${esc(p.id)}">
       <div class="av" style="background:${c.color}33">${avHtml(p.ctl === p.id || p.bot ? p.id : '', c.emoji)}</div>
       <div><div class="nm" style="color:${c.color}">${esc(p.name)}${p.ctl === myId && !p.bot ? '（你）' : ''}</div>
-      <div class="cash">${p.out ? '破產' : money(p.cash)}</div><div class="ic">${ic}</div></div>${off}</div>`;
+      <div class="cash">${p.out ? '破產' : '💵' + wan(p.cash)}</div>${!p.out && p.deposit ? `<div class="dep">🏦${wan(p.deposit)}</div>` : ''}<div class="ic">${ic}</div></div>${off}</div>`;
   }).join('');
   $('#players').querySelectorAll('.pc').forEach(el => el.onclick = () => showPlayer(el.dataset.p));
 }
@@ -691,7 +693,7 @@ function tileInfoHtml(i) {
   if ((t.type === 'company' || t.type === 'bigland') && s.tiles) {
     const st = s.tiles[i], o = st.o && pl(s, st.o);
     h += `<div class="kv"><b>種類</b><span>${t.type === 'company' ? '🏢 投資公司' : '🏗️ 大型建地'}</span><b>地主</b><span>${o ? esc(o.name) : '（無）'}</span><b>價格</b><span>${money(price(s, i))}</span>`;
-    if (t.type === 'company') h += `<b>收費</b><span>骰子點數 × $200 × 地主擁有的公司數${o ? `（目前 ${companyCount(s, o.id)} 家）` : ''}</span></div>`;
+    if (t.type === 'company') h += `<b>收費</b><span>骰子點數 × $2,000 × 地主擁有的公司數${o ? `（目前 ${companyCount(s, o.id)} 家）` : ''}</span></div>`;
     else h += `<b>建築</b><span>${st.b ? BIG[st.b].icon + BIG[st.b].name + `（${st.bl || 1}/${BIG_MAX} 級）` : '空地'}</span><b>收費</b><span>${money(bigFee(s, i))}${st.b === 'hotel' ? '＋住一晚（停一回合）' : ''}</span></div><p class="note">${Object.values(BIG).map(b => `${b.icon}${b.name}：${b.desc}`).join('<br>')}<br>地主再停到這裡可以擴建（最高 ${BIG_MAX} 級，收費提高）。</p>`;
   }
   if (t.type === 'prop' && s.tiles) {
@@ -780,7 +782,7 @@ function openDecide(refresh = false) {
       <div class="row" style="margin-top:8px"><b id="mgScore">0 枚</b><button class="pri" id="mgStart">開始！</button></div>`;
   } else if (pd.type === 'lottery') {
     const L = s.lotto || { pool: 0 };
-    h = `<h3>🎰 樂透彩券行</h3><p>目前彩金 <b style="color:#e53935">${money(L.pool)}</b>，${7 - (s.round % 7)} 天後開獎。花 $500 選一個號碼（1–20）：</p>
+    h = `<h3>🎰 樂透彩券行</h3><p>目前彩金 <b style="color:#e53935">${money(L.pool)}</b>，${7 - (s.round % 7)} 天後開獎。花 $5,000 選一個號碼（1–20）：</p>
       <div class="choice">${Array.from({ length: 20 }, (_, k) => k + 1).map(n => `<button class="pri" style="flex:1 1 17%" data-pick="${n}">${n}</button>`).join('')}</div>
       <button class="ghost" style="width:100%;margin-top:8px" data-a="no">不玩</button>`;
   } else if (pd.type === 'sell') {
@@ -796,8 +798,8 @@ function openDecide(refresh = false) {
   } else if (pd.type === 'bank') {
     h = `<h3>🏦 ${pd.pass ? '經過銀行' : '銀行'}</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
       <p class="note">每月 1 日存款發 10% 利息，存款不會被查稅、均富卡拿走。</p>
-      <div class="choice"><button class="green" data-bank="1000">存 $1000</button><button class="green" data-bank="5000">存 $5000</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
-      <div class="choice"><button class="blue" data-bank="-1000">領 $1000</button><button class="blue" data-bank="-5000">領 $5000</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
+      <div class="choice"><button class="green" data-bank="10000">存 $1萬</button><button class="green" data-bank="50000">存 $5萬</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
+      <div class="choice"><button class="blue" data-bank="-10000">領 $1萬</button><button class="blue" data-bank="-50000">領 $5萬</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
       <button class="ghost" style="width:100%;margin-top:10px" data-a="done">完成</button>`;
   }
   openSheet(h, 'decide');
@@ -819,8 +821,8 @@ function openBank() {
   const s = G.s, p = cur(s);
   openSheet(`<button class="x" data-close>✕</button><h3>🏦 銀行</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
     <p class="note">每月 1 日存款發 10% 利息，存款不會被查稅、均富卡拿走。</p>
-    <div class="choice"><button class="green" data-bank="1000">存 $1000</button><button class="green" data-bank="5000">存 $5000</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
-    <div class="choice"><button class="blue" data-bank="-1000">領 $1000</button><button class="blue" data-bank="-5000">領 $5000</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
+    <div class="choice"><button class="green" data-bank="10000">存 $1萬</button><button class="green" data-bank="50000">存 $5萬</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
+    <div class="choice"><button class="blue" data-bank="-10000">領 $1萬</button><button class="blue" data-bank="-50000">領 $5萬</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
     <button class="ghost" style="width:100%;margin-top:10px" data-close>完成</button>`, 'bankpre');
   $('#sheet').querySelectorAll('[data-bank]').forEach(b => b.onclick = () => { send(p.id, { type: 'bank', amount: +b.dataset.bank }); setTimeout(() => { if (G.ui.mode === 'bankpre') openBank(); }, 350); });
 }
@@ -854,14 +856,14 @@ function renderAuction() {
   if (!A || s.step !== 'auction') { if (G.ui.mode === 'auction') closeSheet(); return; }
   const me = myPlayers().find(p => !p.out && p.id !== A.seller);
   const best = A.best ? `${esc((pl(s, A.best.pid) || {}).name)} 出價 <b style="color:#e53935">${money(A.best.amt)}</b>` : `底價 <b>${money(A.min)}</b>，還沒有人出價`;
-  const need = A.best ? A.best.amt + 100 : A.min;
+  const need = A.best ? A.best.amt + 1000 : A.min;
   const left = Math.max(0, Math.ceil((A.until - hnow()) / 1000));
   const key = A.tile + ':' + (A.best ? A.best.amt : 0) + ':' + left + ':' + !!me;
   if (G.ui.mode === 'auction' && G.ui.aKey === key) return;
   G.ui.aKey = key;
   const t = TILES[A.tile];
   openSheet(`<h3>🔨 拍賣：${esc(t.name)}</h3><p>${best}</p><p class="note">剩 ${left} 秒・有人出價會延長時間${me ? `・你的現金 ${money(me.cash)}` : ''}</p>` +
-    (me ? `<div class="choice">${[0, 500, 1000, 3000].map(d => `<button class="red" data-bid="${need + d}" ${me.cash < need + d ? 'disabled' : ''}>出 ${money(need + d)}</button>`).join('')}</div>` : '<p class="note">你不能參加這次拍賣（你是放棄購買的人或已破產）</p>'), 'auction', true);
+    (me ? `<div class="choice">${[0, 5000, 10000, 30000].map(d => `<button class="red" data-bid="${need + d}" ${me.cash < need + d ? 'disabled' : ''}>出 ${money(need + d)}</button>`).join('')}</div>` : '<p class="note">你不能參加這次拍賣（你是放棄購買的人或已破產）</p>'), 'auction', true);
   $('#sheet').querySelectorAll('[data-bid]').forEach(b => b.onclick = () => send(me.id, { type: 'bid', amount: +b.dataset.bid }));
 }
 setInterval(() => { if (G.s && G.s.step === 'auction') renderAuction(); }, 500);
@@ -926,7 +928,7 @@ function openStock() {
       const prev = m.h.length > 1 ? m.h[m.h.length - 2] : m.p, ch = ((m.p - prev) / prev * 100);
       const hold = me ? me.stocks[k] : 0;
       return `<div class="stk"><div><b>${STOCKS[k].name}</b> <span class="${ch >= 0 ? 'up' : 'dn'}">$${m.p.toFixed(1)} ${ch >= 0 ? '▲' : '▼'}${Math.abs(ch).toFixed(1)}%</span><br><small>持有 ${hold} 股（${money(hold * m.p)}）</small></div><div>${spark(m.h)}</div>
-      ${can ? `<div class="bt"><button class="red" data-q="${k},100">買100</button><button class="red" data-q="${k},1000">買1000</button><button class="green" data-q="${k},-100" ${hold < 100 ? 'disabled' : ''}>賣100</button><button class="green" data-q="${k},-${hold}" ${!hold ? 'disabled' : ''}>全賣</button></div>` : ''}</div>`;
+      ${can ? `<div class="bt"><button class="red" data-q="${k},1000">買1千</button><button class="red" data-q="${k},10000">買1萬</button><button class="green" data-q="${k},-1000" ${hold < 1000 ? 'disabled' : ''}>賣1千</button><button class="green" data-q="${k},-${hold}" ${!hold ? 'disabled' : ''}>全賣</button></div>` : ''}</div>`;
     }).join(''), 'stock');
   $('#sheet').querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
     const [k, q] = b.dataset.q.split(',').map(Number); send(cur(G.s).id, { type: 'stock', sid: k, qty: q });
@@ -1007,10 +1009,10 @@ $('#helpBtn').onclick = () => openSheet(`<button class="x" data-close>✕</butto
   <p>🎲 輪到你時先可以用道具卡、買賣股票，再擲骰子前進。</p>
   <p>🏠 停在無人景點可以買下；停在自己的地可以加蓋，最高蓋到摩天大樓。別人停到你的地要付過路費；自己的地連在一起會「連鎖」，過路費整串加總（大富翁6規則）。</p>
   <p>🎲 預設 1 顆骰子，到🛵車行買機車（2 顆）、汽車（3 顆）。一輪是一天，月曆會走動。</p>
-  <p>🏢 投資公司：別人停下要付「骰子點數 × $200 × 你的公司數」。🏗️ 大型建地：可蓋主題公園、加油站、研究所、購物中心、度假飯店、遊樂園，再停到可以擴建到 3 級。</p>
+  <p>🏢 投資公司：別人停下要付「骰子點數 × $2,000 × 你的公司數」。🏗️ 大型建地：可蓋主題公園、加油站、研究所、購物中心、度假飯店、遊樂園，再停到可以擴建到 3 級。</p>
   <p>🏦 經過或停在銀行後，下次擲骰前可以按「銀行」存提款。買完地可以按「⏭ 換下一位」馬上換人。</p>
   <p>🔨 有人放棄買地時，其他玩家可以出價拍賣。🎰 樂透每 7 天開獎、沒人中就累積。🕹️ 小遊戲接金幣賺點券。🔮魔法屋、👼天使、😈惡魔隨機出現。</p>
-  <p>🚉 經過台北車站領環島獎金 $1000、點券 +10；經過或停在🏦銀行可以存提款，每月 1 日發存款利息 10%。</p>
+  <p>🚉 經過台北車站領環島獎金 $10,000、點券 +10；經過或停在🏦銀行可以存提款，每月 1 日發存款利息 10%。</p>
   <p>🏪 道具店用點券買卡；⛩️ 廟會請到神明附身 5 回合（財神、福神、土地公、媽祖是好神，衰神、窮神是壞神）。</p>
   <p>❓ 機會、📰 新聞會發生隨機事件；🏦 銀行可存提款；🎰 彩券行猜點數。</p>
   <p>💸 付不出錢會自動提款、賣股票、賣地，還不夠就破產。最後只剩一人、或回合結束時總資產最多的人獲勝！</p>

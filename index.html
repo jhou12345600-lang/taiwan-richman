@@ -72,6 +72,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
 .pc .av{font-size:22px;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .pc .nm{font-size:12px;font-weight:900;white-space:nowrap;max-width:84px;overflow:hidden;text-overflow:ellipsis}
 .pc .cash{font-size:13px;font-weight:700;color:#2e7d32}
+.pc .dep{font-size:11px;font-weight:700;color:#1565c0;line-height:1.1}
 .pc .ic{font-size:12px;line-height:1}
 .pc .off{position:absolute;right:4px;top:2px;font-size:10px;color:#e53935;font-weight:900}
 #topbtn{position:absolute;right:8px;top:calc(max(6px,env(safe-area-inset-top)) + 64px);display:flex;flex-direction:column;gap:6px}
@@ -194,7 +195,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
     <div id="hostCtl">
       <div class="row" style="margin:6px 0"><button class="ghost" id="addBot">＋ 電腦玩家</button><button class="ghost" id="addLocal">＋ 本機玩家</button></div>
       <div class="row">
-        <div><div class="lab">起始資金</div><select id="setCash"><option value="20000">$20,000</option><option value="30000" selected>$30,000</option><option value="50000">$50,000</option></select></div>
+        <div><div class="lab">起始資金</div><select id="setCash"><option value="200000">$20 萬</option><option value="300000" selected>$30 萬</option><option value="500000">$50 萬</option><option value="1000000">$100 萬</option></select></div>
         <div><div class="lab">回合上限</div><select id="setRounds"><option value="30">30 回合</option><option value="50" selected>50 回合</option><option value="80">80 回合</option><option value="0">無限（破產制）</option></select></div>
         <div><div class="lab">拍賣</div><select id="setAuction"><option value="1" selected>開啟</option><option value="0">關閉</option></select></div>
         <div><div class="lab">骰子</div><select id="setDice"><option value="1" selected>1 顆（大富翁6）</option><option value="2">2 顆（快速）</option></select></div>
@@ -259,19 +260,19 @@ var SHOP = { type: "shop", name: "道具店", icon: "🏪", desc: "用點券購�
 var CH = { type: "chance", name: "機會", icon: "❓" };
 var NEWS = { type: "news", name: "新聞", icon: "📰" };
 var BANK = { type: "bank", name: "銀行", icon: "🏦", desc: "經過或停下都可以存款、提款。每月 1 日發 10% 存款利息，存款不怕查稅、均富。" };
-var P = (g, name, price2, model, desc, sea) => ({ type: "prop", g, name, price: price2, model, desc, sea });
-var LOT = { type: "lottery", name: "彩券行", icon: "🎰", desc: "買一張 $500 的樂透（號碼 1–20），每 7 天開獎一次，沒人中就累積彩金！" };
+var P = (g, name, price2, model, desc, sea) => ({ type: "prop", g, name, price: price2 * 10, model, desc, sea });
+var LOT = { type: "lottery", name: "彩券行", icon: "🎰", desc: "買一張 $5,000 的樂透（號碼 1–20），每 7 天開獎一次，沒人中就累積彩金！" };
 var GAME = { type: "game", name: "小遊戲", icon: "🕹️", desc: "玩接金幣小遊戲賺點券。" };
 var CAR = { type: "carshop", name: "車行", icon: "🛵", desc: "買機車（擲 2 顆骰）或汽車（擲 3 顆骰）。" };
 var MAGIC = { type: "magic", name: "魔法屋", icon: "🔮", desc: "神秘的魔法屋，會發生意想不到的事。" };
 var HOSP = { type: "hospital", name: "醫院", icon: "🏥", desc: "住院的玩家會在這裡休養。" };
 var POL = { type: "police", name: "警察局", icon: "🚓", desc: "被抓的玩家會在這裡拘留。" };
 var TEMPLE = (name) => ({ type: "temple", name, icon: "⛩️", desc: "隨機請到一位神明附身。" });
-var CO = (name, price2, model, desc) => ({ type: "company", name, price: price2, model, desc: desc + "（投資公司：別人停下時，付「骰子點數 × $200 × 你擁有的公司數」）" });
-var BL = (name, model, desc) => ({ type: "bigland", name, price: 6e3, model, desc: desc + "（大型建地：買下後可蓋加油站、研究所或度假飯店）" });
-var START = (name, desc) => ({ type: "start", name, icon: "🚉", desc: desc || "起點。每次經過領獎金 $1000、點券 +10。" });
+var CO = (name, price2, model, desc) => ({ type: "company", name, price: price2 * 10, model, desc: desc + "（投資公司：別人停下時，付「骰子點數 × $2,000 × 你擁有的公司數」）" });
+var BL = (name, model, desc) => ({ type: "bigland", name, price: 6e4, model, desc: desc + "（大型建地：買下後可蓋加油站、研究所或度假飯店）" });
+var START = (name, desc) => ({ type: "start", name, icon: "🚉", desc: desc || "起點。每次經過領獎金 $10,000、點券 +10。" });
 var TW_TILES = [
-  { type: "start", name: "台北車站", icon: "🚉", desc: "起點。每次經過領環島獎金 $1000、點券 +10。" },
+  { type: "start", name: "台北車站", icon: "🚉", desc: "起點。每次經過領環島獎金 $10,000、點券 +10。" },
   P("tp", "台北101", 4400, "t101", "台北信義區地標，508 公尺高，曾是世界第一高樓。"),
   P("tp", "中正紀念堂", 3800, "cks", "藍瓦白牆的八角屋頂，自由廣場的牌樓非常壯觀。"),
   CH,
@@ -293,7 +294,7 @@ var TW_TILES = [
   P("hl", "清水斷崖", 2200, "cliff", "蘇花公路上的千尺斷崖，直落太平洋。"),
   P("hl", "太魯閣峽谷", 2600, "taroko", "大理石峽谷，燕子口與長春祠。"),
   P("hl", "七星潭", 2200, "qixing", "彎月形的礫石海灘，看日出的好地方。"),
-  { type: "lottery", name: "彩券行", icon: "🎰", desc: "花 $500 猜骰子點數，猜中贏 $3000。" },
+  { type: "lottery", name: "彩券行", icon: "🎰", desc: "花 $5,000 猜骰子點數，猜中贏 $30,000。" },
   { type: "hospital", name: "醫院", icon: "🏥", desc: "住院的玩家會在這裡休養。" },
   P("tt", "三仙台", 1800, "sanxian", "八拱跨海步橋連接離岸小島。", true),
   P("tt", "伯朗大道", 1600, "brown", "池上稻田間筆直的道路與金城武樹。"),
@@ -367,7 +368,7 @@ Object.assign(GROUPS, {
   t_ts: { name: "淡水", color: "#3949ab" }
 });
 var TP_TILES = [
-  START("台北車站", "起點：台北車站。每次經過領獎金 $1000、點券 +10。"),
+  START("台北車站", "起點：台北車站。每次經過領獎金 $10,000、點券 +10。"),
   P("t_zz", "總統府", 4e3, "presidential", "紅磚與白色飾帶的百年建築，中央高塔非常醒目。"),
   P("t_zz", "中正紀念堂", 3800, "cks", "藍瓦白牆的八角屋頂與自由廣場。"),
   CH,
@@ -429,7 +430,7 @@ Object.assign(GROUPS, {
   n_ys: { name: "鹽水新營", color: "#6d4c41" }
 });
 var TN_TILES = [
-  START("台南車站", "起點：台南車站。每次經過領獎金 $1000、點券 +10。"),
+  START("台南車站", "起點：台南車站。每次經過領獎金 $10,000、點券 +10。"),
   P("n_zx", "赤崁樓", 3600, "chihkan", "府城古蹟，紅牆飛簷。"),
   P("n_zx", "大天后宮", 3200, "longshan", "台灣第一座官建媽祖廟。"),
   CH,
@@ -481,7 +482,7 @@ Object.assign(GROUPS, {
   i_gs: { name: "龜山島", color: "#8d6e63" }
 });
 var IS_TILES = [
-  START("澎湖馬公港", "起點：澎湖馬公港。每次經過領獎金 $1000、點券 +10。"),
+  START("澎湖馬公港", "起點：澎湖馬公港。每次經過領獎金 $10,000、點券 +10。"),
   P("i_ph", "澎湖天后宮", 3200, "longshan", "台灣最古老的媽祖廟。", true),
   P("i_ph", "澎湖跨海大橋", 3e3, "phbridge", "連接白沙與西嶼的大橋。", true),
   CH,
@@ -544,7 +545,7 @@ Object.assign(GROUPS, {
   c_nt: { name: "南投山林", color: "#2e7d32" }
 });
 var TC_TILES = [
-  START("台中車站", "起點：台中車站。每次經過領獎金 $1000、點券 +10。"),
+  START("台中車站", "起點：台中車站。每次經過領獎金 $10,000、點券 +10。"),
   P("c_xt", "台中國家歌劇院", 3800, "opera", "伊東豊雄設計，像海綿一樣的曲牆建築。"),
   P("c_xt", "逢甲夜市", 3400, "fengjia", "全台最大夜市之一，大腸包小腸發源地。"),
   P("c_xt", "秋紅谷", 3200, "autumnvalley", "七期高樓間的下凹式湖景公園。"),
@@ -598,7 +599,7 @@ Object.assign(GROUPS, {
   k_ph: { name: "亞洲新灣區", color: "#00acc1" }
 });
 var KH_TILES = [
-  START("高雄車站", "起點：高雄車站。每次經過領獎金 $1000、點券 +10。"),
+  START("高雄車站", "起點：高雄車站。每次經過領獎金 $10,000、點券 +10。"),
   P("k_ya", "駁二藝術特區", 3600, "pier2", "港邊倉庫改成的藝術園區。"),
   P("k_ya", "愛河", 3e3, "mangrove", "夜晚燈光倒映的城市河流。"),
   P("k_ya", "高雄流行音樂中心", 3400, "popmusic", "港邊的六角形白色塔群。"),
@@ -652,7 +653,7 @@ Object.assign(GROUPS, {
   e_ft: { name: "台東市區", color: "#8e24aa" }
 });
 var EA_TILES = [
-  START("花蓮車站", "起點：花蓮車站。每次經過領獎金 $1000、點券 +10。"),
+  START("花蓮車站", "起點：花蓮車站。每次經過領獎金 $10,000、點券 +10。"),
   P("e_hl", "東大門夜市", 3e3, "nightmarket", "花蓮最大的夜市。"),
   P("e_hl", "松園別館", 2600, "hayashi", "松林中的日式老建築。"),
   P("e_hl", "七星潭", 3200, "qixing", "月牙形的礫石海灣。"),
@@ -716,7 +717,7 @@ function useMap(id) {
 var LEVEL_NAMES = ["空地", "平房", "二層樓", "透天厝", "公寓", "摩天大樓"];
 var TOLL_MUL = [0.2, 0.5, 1, 1.7, 2.6, 3.8];
 var UPGRADE_RATE = 0.55;
-var SALARY = 1e3;
+var SALARY = 1e4;
 var CHARS = [
   {
     id: "bear",
@@ -845,7 +846,7 @@ var CHARS = [
     color: "#ff6f00",
     animal: 1,
     bio: "喉嚨一片金黃的黃喉貂，動作快、手腳更快。",
-    sk: [["thief", "神偷", "使用搶奪卡時再多偷 $1000"], ["rob2", "雙手並用", "搶奪卡一次搶兩張"]]
+    sk: [["thief", "神偷", "使用搶奪卡時再多偷 $10,000"], ["rob2", "雙手並用", "搶奪卡一次搶兩張"]]
   },
   {
     id: "barbet",
@@ -954,15 +955,15 @@ var HOSPI = () => TILES.findIndex((t) => t.type === "hospital");
 var POLI = () => TILES.findIndex((t) => t.type === "police");
 var OWNABLE = (t) => t.type === "prop" || t.type === "company" || t.type === "bigland";
 var BIG = {
-  park: { name: "主題公園", icon: "🌳", cost: 3e3, fee: 800, desc: "遊客付門票，還會送地主點券" },
-  gas: { name: "加油站", icon: "⛽", cost: 4e3, fee: 1500, desc: "收加油費；地主停下點券 +15" },
-  lab: { name: "研究所", icon: "🔬", cost: 5e3, fee: 1e3, desc: "地主停下送道具卡；別人付錢後地主點券 +20" },
-  mall: { name: "購物中心", icon: "🛍️", cost: 6e3, fee: 2e3, desc: "收購物費；別人停下時地主多拿 10% 的業績獎金" },
-  hotel: { name: "度假飯店", icon: "🏨", cost: 7e3, fee: 3e3, desc: "收住宿費，還要住一晚（停一回合）" },
-  fun: { name: "遊樂園", icon: "🎡", cost: 9e3, fee: 3500, desc: "收門票；遊客玩得開心會拿到一張道具卡" }
+  park: { name: "主題公園", icon: "🌳", cost: 3e4, fee: 8e3, desc: "遊客付門票，還會送地主點券" },
+  gas: { name: "加油站", icon: "⛽", cost: 4e4, fee: 15e3, desc: "收加油費；地主停下點券 +15" },
+  lab: { name: "研究所", icon: "🔬", cost: 5e4, fee: 1e4, desc: "地主停下送道具卡；別人付錢後地主點券 +20" },
+  mall: { name: "購物中心", icon: "🛍️", cost: 6e4, fee: 2e4, desc: "收購物費；別人停下時地主多拿 10% 的業績獎金" },
+  hotel: { name: "度假飯店", icon: "🏨", cost: 7e4, fee: 3e4, desc: "收住宿費，還要住一晚（停一回合）" },
+  fun: { name: "遊樂園", icon: "🎡", cost: 9e4, fee: 35e3, desc: "收門票；遊客玩得開心會拿到一張道具卡" }
 };
 var BIG_MAX = 3;
-var VEH = [{ name: "步行", icon: "🚶", dice: 1, price: 0 }, { name: "機車", icon: "🛵", dice: 2, price: 3e3 }, { name: "汽車", icon: "🚗", dice: 3, price: 8e3 }];
+var VEH = [{ name: "步行", icon: "🚶", dice: 1, price: 0 }, { name: "機車", icon: "🛵", dice: 2, price: 3e4 }, { name: "汽車", icon: "🚗", dice: 3, price: 8e4 }];
 function diceCount(s, p) {
   return Math.max(s.settings.dice || 1, VEH[p.veh || 0].dice);
 }
@@ -1091,11 +1092,11 @@ function companyCount(s, pid) {
 }
 function companyFee(s, i, dice) {
   const st = s.tiles[i];
-  return Math.max(400, (dice || 7) * 200 * companyCount(s, st.o));
+  return Math.max(4e3, (dice || 7) * 2e3 * companyCount(s, st.o));
 }
 function bigFee(s, i) {
   const st = s.tiles[i];
-  return st.b ? r10(BIG[st.b].fee * (1 + ((st.bl || 1) - 1) * 0.6)) : 500;
+  return st.b ? r10(BIG[st.b].fee * (1 + ((st.bl || 1) - 1) * 0.6)) : 5e3;
 }
 function bigUpCost(s, i) {
   const st = s.tiles[i];
@@ -1162,7 +1163,7 @@ function createGame(players, settings, now) {
   useMap(settings.map || "taiwan");
   const s = {
     map: MAP_ID,
-    lotto: { pool: 5e3, tix: [], last: null },
+    lotto: { pool: 5e4, tix: [], last: null },
     auction: null,
     lastDice: 7,
     v: 0,
@@ -1416,7 +1417,7 @@ function sendHospital(s, p, turns) {
   if (hasSkill(p, "agile")) turns = Math.max(0, turns - 1);
   teleport(s, p, HOSPI());
   p.st.hosp = turns;
-  const fee = Math.min(p.cash, hasSkill(p, "thick") ? 400 : 500);
+  const fee = Math.min(p.cash, hasSkill(p, "thick") ? 4e3 : 5e3);
   p.cash -= fee;
   log(s, `🚑 ${p.name} 被送進醫院，住院 ${turns} 回合（醫藥費 ${money(fee)}）`);
   return true;
@@ -1541,7 +1542,7 @@ function land(s, now) {
       log(s, `🏪 ${p.name} 點券不足，逛逛就走`);
       return done(s, now);
     case "lottery":
-      if (p.cash >= 500 && !s.lotto.tix.some((x) => x.pid === p.id)) return ask(s, { type: "lottery" }, now);
+      if (p.cash >= 5e3 && !s.lotto.tix.some((x) => x.pid === p.id)) return ask(s, { type: "lottery" }, now);
       log(s, `🎰 ${p.name} 已經有樂透彩券了`);
       return done(s, now);
     case "bank":
@@ -1680,7 +1681,7 @@ function feeWhy(s, p, i, kind) {
   else if (kind === "prop") {
     const ch = chainOf(s, i).length;
     w = `過路費：${t.name}・${LEVEL_NAMES[st.l]}${ch > 1 ? `・${ch} 塊連鎖` : ""}`;
-  } else if (kind === "company") w = `公司收費：${t.name}（骰 ${s.lastDice} 點 × $200 × ${companyCount(s, st.o)} 家）`;
+  } else if (kind === "company") w = `公司收費：${t.name}（骰 ${s.lastDice} 點 × $2,000 × ${companyCount(s, st.o)} 家）`;
   else {
     const b = st.b ? BIG[st.b] : null;
     w = `${b ? b.name : "建地"}收費：${t.name}${st.bl > 1 ? `（${st.bl} 級）` : ""}`;
@@ -1832,7 +1833,7 @@ function bid(s, pid, amt, now) {
   if (!a) return "沒有拍賣";
   const p = pl(s, pid);
   if (!p || p.out || pid === a.seller) return "你不能出價";
-  const need = a.best ? a.best.amt + 100 : a.min;
+  const need = a.best ? a.best.amt + 1e3 : a.min;
   amt = r100(amt);
   if (amt < need) return `至少要出 ${money(need)}`;
   if (amt > p.cash) return "現金不足";
@@ -1867,11 +1868,11 @@ function drawLotto(s) {
     const names = win.map((x) => (pl(s, x.pid) || {}).name).join("、");
     log(s, `🎰 樂透開獎：${n} 號！${names} 中獎，各得 ${money(each)}`);
     fx(s, { k: "notice", kind: "god", title: "🎰 樂透開獎", text: `頭獎 ${n} 號！${names} 各得 ${money(each)}` });
-    L.pool = 5e3;
+    L.pool = 5e4;
   } else {
-    log(s, `🎰 樂透開獎：${n} 號，沒有人中獎，彩金累積到 ${money(L.pool + 2e3)}`);
-    fx(s, { k: "notice", kind: "chance", title: "🎰 樂透開獎", text: `${n} 號，槓龜！彩金累積到 ${money(L.pool + 2e3)}` });
-    L.pool += 2e3;
+    log(s, `🎰 樂透開獎：${n} 號，沒有人中獎，彩金累積到 ${money(L.pool + 2e4)}`);
+    fx(s, { k: "notice", kind: "chance", title: "🎰 樂透開獎", text: `${n} 號，槓龜！彩金累積到 ${money(L.pool + 2e4)}` });
+    L.pool += 2e4;
   }
   L.last = n;
   L.tix = [];
@@ -1899,26 +1900,26 @@ function setGod(s, p, id, t) {
   return true;
 }
 var CHANCE = [
-  { t: "統一發票中了二獎！", f: (s, p) => gain(s, p, 4e3) },
-  { t: "在夜市擺攤大賺一筆", f: (s, p) => gain(s, p, 1500) },
-  { t: "颳中刮刮樂頭獎！", f: (s, p) => gain(s, p, 6e3), w: 0.5 },
+  { t: "統一發票中了二獎！", f: (s, p) => gain(s, p, 4e4) },
+  { t: "在夜市擺攤大賺一筆", f: (s, p) => gain(s, p, 15e3) },
+  { t: "颳中刮刮樂頭獎！", f: (s, p) => gain(s, p, 6e4), w: 0.5 },
   { t: "參加路跑，獲得點券 30 點", f: (s, p) => {
     addPts(p, 30);
   } },
   { t: "朋友送你一張道具卡", f: (s, p) => giveCard(s, p) },
-  { t: "生日快樂！每位玩家送你 $500", f: (s, p) => alive(s).forEach((o) => {
-    if (o !== p) pay(s, o, p, 500);
+  { t: "生日快樂！每位玩家送你 $5,000", f: (s, p) => alive(s).forEach((o) => {
+    if (o !== p) pay(s, o, p, 5e3);
   }) },
-  { t: "請大家喝珍奶，每人付 $300", bad: 1, f: (s, p) => alive(s).forEach((o) => {
-    if (o !== p && !p.out) pay(s, p, o, 300, "機會：請喝珍奶");
+  { t: "請大家喝珍奶，每人付 $3,000", bad: 1, f: (s, p) => alive(s).forEach((o) => {
+    if (o !== p && !p.out) pay(s, p, o, 3e3, "機會：請喝珍奶");
   }) },
-  { t: "違規停車，罰單 $1200", bad: 1, f: (s, p) => pay(s, p, null, 1200) },
-  { t: "繳交房屋稅：每層樓 $250", bad: 1, f: (s, p) => {
+  { t: "違規停車，罰單 $12,000", bad: 1, f: (s, p) => pay(s, p, null, 12e3) },
+  { t: "繳交房屋稅：每層樓 $2,500", bad: 1, f: (s, p) => {
     let n = 0;
     s.tiles.forEach((t) => {
       if (t && t.o === p.id) n += t.l;
     });
-    pay(s, p, null, n * 250);
+    pay(s, p, null, n * 2500);
   } },
   { t: "吃太多鹹酥雞拉肚子，住院 1 回合", bad: 1, f: (s, p) => sendHospital(s, p, 1), stop: 1 },
   { t: "騎車闖紅燈被警察攔下，拘留 2 回合", bad: 1, f: (s, p) => sendJail(s, p, 2), stop: 1 },
@@ -1927,8 +1928,8 @@ var CHANCE = [
     gain(s, p, SALARY);
     addPts(p, 10);
   }, stop: 1 },
-  { t: "廟口捐香油錢 $500，點券 +25", f: (s, p) => {
-    pay(s, p, null, 500);
+  { t: "廟口捐香油錢 $5,000，點券 +25", f: (s, p) => {
+    pay(s, p, null, 5e3);
     addPts(p, 25);
   } },
   { t: "股票配息：持股市值 8%", f: (s, p) => gain(s, p, r10(stockValue(s, p) * 0.08)) },
@@ -1945,10 +1946,10 @@ var CHANCE = [
   { t: "抽中機車一台！", f: (s, p) => {
     if (p.veh < 1) p.veh = 1;
   } },
-  { t: "統一發票中了千萬特別獎！獎金 $10,000", f: (s, p) => gain(s, p, 1e4) },
-  { t: "過年回阿嬤家，紅包收到 $2,000", f: (s, p) => gain(s, p, 2e3) },
-  { t: "幫鄰居顧雜貨店，賺 $800 和點券 15 點", f: (s, p) => {
-    gain(s, p, 800);
+  { t: "統一發票中了千萬特別獎！獎金 $100,000", f: (s, p) => gain(s, p, 1e5) },
+  { t: "過年回阿嬤家，紅包收到 $20,000", f: (s, p) => gain(s, p, 2e4) },
+  { t: "幫鄰居顧雜貨店，賺 $8,000 和點券 15 點", f: (s, p) => {
+    gain(s, p, 8e3);
     addPts(p, 15);
   } },
   { t: "手搖飲集點集滿了，換到 2 張道具卡", f: (s, p) => {
@@ -1958,8 +1959,8 @@ var CHANCE = [
   { t: "跨年晚會被拍上電視，點券 +50", f: (s, p) => addPts(p, 50) },
   { t: "去墾丁衝浪曬傷了，住院 1 回合", bad: 1, f: (s, p) => sendHospital(s, p, 1), stop: 1 },
   { t: "打卡送優惠券，開心前進 2 格", f: () => ({ move: 2 }) },
-  { t: "接到假冒客服的詐騙電話，被騙走 $2,000", bad: 1, f: (s, p) => pay(s, p, null, 2e3) },
-  { t: "繳交牌照稅：機車 $300、汽車 $800", bad: 1, f: (s, p) => pay(s, p, null, p.veh >= 2 ? 800 : p.veh >= 1 ? 300 : 0) },
+  { t: "接到假冒客服的詐騙電話，被騙走 $20,000", bad: 1, f: (s, p) => pay(s, p, null, 2e4) },
+  { t: "繳交牌照稅：機車 $3,000、汽車 $8,000", bad: 1, f: (s, p) => pay(s, p, null, p.veh >= 2 ? 8e3 : p.veh >= 1 ? 3e3 : 0) },
   { t: "政府老屋修繕補助：你的一塊地免費加蓋一層", f: (s, p) => {
     const a = ownProps(s, p).filter((i) => s.tiles[i].l < 5 && !s.tiles[i].mg);
     if (a.length) {
@@ -1968,7 +1969,7 @@ var CHANCE = [
       fx(s, { k: "build", tile: i, pid: p.id });
       return;
     }
-    gain(s, p, 1e3);
+    gain(s, p, 1e4);
   } },
   { t: "地震搖了一下，你的一塊地房子倒一層", bad: 1, f: (s, p) => {
     const a = ownProps(s, p).filter((i) => s.tiles[i].l > 0 && !s.tiles[i].mg);
@@ -1988,7 +1989,7 @@ var CHANCE = [
       log(s, `🏠 ${p.name} 繼承了 ${TILES[i].name}`);
       return;
     }
-    gain(s, p, 3e3);
+    gain(s, p, 3e4);
   } },
   { t: "搭捷運坐過站，往回走 3 格", bad: 1, f: (s, p) => {
     p.dir *= -1;
@@ -2005,12 +2006,12 @@ var CHANCE = [
     teleport(s, p, pick(a));
     return { land: 1 };
   }, stop: 1 },
-  { t: "全民運動會拿到金牌！每位玩家送你 $300", f: (s, p) => alive(s).forEach((o) => {
-    if (o !== p) pay(s, o, p, 300, "機會：運動會金牌賀禮");
+  { t: "全民運動會拿到金牌！每位玩家送你 $3,000", f: (s, p) => alive(s).forEach((o) => {
+    if (o !== p) pay(s, o, p, 3e3, "機會：運動會金牌賀禮");
   }) },
-  { t: "夏天冷氣開太兇，電費 $800", bad: 1, f: (s, p) => pay(s, p, null, 800) },
-  { t: "撿到錢包交給警察，好人有好報：$500 和點券 40", f: (s, p) => {
-    gain(s, p, 500);
+  { t: "夏天冷氣開太兇，電費 $8,000", bad: 1, f: (s, p) => pay(s, p, null, 8e3) },
+  { t: "撿到錢包交給警察，好人有好報：$5,000 和點券 40", f: (s, p) => {
+    gain(s, p, 5e3);
     addPts(p, 40);
   } },
   { t: "跟風投資虛擬幣慘賠，損失現金 15%", bad: 1, f: (s, p) => pay(s, p, null, r10(p.cash * 0.15)) },
@@ -2019,13 +2020,13 @@ var CHANCE = [
     p.deposit += add;
     if (add) fx(s, { k: "money", pid: p.id, d: add });
   } },
-  { t: "公司尾牙抽中頭獎 $3,000！", f: (s, p) => gain(s, p, 3e3) },
+  { t: "公司尾牙抽中頭獎 $30,000！", f: (s, p) => gain(s, p, 3e4) },
   { t: "被野狗追，一路狂奔 5 格", f: () => ({ move: 5 }) },
   { t: "換購電動機車，交通工具升級！", f: (s, p) => {
     if (p.veh < 1) p.veh = 1;
-    else gain(s, p, 500);
+    else gain(s, p, 5e3);
   } },
-  { t: "颱風天搶購泡麵，花了 $400", bad: 1, f: (s, p) => pay(s, p, null, 400) },
+  { t: "颱風天搶購泡麵，花了 $4,000", bad: 1, f: (s, p) => pay(s, p, null, 4e3) },
   { t: "在路邊攤吃到超好吃的蚵仔煎，心情好點券 +20", f: (s, p) => addPts(p, 20) },
   { t: "被選為里長伯的助手，下次過路費免付（獲得免費卡）", f: (s, p) => {
     if (p.cards.length < cardLimit(p)) {
@@ -2033,7 +2034,7 @@ var CHANCE = [
       fx(s, { k: "card", pid: p.id, card: "free", got: 1 });
     }
   } },
-  { t: "健身房年費到期續約 $1,000", bad: 1, f: (s, p) => pay(s, p, null, 1e3) }
+  { t: "健身房年費到期續約 $10,000", bad: 1, f: (s, p) => pay(s, p, null, 1e4) }
 ];
 function chance(s, p, now) {
   const c = CHANCE[draw(s, "chance", CHANCE.length)];
@@ -2067,7 +2068,7 @@ var NEWS2 = [
   { t: "中央銀行升息！所有人存款增加 10%", f: (s) => alive(s).forEach((p) => {
     p.deposit = r10(p.deposit * 1.1);
   }) },
-  { t: "政府發放振興券，每人 $2000", f: (s) => alive(s).forEach((p) => gain(s, p, 2e3)) },
+  { t: "政府發放振興券，每人 $20,000", f: (s) => alive(s).forEach((p) => gain(s, p, 2e4)) },
   { t: "繳交所得稅，每人繳現金 10%", f: (s) => alive(s).forEach((p) => {
     if (!hasGod(p, "mazu") && !hasSkill(p, "rainy")) pay(s, p, null, r10(p.cash * 0.1));
   }) },
@@ -2090,10 +2091,10 @@ var NEWS2 = [
     const paid = pay(s, rich, poor, amt, "新聞：富人捐給窮人");
     return `💰 ${rich.name}（最富有）➜ ${poor.name}（最窮）${money(paid)}`;
   } },
-  { t: "物價上漲！每位玩家多付生活費 $500", f: (s) => alive(s).forEach((p) => {
-    if (!hasGod(p, "mazu")) pay(s, p, null, 500);
+  { t: "物價上漲！每位玩家多付生活費 $5,000", f: (s) => alive(s).forEach((p) => {
+    if (!hasGod(p, "mazu")) pay(s, p, null, 5e3);
   }) },
-  { t: "年終獎金發放！每人領 $1,500", f: (s) => alive(s).forEach((p) => gain(s, p, 1500)) },
+  { t: "年終獎金發放！每人領 $15,000", f: (s) => alive(s).forEach((p) => gain(s, p, 15e3)) },
   { t: "颱風假放一天，大家在家休息，點券各 +20", f: (s) => alive(s).forEach((p) => addPts(p, 20)) },
   { t: "政府打炒房！全台過路費打 8 折，持續 3 回合", f: (s) => {
     s.allMod = { m: 0.8, r: 3 };
@@ -2120,23 +2121,23 @@ var NEWS2 = [
     sendHospital(s, p, 1);
     return `🤧 ${p.name} 中標住院 1 回合`;
   } },
-  { t: "大樂透連槓！彩金池增加 $5,000", f: (s) => {
-    s.lotto.pool += 5e3;
+  { t: "大樂透連槓！彩金池增加 $50,000", f: (s) => {
+    s.lotto.pool += 5e4;
   } },
-  { t: "政府普發現金！每人 $3,000", f: (s) => alive(s).forEach((p) => gain(s, p, 3e3)) },
-  { t: "地價稅開徵，每塊土地繳 $200", f: (s) => {
+  { t: "政府普發現金！每人 $30,000", f: (s) => alive(s).forEach((p) => gain(s, p, 3e4)) },
+  { t: "地價稅開徵，每塊土地繳 $2,000", f: (s) => {
     const out = [];
     alive(s).forEach((p) => {
       const n = s.tiles.filter((t) => t && t.o === p.id).length;
       if (n && !hasGod(p, "mazu")) {
-        pay(s, p, null, n * 200);
-        out.push(`${p.name} ${n} 塊 ${money(n * 200)}`);
+        pay(s, p, null, n * 2e3);
+        out.push(`${p.name} ${n} 塊 ${money(n * 2e3)}`);
       }
     });
     return out.join("、");
   } },
-  { t: "慈善晚會，每人捐 $500 進樂透彩金", f: (s) => alive(s).forEach((p) => {
-    const v = Math.min(500, p.cash);
+  { t: "慈善晚會，每人捐 $5,000 進樂透彩金", f: (s) => alive(s).forEach((p) => {
+    const v = Math.min(5e3, p.cash);
     p.cash -= v;
     s.lotto.pool += v;
     if (v) fx(s, { k: "money", pid: p.id, d: -v });
@@ -2154,8 +2155,8 @@ var NEWS2 = [
     setGod(s, p, "caishen", 3);
     return `💰 ${p.name} 被財神附身 3 回合`;
   } },
-  { t: "中元普渡，大家準備供品，每人付 $300、點券 +15", f: (s) => alive(s).forEach((p) => {
-    pay(s, p, null, 300);
+  { t: "中元普渡，大家準備供品，每人付 $3,000、點券 +15", f: (s) => alive(s).forEach((p) => {
+    pay(s, p, null, 3e3);
     addPts(p, 15);
   }) },
   { tg: 1, t: (g) => `都市更新通過！${GROUPS[g].name}的房子各加蓋一層`, f: (s, g) => {
@@ -2466,11 +2467,11 @@ ${MG[k].desc}`, pid: p.id });
     case "lottery": {
       if (a.type === "pick") {
         const num = Math.max(1, Math.min(20, a.num | 0));
-        if (p.cash < 500) return "現金不足";
-        p.cash -= 500;
-        s.lotto.pool += 500;
+        if (p.cash < 5e3) return "現金不足";
+        p.cash -= 5e3;
+        s.lotto.pool += 5e3;
         s.lotto.tix.push({ pid: p.id, num });
-        fx(s, { k: "money", pid: p.id, d: -500 });
+        fx(s, { k: "money", pid: p.id, d: -5e3 });
         log(s, `🎰 ${p.name} 買了 ${num} 號樂透（彩金 ${money(s.lotto.pool)}，${7 - s.round % 7} 天後開獎）`);
       }
       return done(s, now, 500), null;
@@ -2640,7 +2641,7 @@ function useCard(s, p, a, now) {
       }
       log(s, `${pre}，從 ${tp.name} 搶走「${got.join("、")}」`);
       if (hasSkill(p, "thief")) {
-        const m = Math.min(1e3, tp.cash);
+        const m = Math.min(1e4, tp.cash);
         tp.cash -= m;
         gain(s, p, m);
         fx(s, { k: "money", pid: tp.id, d: -m });
@@ -2786,12 +2787,12 @@ function tick(s, now, isAuto) {
     }
     if (!A.botT || now >= A.botT) {
       A.botT = now + 900 + rnd(900);
-      const need = A.best ? A.best.amt + 100 : A.min;
+      const need = A.best ? A.best.amt + 1e3 : A.min;
       for (const [id, max] of Object.entries(A.bots)) {
         const b = pl(s, id);
         if (!b || b.out || A.best && A.best.pid === id) continue;
-        if (need <= max && b.cash - need > 3e3 && Math.random() < 0.7) {
-          bid(s, id, need + (Math.random() < 0.5 ? 0 : 200), now);
+        if (need <= max && b.cash - need > 3e4 && Math.random() < 0.7) {
+          bid(s, id, need + (Math.random() < 0.5 ? 0 : 2e3), now);
           return true;
         }
       }
@@ -2833,7 +2834,7 @@ function botAction(s, p) {
     if (Math.random() < 0.15) {
       const k = rnd(6), m = s.market[k];
       if (p.stocks[k] > 0 && m.p > STOCKS[k].p * 1.25) return { type: "stock", sid: k, qty: -p.stocks[k] };
-      if (p.cash > 18e3 && m.p < STOCKS[k].p * 0.95) {
+      if (p.cash > 18e4 && m.p < STOCKS[k].p * 0.95) {
         const q = Math.floor(p.cash * 0.12 / m.p / 100) * 100;
         if (q > 0) return { type: "stock", sid: k, qty: q };
       }
@@ -2845,17 +2846,17 @@ function botAction(s, p) {
     case "sell":
       return { type: "auto" };
     case "buy":
-      return { type: p.cash - price(s, pd.tile) >= 2500 ? "yes" : "no" };
+      return { type: p.cash - price(s, pd.tile) >= 25e3 ? "yes" : "no" };
     case "mgup":
-      return { type: p.cash - mgUpCost(s, pd.tile) >= 5e3 ? "yes" : "no" };
+      return { type: p.cash - mgUpCost(s, pd.tile) >= 5e4 ? "yes" : "no" };
     case "upgrade": {
       if (pd.merge && Math.random() < 0.7) {
-        for (const k of ["com", "res", "ind"]) if (p.cash - mgBuildCost(s, pd.merge, k) >= 5e3) return { type: "merge", kind: k };
+        for (const k of ["com", "res", "ind"]) if (p.cash - mgBuildCost(s, pd.merge, k) >= 5e4) return { type: "merge", kind: k };
       }
       if (s.tiles[pd.tile].l >= 5) return { type: "no" };
       const c = upCostFor(s, pd.tile, p);
-      if (p.cash - 2 * c >= 6e3) return { type: "yes", n: 2 };
-      return { type: p.cash - c >= 3e3 ? "yes" : "no" };
+      if (p.cash - 2 * c >= 6e4) return { type: "yes", n: 2 };
+      return { type: p.cash - c >= 3e4 ? "yes" : "no" };
     }
     case "shop": {
       if (p.cards.length >= cardLimit(p) - 3) return { type: "done" };
@@ -2867,19 +2868,19 @@ function botAction(s, p) {
       return Math.random() < 0.5 ? { type: "pick", num: 1 + rnd(20) } : { type: "no" };
     case "car": {
       const v = p.veh + 1;
-      return p.cash - VEH[v].price > 12e3 ? { type: "veh", v } : { type: "no" };
+      return p.cash - VEH[v].price > 12e4 ? { type: "veh", v } : { type: "no" };
     }
     case "bigbuild": {
-      for (const k of ["fun", "hotel", "mall", "lab", "gas", "park"]) if (p.cash - BIG[k].cost > 3e3) return { type: "build", kind: k };
+      for (const k of ["fun", "hotel", "mall", "lab", "gas", "park"]) if (p.cash - BIG[k].cost > 3e4) return { type: "build", kind: k };
       return { type: "no" };
     }
     case "bigup":
-      return { type: p.cash - bigUpCost(s, pd.tile) > 4e3 ? "yes" : "no" };
+      return { type: p.cash - bigUpCost(s, pd.tile) > 4e4 ? "yes" : "no" };
     case "minigame":
       return { type: "mg", score: 10 + rnd(35) };
     case "bank":
-      if (!pd.did && p.cash > 26e3) return { type: "bank", amount: r100(p.cash - 16e3) };
-      if (!pd.did && p.cash < 4e3 && p.deposit > 0) return { type: "bank", amount: -Math.min(p.deposit, 8e3) };
+      if (!pd.did && p.cash > 26e4) return { type: "bank", amount: r100(p.cash - 16e4) };
+      if (!pd.did && p.cash < 4e4 && p.deposit > 0) return { type: "bank", amount: -Math.min(p.deposit, 8e4) };
       return { type: "done" };
   }
   return { type: "no" };
@@ -2890,13 +2891,13 @@ function botCard(s, p) {
   const richest = [...others].sort((a, b) => assets(s, b) - assets(s, a))[0];
   if (has("buyland")) {
     const t = cardTargets(s, p, "buyland");
-    if (t.length && p.cash - propValue(s, p.pos) > 5e3) return { type: "card", card: "buyland" };
+    if (t.length && p.cash - propValue(s, p.pos) > 5e4) return { type: "card", card: "buyland" };
   }
   if (has("equal")) {
     const avg = alive(s).reduce((a, o) => a + o.cash, 0) / alive(s).length;
     if (p.cash < avg * 0.55) return { type: "card", card: "equal" };
   }
-  if (has("tax") && richest && richest.cash > 9e3 && Math.random() < 0.6) return { type: "card", card: "tax", target: richest.id };
+  if (has("tax") && richest && richest.cash > 9e4 && Math.random() < 0.6) return { type: "card", card: "tax", target: richest.id };
   if (has("monster")) {
     const t = cardTargets(s, p, "monster").filter((i) => s.tiles[i].l >= 3);
     if (t.length) return { type: "card", card: "monster", tile: t.sort((a, b) => s.tiles[b].l - s.tiles[a].l)[0] };
@@ -2932,11 +2933,11 @@ function botCard(s, p) {
         best = v;
       }
     }
-    if (bs - sum / cnt > 1500) return { type: "card", card: "remote", value: best };
+    if (bs - sum / cnt > 15e3) return { type: "card", card: "remote", value: best };
   }
   if (has("stay")) {
     const t = s.tiles[p.pos];
-    if (t && t.o === p.id && t.l < 5 && p.cash > upCost(s, p.pos) + 6e3 && Math.random() < 0.5) return { type: "card", card: "stay" };
+    if (t && t.o === p.id && t.l < 5 && p.cash > upCost(s, p.pos) + 6e4 && Math.random() < 0.5) return { type: "card", card: "stay" };
   }
   if (has("sendgod")) {
     const t = alive(s).find((o) => o.god && o === p !== GODS[o.god.id].good);
@@ -2957,11 +2958,11 @@ function botCard(s, p) {
 function scoreTile(s, p, i) {
   const t = TILES[i], st = s.tiles[i];
   if (t.type === "prop") {
-    if (st.o == null) return p.cash > price(s, i) ? 2e3 : 0;
-    if (st.o === p.id) return st.l < 5 ? 1500 : 200;
+    if (st.o == null) return p.cash > price(s, i) ? 2e4 : 0;
+    if (st.o === p.id) return st.l < 5 ? 15e3 : 2e3;
     return -toll(s, i);
   }
-  return { shop: 500, temple: 600, chance: 300, news: 100, bank: 200, lottery: 100 }[t.type] || 0;
+  return { shop: 5e3, temple: 6e3, chance: 3e3, news: 1e3, bank: 2e3, lottery: 1e3 }[t.type] || 0;
 }
 
 // src/world.js
@@ -7837,7 +7838,7 @@ function shareUrl() {
   return u.toString();
 }
 function lobbyState() {
-  return { phase: "lobby", v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 3e4, maxRounds: 50, dice: 1, map: LS.get("tr3d-map", "taiwan"), auction: true }, fx: [], fxn: 0, log: [] };
+  return { phase: "lobby", v: 1, host: myId, room: G.room, seats: [], settings: { startCash: 3e5, maxRounds: 50, dice: 1, map: LS.get("tr3d-map", "taiwan"), auction: true }, fx: [], fxn: 0, log: [] };
 }
 async function connectNet() {
   if (G.net) G.net.close();
@@ -7910,6 +7911,12 @@ function onStateMsg(m) {
     toast("原房主離開了，由你接手主持遊戲");
   }
   applyState(s);
+}
+function wan(n) {
+  n = Math.round(n);
+  if (Math.abs(n) < 1e4) return money(n);
+  const w = n / 1e4;
+  return "$" + (Math.abs(w) >= 100 ? Math.round(w).toLocaleString("en-US") : Math.round(w * 10) / 10) + "萬";
 }
 function nameOf(s, id) {
   const a = (s.players || s.seats || []).find((p) => p.id === id || p.ctl === id);
@@ -8257,7 +8264,7 @@ function renderPlayers() {
     return `<div class="pc ${i === s.turn && s.phase === "play" ? "cur" : ""} ${p.out ? "out" : ""}" data-p="${esc(p.id)}">
       <div class="av" style="background:${c.color}33">${avHtml(p.ctl === p.id || p.bot ? p.id : "", c.emoji)}</div>
       <div><div class="nm" style="color:${c.color}">${esc(p.name)}${p.ctl === myId && !p.bot ? "（你）" : ""}</div>
-      <div class="cash">${p.out ? "破產" : money(p.cash)}</div><div class="ic">${ic}</div></div>${off}</div>`;
+      <div class="cash">${p.out ? "破產" : "💵" + wan(p.cash)}</div>${!p.out && p.deposit ? `<div class="dep">🏦${wan(p.deposit)}</div>` : ""}<div class="ic">${ic}</div></div>${off}</div>`;
   }).join("");
   $("#players").querySelectorAll(".pc").forEach((el) => el.onclick = () => showPlayer(el.dataset.p));
 }
@@ -8489,7 +8496,7 @@ function tileInfoHtml(i) {
   if ((t.type === "company" || t.type === "bigland") && s.tiles) {
     const st = s.tiles[i], o = st.o && pl(s, st.o);
     h += `<div class="kv"><b>種類</b><span>${t.type === "company" ? "🏢 投資公司" : "🏗️ 大型建地"}</span><b>地主</b><span>${o ? esc(o.name) : "（無）"}</span><b>價格</b><span>${money(price(s, i))}</span>`;
-    if (t.type === "company") h += `<b>收費</b><span>骰子點數 × $200 × 地主擁有的公司數${o ? `（目前 ${companyCount(s, o.id)} 家）` : ""}</span></div>`;
+    if (t.type === "company") h += `<b>收費</b><span>骰子點數 × $2,000 × 地主擁有的公司數${o ? `（目前 ${companyCount(s, o.id)} 家）` : ""}</span></div>`;
     else h += `<b>建築</b><span>${st.b ? BIG[st.b].icon + BIG[st.b].name + `（${st.bl || 1}/${BIG_MAX} 級）` : "空地"}</span><b>收費</b><span>${money(bigFee(s, i))}${st.b === "hotel" ? "＋住一晚（停一回合）" : ""}</span></div><p class="note">${Object.values(BIG).map((b) => `${b.icon}${b.name}：${b.desc}`).join("<br>")}<br>地主再停到這裡可以擴建（最高 ${BIG_MAX} 級，收費提高）。</p>`;
   }
   if (t.type === "prop" && s.tiles) {
@@ -8574,7 +8581,7 @@ function openDecide(refresh = false) {
       <div class="row" style="margin-top:8px"><b id="mgScore">0 枚</b><button class="pri" id="mgStart">開始！</button></div>`;
   } else if (pd.type === "lottery") {
     const L = s.lotto || { pool: 0 };
-    h = `<h3>🎰 樂透彩券行</h3><p>目前彩金 <b style="color:#e53935">${money(L.pool)}</b>，${7 - s.round % 7} 天後開獎。花 $500 選一個號碼（1–20）：</p>
+    h = `<h3>🎰 樂透彩券行</h3><p>目前彩金 <b style="color:#e53935">${money(L.pool)}</b>，${7 - s.round % 7} 天後開獎。花 $5,000 選一個號碼（1–20）：</p>
       <div class="choice">${Array.from({ length: 20 }, (_, k) => k + 1).map((n) => `<button class="pri" style="flex:1 1 17%" data-pick="${n}">${n}</button>`).join("")}</div>
       <button class="ghost" style="width:100%;margin-top:8px" data-a="no">不玩</button>`;
   } else if (pd.type === "sell") {
@@ -8593,8 +8600,8 @@ function openDecide(refresh = false) {
   } else if (pd.type === "bank") {
     h = `<h3>🏦 ${pd.pass ? "經過銀行" : "銀行"}</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
       <p class="note">每月 1 日存款發 10% 利息，存款不會被查稅、均富卡拿走。</p>
-      <div class="choice"><button class="green" data-bank="1000">存 $1000</button><button class="green" data-bank="5000">存 $5000</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
-      <div class="choice"><button class="blue" data-bank="-1000">領 $1000</button><button class="blue" data-bank="-5000">領 $5000</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
+      <div class="choice"><button class="green" data-bank="10000">存 $1萬</button><button class="green" data-bank="50000">存 $5萬</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
+      <div class="choice"><button class="blue" data-bank="-10000">領 $1萬</button><button class="blue" data-bank="-50000">領 $5萬</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
       <button class="ghost" style="width:100%;margin-top:10px" data-a="done">完成</button>`;
   }
   openSheet(h, "decide");
@@ -8639,8 +8646,8 @@ function openBank() {
   const s = G.s, p = cur(s);
   openSheet(`<button class="x" data-close>✕</button><h3>🏦 銀行</h3><div class="kv"><b>現金</b><span>${money(p.cash)}</span><b>存款</b><span>${money(p.deposit)}</span></div>
     <p class="note">每月 1 日存款發 10% 利息，存款不會被查稅、均富卡拿走。</p>
-    <div class="choice"><button class="green" data-bank="1000">存 $1000</button><button class="green" data-bank="5000">存 $5000</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
-    <div class="choice"><button class="blue" data-bank="-1000">領 $1000</button><button class="blue" data-bank="-5000">領 $5000</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
+    <div class="choice"><button class="green" data-bank="10000">存 $1萬</button><button class="green" data-bank="50000">存 $5萬</button><button class="green" data-bank="${p.cash}">全部存入</button></div>
+    <div class="choice"><button class="blue" data-bank="-10000">領 $1萬</button><button class="blue" data-bank="-50000">領 $5萬</button><button class="blue" data-bank="${-p.deposit}">全部領出</button></div>
     <button class="ghost" style="width:100%;margin-top:10px" data-close>完成</button>`, "bankpre");
   $("#sheet").querySelectorAll("[data-bank]").forEach((b) => b.onclick = () => {
     send(p.id, { type: "bank", amount: +b.dataset.bank });
@@ -8702,13 +8709,13 @@ function renderAuction() {
   }
   const me = myPlayers().find((p) => !p.out && p.id !== A.seller);
   const best = A.best ? `${esc((pl(s, A.best.pid) || {}).name)} 出價 <b style="color:#e53935">${money(A.best.amt)}</b>` : `底價 <b>${money(A.min)}</b>，還沒有人出價`;
-  const need = A.best ? A.best.amt + 100 : A.min;
+  const need = A.best ? A.best.amt + 1e3 : A.min;
   const left = Math.max(0, Math.ceil((A.until - hnow()) / 1e3));
   const key = A.tile + ":" + (A.best ? A.best.amt : 0) + ":" + left + ":" + !!me;
   if (G.ui.mode === "auction" && G.ui.aKey === key) return;
   G.ui.aKey = key;
   const t = TILES[A.tile];
-  openSheet(`<h3>🔨 拍賣：${esc(t.name)}</h3><p>${best}</p><p class="note">剩 ${left} 秒・有人出價會延長時間${me ? `・你的現金 ${money(me.cash)}` : ""}</p>` + (me ? `<div class="choice">${[0, 500, 1e3, 3e3].map((d) => `<button class="red" data-bid="${need + d}" ${me.cash < need + d ? "disabled" : ""}>出 ${money(need + d)}</button>`).join("")}</div>` : '<p class="note">你不能參加這次拍賣（你是放棄購買的人或已破產）</p>'), "auction", true);
+  openSheet(`<h3>🔨 拍賣：${esc(t.name)}</h3><p>${best}</p><p class="note">剩 ${left} 秒・有人出價會延長時間${me ? `・你的現金 ${money(me.cash)}` : ""}</p>` + (me ? `<div class="choice">${[0, 5e3, 1e4, 3e4].map((d) => `<button class="red" data-bid="${need + d}" ${me.cash < need + d ? "disabled" : ""}>出 ${money(need + d)}</button>`).join("")}</div>` : '<p class="note">你不能參加這次拍賣（你是放棄購買的人或已破產）</p>'), "auction", true);
   $("#sheet").querySelectorAll("[data-bid]").forEach((b) => b.onclick = () => send(me.id, { type: "bid", amount: +b.dataset.bid }));
 }
 setInterval(() => {
@@ -8803,7 +8810,7 @@ function openStock() {
     const prev = m.h.length > 1 ? m.h[m.h.length - 2] : m.p, ch = (m.p - prev) / prev * 100;
     const hold = me ? me.stocks[k] : 0;
     return `<div class="stk"><div><b>${STOCKS[k].name}</b> <span class="${ch >= 0 ? "up" : "dn"}">$${m.p.toFixed(1)} ${ch >= 0 ? "▲" : "▼"}${Math.abs(ch).toFixed(1)}%</span><br><small>持有 ${hold} 股（${money(hold * m.p)}）</small></div><div>${spark(m.h)}</div>
-      ${can ? `<div class="bt"><button class="red" data-q="${k},100">買100</button><button class="red" data-q="${k},1000">買1000</button><button class="green" data-q="${k},-100" ${hold < 100 ? "disabled" : ""}>賣100</button><button class="green" data-q="${k},-${hold}" ${!hold ? "disabled" : ""}>全賣</button></div>` : ""}</div>`;
+      ${can ? `<div class="bt"><button class="red" data-q="${k},1000">買1千</button><button class="red" data-q="${k},10000">買1萬</button><button class="green" data-q="${k},-1000" ${hold < 1e3 ? "disabled" : ""}>賣1千</button><button class="green" data-q="${k},-${hold}" ${!hold ? "disabled" : ""}>全賣</button></div>` : ""}</div>`;
   }).join(""), "stock");
   $("#sheet").querySelectorAll("[data-q]").forEach((b) => b.onclick = () => {
     const [k, q] = b.dataset.q.split(",").map(Number);
@@ -8928,10 +8935,10 @@ $("#helpBtn").onclick = () => openSheet(`<button class="x" data-close>✕</butto
   <p>🎲 輪到你時先可以用道具卡、買賣股票，再擲骰子前進。</p>
   <p>🏠 停在無人景點可以買下；停在自己的地可以加蓋，最高蓋到摩天大樓。別人停到你的地要付過路費；自己的地連在一起會「連鎖」，過路費整串加總（大富翁6規則）。</p>
   <p>🎲 預設 1 顆骰子，到🛵車行買機車（2 顆）、汽車（3 顆）。一輪是一天，月曆會走動。</p>
-  <p>🏢 投資公司：別人停下要付「骰子點數 × $200 × 你的公司數」。🏗️ 大型建地：可蓋主題公園、加油站、研究所、購物中心、度假飯店、遊樂園，再停到可以擴建到 3 級。</p>
+  <p>🏢 投資公司：別人停下要付「骰子點數 × $2,000 × 你的公司數」。🏗️ 大型建地：可蓋主題公園、加油站、研究所、購物中心、度假飯店、遊樂園，再停到可以擴建到 3 級。</p>
   <p>🏦 經過或停在銀行後，下次擲骰前可以按「銀行」存提款。買完地可以按「⏭ 換下一位」馬上換人。</p>
   <p>🔨 有人放棄買地時，其他玩家可以出價拍賣。🎰 樂透每 7 天開獎、沒人中就累積。🕹️ 小遊戲接金幣賺點券。🔮魔法屋、👼天使、😈惡魔隨機出現。</p>
-  <p>🚉 經過台北車站領環島獎金 $1000、點券 +10；經過或停在🏦銀行可以存提款，每月 1 日發存款利息 10%。</p>
+  <p>🚉 經過台北車站領環島獎金 $10,000、點券 +10；經過或停在🏦銀行可以存提款，每月 1 日發存款利息 10%。</p>
   <p>🏪 道具店用點券買卡；⛩️ 廟會請到神明附身 5 回合（財神、福神、土地公、媽祖是好神，衰神、窮神是壞神）。</p>
   <p>❓ 機會、📰 新聞會發生隨機事件；🏦 銀行可存提款；🎰 彩券行猜點數。</p>
   <p>💸 付不出錢會自動提款、賣股票、賣地，還不夠就破產。最後只剩一人、或回合結束時總資產最多的人獲勝！</p>

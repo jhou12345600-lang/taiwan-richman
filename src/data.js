@@ -21,21 +21,21 @@ const SHOP = { type: 'shop', name: '道具店', icon: '🏪', desc: '用點券�
 const CH = { type: 'chance', name: '機會', icon: '❓' };
 const NEWS = { type: 'news', name: '新聞', icon: '📰' };
 const BANK = { type: 'bank', name: '銀行', icon: '🏦', desc: '經過或停下都可以存款、提款。每月 1 日發 10% 存款利息，存款不怕查稅、均富。' };
-const P = (g, name, price, model, desc, sea) => ({ type: 'prop', g, name, price, model, desc, sea });
-const LOT = { type: 'lottery', name: '彩券行', icon: '🎰', desc: '買一張 $500 的樂透（號碼 1–20），每 7 天開獎一次，沒人中就累積彩金！' };
+const P = (g, name, price, model, desc, sea) => ({ type: 'prop', g, name, price: price * 10, model, desc, sea });
+const LOT = { type: 'lottery', name: '彩券行', icon: '🎰', desc: '買一張 $5,000 的樂透（號碼 1–20），每 7 天開獎一次，沒人中就累積彩金！' };
 const GAME = { type: 'game', name: '小遊戲', icon: '🕹️', desc: '玩接金幣小遊戲賺點券。' };
 const CAR = { type: 'carshop', name: '車行', icon: '🛵', desc: '買機車（擲 2 顆骰）或汽車（擲 3 顆骰）。' };
 const MAGIC = { type: 'magic', name: '魔法屋', icon: '🔮', desc: '神秘的魔法屋，會發生意想不到的事。' };
 const HOSP = { type: 'hospital', name: '醫院', icon: '🏥', desc: '住院的玩家會在這裡休養。' };
 const POL = { type: 'police', name: '警察局', icon: '🚓', desc: '被抓的玩家會在這裡拘留。' };
 const TEMPLE = name => ({ type: 'temple', name, icon: '⛩️', desc: '隨機請到一位神明附身。' });
-const CO = (name, price, model, desc) => ({ type: 'company', name, price, model, desc: desc + '（投資公司：別人停下時，付「骰子點數 × $200 × 你擁有的公司數」）' });
-const BL = (name, model, desc) => ({ type: 'bigland', name, price: 6000, model, desc: desc + '（大型建地：買下後可蓋加油站、研究所或度假飯店）' });
-const START = (name, desc) => ({ type: 'start', name, icon: '🚉', desc: desc || '起點。每次經過領獎金 $1000、點券 +10。' });
+const CO = (name, price, model, desc) => ({ type: 'company', name, price: price * 10, model, desc: desc + '（投資公司：別人停下時，付「骰子點數 × $2,000 × 你擁有的公司數」）' });
+const BL = (name, model, desc) => ({ type: 'bigland', name, price: 60000, model, desc: desc + '（大型建地：買下後可蓋加油站、研究所或度假飯店）' });
+const START = (name, desc) => ({ type: 'start', name, icon: '🚉', desc: desc || '起點。每次經過領獎金 $10,000、點券 +10。' });
 
 // type: start prop chance news shop temple hospital police lottery bank（順時針環島 72 格）
 const TW_TILES = [
-  { type: 'start', name: '台北車站', icon: '🚉', desc: '起點。每次經過領環島獎金 $1000、點券 +10。' },
+  { type: 'start', name: '台北車站', icon: '🚉', desc: '起點。每次經過領環島獎金 $10,000、點券 +10。' },
   P('tp', '台北101', 4400, 't101', '台北信義區地標，508 公尺高，曾是世界第一高樓。'),
   P('tp', '中正紀念堂', 3800, 'cks', '藍瓦白牆的八角屋頂，自由廣場的牌樓非常壯觀。'),
   CH,
@@ -57,7 +57,7 @@ const TW_TILES = [
   P('hl', '清水斷崖', 2200, 'cliff', '蘇花公路上的千尺斷崖，直落太平洋。'),
   P('hl', '太魯閣峽谷', 2600, 'taroko', '大理石峽谷，燕子口與長春祠。'),
   P('hl', '七星潭', 2200, 'qixing', '彎月形的礫石海灘，看日出的好地方。'),
-  { type: 'lottery', name: '彩券行', icon: '🎰', desc: '花 $500 猜骰子點數，猜中贏 $3000。' },
+  { type: 'lottery', name: '彩券行', icon: '🎰', desc: '花 $5,000 猜骰子點數，猜中贏 $30,000。' },
   { type: 'hospital', name: '醫院', icon: '🏥', desc: '住院的玩家會在這裡休養。' },
   P('tt', '三仙台', 1800, 'sanxian', '八拱跨海步橋連接離岸小島。', true),
   P('tt', '伯朗大道', 1600, 'brown', '池上稻田間筆直的道路與金城武樹。'),
@@ -128,7 +128,7 @@ Object.assign(GROUPS, {
   t_ts: { name: '淡水', color: '#3949ab' },
 });
 const TP_TILES = [
-  START('台北車站', '起點：台北車站。每次經過領獎金 $1000、點券 +10。'),
+  START('台北車站', '起點：台北車站。每次經過領獎金 $10,000、點券 +10。'),
   P('t_zz', '總統府', 4000, 'presidential', '紅磚與白色飾帶的百年建築，中央高塔非常醒目。'),
   P('t_zz', '中正紀念堂', 3800, 'cks', '藍瓦白牆的八角屋頂與自由廣場。'),
   CH,
@@ -188,7 +188,7 @@ Object.assign(GROUPS, {
   n_ys: { name: '鹽水新營', color: '#6d4c41' },
 });
 const TN_TILES = [
-  START('台南車站', '起點：台南車站。每次經過領獎金 $1000、點券 +10。'),
+  START('台南車站', '起點：台南車站。每次經過領獎金 $10,000、點券 +10。'),
   P('n_zx', '赤崁樓', 3600, 'chihkan', '府城古蹟，紅牆飛簷。'),
   P('n_zx', '大天后宮', 3200, 'longshan', '台灣第一座官建媽祖廟。'),
   CH,
@@ -238,7 +238,7 @@ Object.assign(GROUPS, {
   i_gs: { name: '龜山島', color: '#8d6e63' },
 });
 const IS_TILES = [
-  START('澎湖馬公港', '起點：澎湖馬公港。每次經過領獎金 $1000、點券 +10。'),
+  START('澎湖馬公港', '起點：澎湖馬公港。每次經過領獎金 $10,000、點券 +10。'),
   P('i_ph', '澎湖天后宮', 3200, 'longshan', '台灣最古老的媽祖廟。', true),
   P('i_ph', '澎湖跨海大橋', 3000, 'phbridge', '連接白沙與西嶼的大橋。', true),
   CH,
@@ -295,7 +295,7 @@ Object.assign(GROUPS, {
   c_ch: { name: '彰化鹿港', color: '#8e24aa' }, c_nt: { name: '南投山林', color: '#2e7d32' },
 });
 const TC_TILES = [
-  START('台中車站', '起點：台中車站。每次經過領獎金 $1000、點券 +10。'),
+  START('台中車站', '起點：台中車站。每次經過領獎金 $10,000、點券 +10。'),
   P('c_xt', '台中國家歌劇院', 3800, 'opera', '伊東豊雄設計，像海綿一樣的曲牆建築。'),
   P('c_xt', '逢甲夜市', 3400, 'fengjia', '全台最大夜市之一，大腸包小腸發源地。'),
   P('c_xt', '秋紅谷', 3200, 'autumnvalley', '七期高樓間的下凹式湖景公園。'),
@@ -346,7 +346,7 @@ Object.assign(GROUPS, {
   k_ms: { name: '高雄山區', color: '#6d4c41' }, k_ph: { name: '亞洲新灣區', color: '#00acc1' },
 });
 const KH_TILES = [
-  START('高雄車站', '起點：高雄車站。每次經過領獎金 $1000、點券 +10。'),
+  START('高雄車站', '起點：高雄車站。每次經過領獎金 $10,000、點券 +10。'),
   P('k_ya', '駁二藝術特區', 3600, 'pier2', '港邊倉庫改成的藝術園區。'),
   P('k_ya', '愛河', 3000, 'mangrove', '夜晚燈光倒映的城市河流。'),
   P('k_ya', '高雄流行音樂中心', 3400, 'popmusic', '港邊的六角形白色塔群。'),
@@ -397,7 +397,7 @@ Object.assign(GROUPS, {
   e_is: { name: '綠島蘭嶼', color: '#1e88e5' }, e_ft: { name: '台東市區', color: '#8e24aa' },
 });
 const EA_TILES = [
-  START('花蓮車站', '起點：花蓮車站。每次經過領獎金 $1000、點券 +10。'),
+  START('花蓮車站', '起點：花蓮車站。每次經過領獎金 $10,000、點券 +10。'),
   P('e_hl', '東大門夜市', 3000, 'nightmarket', '花蓮最大的夜市。'),
   P('e_hl', '松園別館', 2600, 'hayashi', '松林中的日式老建築。'),
   P('e_hl', '七星潭', 3200, 'qixing', '月牙形的礫石海灣。'),
@@ -458,7 +458,7 @@ export function useMap(id) { if (!MAPS[id]) id = 'taiwan'; MAP_ID = id; TILES = 
 export const LEVEL_NAMES = ['空地', '平房', '二層樓', '透天厝', '公寓', '摩天大樓'];
 export const TOLL_MUL = [0.2, 0.5, 1.0, 1.7, 2.6, 3.8];
 export const UPGRADE_RATE = 0.55; // 每升一級花費 = 地價 × 0.55
-export const SALARY = 1000;
+export const SALARY = 10000;
 
 export const CHARS = [
   { id: 'bear', name: '黑熊', emoji: '🐻', color: '#43a047', animal: 1, bio: '從玉山下來環島的台灣黑熊，胸前的白色 V 字是招牌，皮粗肉厚、深受山神眷顧。',
@@ -490,7 +490,7 @@ export const CHARS = [
   { id: 'serow', name: '長鬃山羊', emoji: '🐐', color: '#a1887f', animal: 1, bio: '在峭壁上健步如飛的長鬃山羊，台灣特有的攀岩高手。',
     sk: [['minstep', '攀岩', '擲出的點數小於 3 時，當作走 3 步'], ['agile', '穩健', '住院、拘留時間少 1 回合']] },
   { id: 'marten', name: '黃喉貂', emoji: '🦡', color: '#ff6f00', animal: 1, bio: '喉嚨一片金黃的黃喉貂，動作快、手腳更快。',
-    sk: [['thief', '神偷', '使用搶奪卡時再多偷 $1000'], ['rob2', '雙手並用', '搶奪卡一次搶兩張']] },
+    sk: [['thief', '神偷', '使用搶奪卡時再多偷 $10,000'], ['rob2', '雙手並用', '搶奪卡一次搶兩張']] },
   { id: 'barbet', name: '五色鳥', emoji: '🦜', color: '#64dd17', animal: 1, bio: '頭上有紅黃藍黑綠五種顏色的五色鳥，叫聲像敲木魚，是股市老手。',
     sk: [['dividend', '股市老手', '每月 1 日拿到持股市值 8% 的股利'], ['pointsx', '花枝招展', '獲得的點券加倍']] },
   { id: 'civet', name: '白鼻心', emoji: '🦝', color: '#78909c', animal: 1, bio: '鼻子上一條白線的白鼻心，最愛逛夜市找水果吃。',

@@ -1,6 +1,6 @@
 // ===== 寶島富翁 3D：主程式（房主 / 玩家 / 介面）=====
 import { MAPS, useMap, TILES, N_TILES, GROUPS, CHARS, CARDS, GODS, STOCKS, EMOTES, LEVEL_NAMES, TOLL_MUL } from './data.js';
-import { BIG, BIG_MAX, bigUpCost, bigFee, VEH, companyCount, companyFee, diceCount, chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T, sellables, sellValue } from './engine.js';
+import { BIG, BIG_MAX, bigUpCost, bigFee, VEH, companyCount, companyFee, diceCount, chainOf, cardLimit, createGame, act, tick, cur, pl, price, upCost, upCostFor, cardCost, toll, propValue, assets, money, cardTargets, stockValue, PRE_T, DEC_T, sellables, sellValue, MG, MG_MAX, mgBuildCost, mgUpCost, mgToll, mgDaily } from './engine.js';
 import { World } from './world.js';
 import { MqttNet, LocalNet, BROKERS } from './net.js';
 
@@ -38,8 +38,8 @@ function sampleOffset(host, sent) {
   G.offset = Math.min(...G.offS.map(x => x[1]));
 }
 // 接手當房主：把狀態裡用「前任房主時鐘」記的時間換成自己的時鐘
-function becomeHost(fromOther) {
-  const d = fromOther ? G.offset || 0 : 0, s = G.s;
+function becomeHost(fromOther, st) {
+  const d = fromOther ? G.offset || 0 : 0, s = st || G.s;
   if (d && s) {
     for (const k of ['deadline', 'botAt', 'until']) if (typeof s[k] === 'number') s[k] += d;
     if (s.anim && typeof s.anim.t0 === 'number') s.anim.t0 += d;
@@ -294,6 +294,7 @@ function onStateMsg(m) {
   if (G.s && !G.isHost && s.v === G.s.v && s.host === G.s.host && s.phase === G.s.phase) { world.offset = hostOff(); return; }   // 房主定期重送的同一份狀態，不必重畫
   if (G.isHost && s.host !== myId) { G.isHost = false; toast('房主已交給 ' + (nameOf(s, s.host) || '其他玩家')); }
   if (!G.isHost && s.host === myId && G.s == null) becomeHost(false);
+  else if (!G.isHost && s.host === myId && G.s && G.s.host !== myId && s.phase === 'play') { becomeHost(true, s); toast('原房主離開了，由你接手主持遊戲'); }
   applyState(s);
 }
 function nameOf(s, id) { const a = (s.players || s.seats || []).find(p => p.id === id || p.ctl === id); return a && a.name; }
@@ -526,7 +527,7 @@ function renderPlayers() {
   $('#players').innerHTML = s.players.map((p, i) => {
     const c = charOf(p.char);
     const ic = [p.veh ? VEH[p.veh].icon : '', p.god ? GODS[p.god.id].icon : '', p.st.hosp ? '🏥' : '', p.st.jail ? '🚓' : '', p.st.sleep ? '😴' : '', p.st.turtle ? '🐢' : '', p.dir < 0 ? '🔄' : ''].join('');
-    const off = !p.bot && s.phase === 'play' && !p.out ? (p.away ? '<span class="off">☕暫離・託管</span>' : !online(p.ctl) ? '<span class="off">離線・託管</span>' : '') : '';
+    const off = p.left ? '<span class="off">🚪 已離開</span>' : !p.bot && s.phase === 'play' && !p.out ? (p.away ? '<span class="off">☕暫離・託管</span>' : !online(p.ctl) ? '<span class="off">離線・託管</span>' : '') : '';
     return `<div class="pc ${i === s.turn && s.phase === 'play' ? 'cur' : ''} ${p.out ? 'out' : ''}" data-p="${esc(p.id)}">
       <div class="av" style="background:${c.color}33">${avHtml(p.ctl === p.id || p.bot ? p.id : '', c.emoji)}</div>
       <div><div class="nm" style="color:${c.color}">${esc(p.name)}${p.ctl === myId && !p.bot ? '（你）' : ''}</div>
@@ -545,6 +546,7 @@ function renderHud() {
   if (s.phase === 'over') { renderOver(); $('#awayBox').classList.add('hidden'); return; }
   const mps = myPlayers().filter(p => !p.out);
   $('#awayBtn').classList.toggle('hidden', !mps.length);
+  $('#quitBtn').classList.toggle('hidden', !(myPlayers().length && !mps.length && !G.solo));
   $('#awayBox').classList.toggle('hidden', !(mps.length && mps.every(p => p.away)));
   const c = cur(s), mine = isMyTurn() && !c.away;
   const acts = $('#acts');
@@ -641,7 +643,10 @@ function playFx(s, f) {
     case 'xfer': showXfer(s, f); world.coinFlow(f.from, f.to, f.amt); break;
     case 'sold': world.burst(f.tile, '#9e9e9e', 22); world.floatText(f.pid, '🏚️ 變賣 ' + TILES[f.tile].name, '#ffcc80'); break;
     case 'emote': world.floatText(f.pid, f.e, '#ffffff'); world.react(f.pid, 'wave', 1500); break;
-    case 'bankrupt': showNotice('💸 破產', `${p ? p.name : ''} 破產出局了！`, 'evil'); break;
+    case 'bankrupt':
+      showNotice('💸 破產', `${p ? p.name : ''} 破產出局了！`, 'evil');
+      if (p && p.ctl === myId && !p.bot && !G.solo && myPlayers().every(q => q.out || q.id === p.id) && !G.leaveAsked) { G.leaveAsked = true; setTimeout(askLeave, 2600); }
+      break;
     case 'mark': world.burst(f.tile, '#ff9800', 10); break;
   }
 }
@@ -691,6 +696,13 @@ function tileInfoHtml(i) {
   }
   if (t.type === 'prop' && s.tiles) {
     const st = s.tiles[i], o = st.o && pl(s, st.o);
+    if (st.mg) {
+      const m = st.mg, K = MG[m.k];
+      h += `<div class="kv"><b>建築</b><span style="font-weight:900">${K.icon} ${K.name} ${m.lv}/${MG_MAX} 級</span><b>合併土地</b><span>${m.ts.map(j => esc(TILES[j].name)).join('、')}</span>
+        <b>地主</b><span>${o ? esc(o.name) : ''}</span><b>過路費</b><span style="color:#e53935;font-weight:900">${money(mgToll(s, i))}</span>${K.daily ? `<b>每天收入</b><span>${money(mgDaily(s, i))}</span>` : ''}</div>
+        <p class="note">${K.desc}。踩到任何一塊都算。被飛彈炸會降一級，降到 0 級恢復成空地。</p>`;
+      return h;
+    }
     h += `<div class="kv"><b>區域</b><span style="color:${GROUPS[t.g].color};font-weight:900">${GROUPS[t.g].name}</span>
       <b>地主</b><span>${o ? esc(o.name) : '（無）'}</span><b>建築</b><span>${LEVEL_NAMES[st.l]}</span>
       <b>地價</b><span>${money(price(s, i))}</span><b>加蓋費</b><span>${money(upCost(s, i))}／層</span>
@@ -732,9 +744,20 @@ function openDecide(refresh = false) {
       <div class="choice"><button class="green" data-a="yes">🏠 買下</button><button class="ghost" data-a="no">不買</button></div>`;
   } else if (pd.type === 'upgrade') {
     const i = pd.tile, st = s.tiles[i], c1 = upCostFor(s, i, p);
-    const two = st.l <= 3 && p.cash >= c1 * 2;
-    h = tileInfoHtml(i) + `<p>要加蓋成 <b>${LEVEL_NAMES[st.l + 1]}</b> 嗎？每層 <b>${c1 ? money(c1) : '免費（福神）'}</b>（你有 ${money(p.cash)}）</p>
-      <div class="choice"><button class="green" data-a="yes">🏗️ 蓋一層</button>${two ? `<button class="green" data-n2>🏗️🏗️ 蓋兩層（${money(c1 * 2)}）</button>` : ''}<button class="ghost" data-a="no">不用</button></div>`;
+    const two = st.l <= 3 && p.cash >= c1 * 2, can1 = st.l < 5 && p.cash >= c1;
+    h = tileInfoHtml(i) + (can1 ? `<p>要加蓋成 <b>${LEVEL_NAMES[st.l + 1]}</b> 嗎？每層 <b>${c1 ? money(c1) : '免費（福神）'}</b>（你有 ${money(p.cash)}）</p>
+      <div class="choice"><button class="green" data-a="yes">🏗️ 蓋一層</button>${two ? `<button class="green" data-n2>🏗️🏗️ 蓋兩層（${money(c1 * 2)}）</button>` : ''}</div>` : `<p>現金 ${money(p.cash)}</p>`);
+    if (pd.merge) {
+      const ts = pd.merge, base = ts.reduce((a, j) => a + price(s, j), 0);
+      h += `<div class="mgbox"><b>🧩 合併建設</b>：你有 ${ts.length} 塊相連的地（${ts.map(j => esc(TILES[j].name)).join('、')}），可以合併蓋成大型建築，三塊地一起收過路費！<div class="choice">` +
+        Object.entries(MG).map(([k, K]) => { const c = mgBuildCost(s, ts, k); return `<button class="${k === 'com' ? 'pri' : k === 'res' ? 'green' : 'blue'}" style="flex:1 1 30%" data-mg="${k}" ${p.cash < c ? 'disabled' : ''}>${K.icon} ${K.name}<br><b>${money(c)}</b><br><small>過路費 ${money(Math.round(base * K.toll[0] / 10) * 10)}${K.daily ? `・每天 +${money(Math.round(base * K.daily / 10) * 10)}` : ''}</small></button>`; }).join('') +
+        `</div><p class="note">原本蓋的房子會折抵一半費用。之後再停到這裡可以擴建到 ${MG_MAX} 級。</p></div>`;
+    }
+    h += `<button class="ghost" style="width:100%;margin-top:6px" data-a="no">不用</button>`;
+  } else if (pd.type === 'mgup') {
+    const i = pd.tile, m = s.tiles[i].mg, K = MG[m.k], c = mgUpCost(s, i);
+    h = tileInfoHtml(i) + `<p>要把${K.icon}${K.name}擴建到 <b>${m.lv + 1} 級</b>嗎？費用 <b>${money(c)}</b>（你有 ${money(p.cash)}）</p>
+      <div class="choice"><button class="green" data-a="yes">🏗️ 擴建</button><button class="ghost" data-a="no">不用</button></div>`;
   } else if (pd.type === 'shop') {
     h = `<h3>🏪 道具店</h3><p>你的點券：<b>${p.points}</b>　道具卡 ${p.cards.length}/${cardLimit(p)}</p><div class="cards">` +
       Object.entries(CARDS).map(([k, c]) => `<div class="card"><div class="t">${c.icon} ${c.name}</div><div class="d">${c.desc}</div>
@@ -783,6 +806,7 @@ function openDecide(refresh = false) {
   sh.querySelectorAll('[data-veh]').forEach(b => b.onclick = () => { send(id, { type: 'veh', v: +b.dataset.veh }); closeSheet(); });
   sh.querySelectorAll('[data-big]').forEach(b => b.onclick = () => { send(id, { type: 'build', kind: b.dataset.big }); closeSheet(); });
   if (pd.type === 'minigame' && !refresh) setupMinigame(id);
+  sh.querySelectorAll('[data-mg]').forEach(b => b.onclick = () => { send(id, { type: 'merge', kind: b.dataset.mg }); closeSheet(); });
   sh.querySelectorAll('[data-n2]').forEach(b => b.onclick = () => { send(id, { type: 'yes', n: 2 }); closeSheet(); });
   sh.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => send(id, { type: 'buyCard', card: b.dataset.buy }));
   sh.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => { send(id, { type: 'pick', num: +b.dataset.pick }); closeSheet(); });
@@ -931,6 +955,28 @@ function renderOver() {
 
 // 按鈕
 $('#fsBtn').onclick = () => enterFS(true);
+// 破產後：可以繼續觀看，或直接離開房間（房主會先把主持交給其他玩家）
+function askLeave() {
+  if (!G.s || G.s.phase !== 'play') return;
+  openSheet(`<h3>😢 你破產了</h3><p class="note">可以留下來看其他人比完，也可以直接離開房間，不會影響其他玩家繼續玩。</p>
+    <button class="pri" style="width:100%;margin:6px 0" data-close>👀 繼續觀看</button>
+    <button class="ghost" style="width:100%;margin:6px 0" id="leaveGo">🚪 離開房間，回首頁</button>`);
+}
+function leaveRoom() {
+  const s = G.s;
+  if (s && s.phase === 'play') {
+    myPlayers().forEach(p => send(p.id, { type: 'leave' }));
+    if (G.isHost && !G.solo) {
+      const cand = s.players.filter(p => !p.bot && p.ctl !== myId && !p.left && online(p.ctl)).sort((a, b) => (a.out - b.out) || (a.ctl < b.ctl ? -1 : 1))[0];
+      if (cand) { s.host = cand.ctl; s.v += 1000; publish(true); }
+      G.isHost = false;
+    }
+    LS.set('tr3d-lastroom', null);
+  }
+  setTimeout(() => { location.href = location.pathname; }, 700);
+}
+$('#quitBtn').onclick = askLeave;
+document.addEventListener('click', e => { if (e.target && e.target.id === 'leaveGo') leaveRoom(); });
 function setAway(on) { myPlayers().filter(p => !p.out).forEach(p => send(p.id, { type: 'away', on })); if (on) closeSheet(); }
 $('#awayBtn').onclick = () => openSheet(`<button class="x" data-close>✕</button><h3>☕ 臨時離開</h3>
   <p>暫離期間由電腦幫你代打（擲骰、買地、付錢都會自動處理），你的座位和資產都會保留。</p>
@@ -1008,4 +1054,4 @@ $('#helpBtn').onclick = () => openSheet(`<button class="x" data-close>✕</butto
   }
 })();
 
-window.__G = G; window.__world = world; window.__pickTile = i => onTileClick(i);
+window.__G = G; window.__world = world; window.__pickTile = i => onTileClick(i); window.__publish = publish; window.__apply = s => applyState(s); window.__isProp = i => !!(TILES[i] && TILES[i].type === 'prop');

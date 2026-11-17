@@ -124,6 +124,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
 #xfer .arr{color:#e65100;font-size:15px}#xfer .amt{font-size:24px;color:#d50000}
 #xfer .why{font-size:13px;font-weight:700;color:#6d4c41;margin-top:3px}#xfer .bad{color:#d50000;font-size:13px;font-weight:900}
 @keyframes xpop{0%{transform:scale(.7)}70%{transform:scale(1.06)}100%{transform:scale(1)}}
+#sheet .mgbox{margin-top:10px;padding:10px;border-radius:14px;background:linear-gradient(135deg,#e8f5e9,#fff8e1);border:2px dashed #66bb6a}#sheet .mgbox .choice button{line-height:1.35}
 #sheet .sellgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
 #sheet .sellgrid button{text-align:left;padding:8px 10px;line-height:1.3}#sheet .sellgrid small{opacity:.85}
 #toast{position:fixed;left:50%;top:20%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:8px 16px;border-radius:12px;font-weight:700;z-index:40;pointer-events:none;transition:opacity .3s;opacity:0}
@@ -210,7 +211,7 @@ input,select{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:1
   <div id="players"></div>
   <div id="roundinfo"></div>
   <div id="topbtn">
-    <button id="awayBtn" title="臨時離開">☕</button>
+    <button id="awayBtn" title="臨時離開">☕</button><button id="quitBtn" class="hidden" title="離開房間">🚪</button>
     <button id="fsBtn" title="全螢幕">⛶</button>
     <button id="camBtn" title="視角">🗺️</button>
     <button id="stockBtn" title="股市">📈</button>
@@ -532,11 +533,176 @@ var IS_TILES = [
   ins(TN_TILES, "漁光島", BL("安平港開發區", "riverside", "安平港邊的開發區"));
   ins(IS_TILES, "水頭聚落", BL("金門開發區", "resortland", "金門的大型建地"));
 }
+Object.assign(GROUPS, {
+  c_xt: { name: "西屯七期", color: "#1e88e5" },
+  c_zq: { name: "台中舊城", color: "#e53935" },
+  c_xq: { name: "西區文青", color: "#fb8c00" },
+  c_ds: { name: "東海大坑", color: "#43a047" },
+  c_hx: { name: "台中海線", color: "#00acc1" },
+  c_sx: { name: "台中山線", color: "#6d4c41" },
+  c_ch: { name: "彰化鹿港", color: "#8e24aa" },
+  c_nt: { name: "南投山林", color: "#2e7d32" }
+});
+var TC_TILES = [
+  START("台中車站", "起點：台中車站。每次經過領獎金 $1000、點券 +10。"),
+  P("c_xt", "台中國家歌劇院", 3800, "opera", "伊東豊雄設計，像海綿一樣的曲牆建築。"),
+  P("c_xt", "逢甲夜市", 3400, "fengjia", "全台最大夜市之一，大腸包小腸發源地。"),
+  P("c_xt", "秋紅谷", 3200, "autumnvalley", "七期高樓間的下凹式湖景公園。"),
+  CH,
+  P("c_zq", "宮原眼科", 3e3, "miyahara", "紅磚老眼科改成的冰淇淋名店。"),
+  P("c_zq", "台中公園湖心亭", 2800, "huxin", "百年公園的地標雙亭。"),
+  P("c_zq", "第二市場", 2600, "nightmarket2", "六角形老市場，早餐名店林立。"),
+  SHOP,
+  P("c_xq", "自然科學博物館", 3200, "nmns", "有恐龍和金字塔溫室的博物館。"),
+  P("c_xq", "審計新村", 2800, "dihua", "老宿舍變身文創市集。"),
+  P("c_xq", "勤美草悟道", 3e3, "park", "綠帶串起的城市散步道。"),
+  NEWS,
+  CO("台中捷運公司", 3600, "metro", "綠線高架捷運"),
+  P("c_ds", "東海路思義教堂", 3e3, "luce", "貝聿銘設計的雙曲面教堂。"),
+  P("c_ds", "大坑登山步道", 2400, "xiangshan", "台中人的後山步道。"),
+  P("c_ds", "彩虹眷村", 2600, "rainbow", "彩虹爺爺畫滿整個眷村。"),
+  TEMPLE("大甲鎮瀾宮"),
+  HOSP,
+  P("c_hx", "高美濕地", 2600, "gaomei", "風車與夕陽倒影。"),
+  P("c_hx", "梧棲漁港", 2400, "pier", "現撈海鮮吃到飽。"),
+  P("c_hx", "大甲溪出海口", 2200, "mangrove", "水鳥聚集的溼地。"),
+  GAME,
+  BL("台中港區建地", "resortland", "港區旁的大型建地"),
+  LOT,
+  P("c_sx", "新社花海", 2400, "flowersea", "秋冬整片彩色花田。"),
+  P("c_sx", "谷關溫泉", 2600, "onsen", "山中的碳酸溫泉。"),
+  P("c_sx", "麗寶樂園", 2800, "wheel", "有天空之夢摩天輪的樂園。"),
+  POL,
+  CH,
+  P("c_ch", "鹿港老街", 2800, "lukang", "一府二鹿三艋舺。"),
+  P("c_ch", "八卦山大佛", 2600, "buddha", "彰化的地標大佛。"),
+  P("c_ch", "扇形車庫", 2400, "roundhouse", "全台僅存的扇形火車庫。"),
+  CAR,
+  MAGIC,
+  P("c_nt", "日月潭", 3600, "sunmoon", "台灣最大的天然湖泊。"),
+  P("c_nt", "清境農場", 3200, "cingjing", "綿羊秀與高山草原。"),
+  P("c_nt", "合歡山", 3e3, "hehuan", "冬天會下雪的高山。"),
+  NEWS,
+  CO("台中觀光公司", 3600, "power", "經營中台灣觀光的公司"),
+  BANK,
+  CH
+];
+Object.assign(GROUPS, {
+  k_ya: { name: "鹽埕愛河", color: "#e53935" },
+  k_lx: { name: "苓雅新興", color: "#1e88e5" },
+  k_qj: { name: "旗津", color: "#fdd835" },
+  k_gs: { name: "鼓山西子灣", color: "#fb8c00" },
+  k_zy: { name: "左營", color: "#43a047" },
+  k_fs: { name: "鳳山", color: "#8e24aa" },
+  k_ms: { name: "高雄山區", color: "#6d4c41" },
+  k_ph: { name: "亞洲新灣區", color: "#00acc1" }
+});
+var KH_TILES = [
+  START("高雄車站", "起點：高雄車站。每次經過領獎金 $1000、點券 +10。"),
+  P("k_ya", "駁二藝術特區", 3600, "pier2", "港邊倉庫改成的藝術園區。"),
+  P("k_ya", "愛河", 3e3, "mangrove", "夜晚燈光倒映的城市河流。"),
+  P("k_ya", "高雄流行音樂中心", 3400, "popmusic", "港邊的六角形白色塔群。"),
+  CH,
+  P("k_lx", "高雄 85 大樓", 3800, "t85", "高雄最高的地標大樓。"),
+  P("k_lx", "美麗島站光之穹頂", 3200, "lightdome", "世界最美捷運站之一。"),
+  P("k_lx", "六合夜市", 3e3, "nightmarket", "海產粥、木瓜牛奶。"),
+  SHOP,
+  P("k_qj", "旗津海岸公園", 2800, "kenting", "黑沙灘與貝殼館。"),
+  P("k_qj", "旗津燈塔", 2600, "eluanbi", "山頂的八角形白燈塔。"),
+  P("k_qj", "旗津海產街", 2400, "oldstreet", "渡輪一下船就吃海鮮。"),
+  NEWS,
+  CO("高雄輕軌公司", 3600, "metro", "繞著港邊跑的環狀輕軌"),
+  P("k_gs", "西子灣", 2800, "pier", "看夕陽的海灣。"),
+  P("k_gs", "打狗英國領事館", 3e3, "consulate", "山丘上的紅磚拱廊洋樓。"),
+  P("k_gs", "壽山動物園", 2600, "zoo", "在壽山上的動物園。"),
+  TEMPLE("左營蓮池潭"),
+  HOSP,
+  P("k_zy", "龍虎塔", 3e3, "dragontiger", "從龍口進、虎口出，消災解厄。"),
+  P("k_zy", "瑞豐夜市", 2800, "nightmarket3", "在地人最愛的夜市。"),
+  P("k_zy", "左營眷村", 2400, "rainbow", "眷村文化館與老街。"),
+  GAME,
+  BL("亞洲新灣區建地", "creative", "港邊的大型建地"),
+  LOT,
+  P("k_fs", "衛武營藝術中心", 3200, "weiwuying", "白色波浪屋頂的大劇院。"),
+  P("k_fs", "大東文化藝術中心", 2800, "museum2", "有薄膜傘的文化中心。"),
+  P("k_fs", "鳳儀書院", 2400, "confucius", "台灣最大的書院。"),
+  POL,
+  CH,
+  P("k_ms", "佛光山", 3e3, "buddha", "有大佛的佛教聖地。"),
+  P("k_ms", "美濃客家庄", 2600, "oldstreet", "紙傘與粄條。"),
+  P("k_ms", "田寮月世界", 2400, "moonworld", "灰白色泥岩惡地地形。"),
+  CAR,
+  MAGIC,
+  P("k_ph", "夢時代摩天輪", 3400, "wheel", "港邊購物中心的摩天輪。"),
+  P("k_ph", "高雄展覽館", 3200, "expo", "港邊的波浪造型展覽館。"),
+  P("k_ph", "真愛碼頭", 3e3, "pier2", "港灣夜景與遊艇。"),
+  NEWS,
+  CO("高雄港務公司", 3600, "ferry", "經營全台最大的貨櫃港"),
+  BANK,
+  CH
+];
+Object.assign(GROUPS, {
+  e_hl: { name: "花蓮市區", color: "#e53935" },
+  e_tr: { name: "太魯閣", color: "#6d4c41" },
+  e_zg: { name: "花東縱谷", color: "#43a047" },
+  e_tt: { name: "台東縱谷", color: "#fdd835" },
+  e_hc: { name: "東海岸", color: "#00acc1" },
+  e_db: { name: "南迴", color: "#fb8c00" },
+  e_is: { name: "綠島蘭嶼", color: "#1e88e5" },
+  e_ft: { name: "台東市區", color: "#8e24aa" }
+});
+var EA_TILES = [
+  START("花蓮車站", "起點：花蓮車站。每次經過領獎金 $1000、點券 +10。"),
+  P("e_hl", "東大門夜市", 3e3, "nightmarket", "花蓮最大的夜市。"),
+  P("e_hl", "松園別館", 2600, "hayashi", "松林中的日式老建築。"),
+  P("e_hl", "七星潭", 3200, "qixing", "月牙形的礫石海灣。"),
+  CH,
+  P("e_tr", "太魯閣峽谷", 3600, "taroko", "大理石峽谷。"),
+  P("e_tr", "清水斷崖", 3400, "cliff", "直落太平洋的斷崖。"),
+  P("e_tr", "燕子口", 3e3, "tunnel", "峽谷中的步道與岩洞。"),
+  SHOP,
+  P("e_zg", "鯉魚潭", 2600, "reservoir", "可以划天鵝船的山中湖。"),
+  P("e_zg", "瑞穗牧場", 2400, "cingjing", "鮮奶和乳牛。"),
+  P("e_zg", "林田山林場", 2200, "sugar", "檜木老宿舍與小火車。"),
+  NEWS,
+  CO("台鐵花東線", 3600, "hsr", "沿著縱谷奔馳的火車"),
+  P("e_tt", "伯朗大道", 2800, "brown", "一望無際的稻田大道。"),
+  P("e_tt", "鹿野高台熱氣球", 3e3, "balloon", "夏天的熱氣球嘉年華。"),
+  P("e_tt", "池上稻田", 2400, "gaomei", "金黃稻浪和便當。"),
+  TEMPLE("台東天后宮"),
+  HOSP,
+  P("e_hc", "三仙台", 3e3, "sanxian", "八拱跨海步橋。"),
+  P("e_hc", "石梯坪", 2600, "jibei", "海蝕平台與壺穴。"),
+  P("e_hc", "小野柳", 2400, "moses", "奇岩怪石的海岸。"),
+  GAME,
+  BL("都蘭海岸建地", "resortland", "面海的大型建地"),
+  LOT,
+  P("e_db", "多良車站", 2600, "duoliang", "台灣最美的海景車站。"),
+  P("e_db", "知本溫泉", 2800, "onsen", "森林中的溫泉鄉。"),
+  P("e_db", "金針山", 2400, "hehuan", "夏天開滿金針花。"),
+  POL,
+  CH,
+  P("e_is", "綠島", 3200, "greenisland", "綠島燈塔與小長城。"),
+  P("e_is", "蘭嶼", 3400, "lanyu", "達悟族拼板舟。"),
+  P("e_is", "朝日溫泉", 2800, "seaspring", "世界少見的海底溫泉。"),
+  CAR,
+  MAGIC,
+  P("e_ft", "台東森林公園", 2600, "park2", "琵琶湖與活水湖。"),
+  P("e_ft", "鐵花村", 2800, "lanternport", "熱氣球燈籠下的音樂聚落。"),
+  P("e_ft", "阿美族部落", 2400, "tribe", "豐年祭和傳統茅草屋。"),
+  NEWS,
+  CO("花東觀光公司", 3600, "power", "經營花東觀光的公司"),
+  BANK,
+  CH
+];
 var MAPS = {
   taiwan: { name: "台灣環島", icon: "🏝️", desc: "繞台灣一圈，北中南東 53 個景點", tiles: TW_TILES },
   taipei: { name: "台北城市", icon: "🏙️", desc: "台北 12 區的地標、夜市與老街", tiles: TP_TILES },
   tainan: { name: "台南府城", icon: "🏯", desc: "古蹟、廟宇、鹽田與海線", tiles: TN_TILES },
-  islands: { name: "離島海洋", icon: "🌊", desc: "澎湖、金門、馬祖、綠島蘭嶼、小琉球", tiles: IS_TILES }
+  islands: { name: "離島海洋", icon: "🌊", desc: "澎湖、金門、馬祖、綠島蘭嶼、小琉球", tiles: IS_TILES },
+  taichung: { name: "台中山城", icon: "🌆", desc: "歌劇院、逢甲、高美濕地、日月潭", tiles: TC_TILES },
+  kaohsiung: { name: "高雄港都", icon: "⚓", desc: "駁二、85 大樓、旗津、衛武營", tiles: KH_TILES },
+  huadong: { name: "花東縱谷", icon: "🌄", desc: "太魯閣、伯朗大道、三仙台、綠島蘭嶼", tiles: EA_TILES }
 };
 var MAP_ID = "taiwan";
 var TILES = TW_TILES;
@@ -828,8 +994,94 @@ function upCostFor(s, i, p) {
 function cardCost(p, k) {
   return Math.round(CARDS[k].cost * (hasSkill(p, "bargain") ? 0.7 : 1));
 }
+var MG = {
+  res: { name: "住宅區", icon: "🏘️", build: 1.2, up: 0.8, toll: [1.6, 2.6, 3.6], daily: 0.02, desc: "過路費中等，每天收房租" },
+  com: { name: "商業區", icon: "🏬", build: 1.6, up: 1, toll: [2.3, 3.5, 5], daily: 0, desc: "過路費最高" },
+  ind: { name: "工業區", icon: "🏭", build: 0.9, up: 0.6, toll: [1, 1.6, 2.2], daily: 0.05, desc: "過路費較低，每天工廠收入最多" }
+};
+var MG_MAX = 3;
+var mgBase = (s, ts) => ts.reduce((a, j) => a + price(s, j), 0);
+function mgBuildCost(s, ts, k) {
+  const credit = ts.reduce((a, j) => a + s.tiles[j].l * upCost(s, j), 0) * 0.5;
+  return Math.max(0, r100(mgBase(s, ts) * MG[k].build - credit));
+}
+function mgUpCost(s, i) {
+  const m = s.tiles[i].mg;
+  return r100(mgBase(s, m.ts) * MG[m.k].up);
+}
+function mgToll(s, i) {
+  const m = s.tiles[i].mg;
+  return r10(mgBase(s, m.ts) * MG[m.k].toll[m.lv - 1] * (s.allMod ? s.allMod.m : 1));
+}
+function mgDaily(s, i) {
+  const m = s.tiles[i].mg;
+  return r10(mgBase(s, m.ts) * MG[m.k].daily * m.lv);
+}
+function mergeRun(s, pid, i) {
+  const ok = (j) => TILES[j] && TILES[j].type === "prop" && s.tiles[j].o === pid && !s.tiles[j].mg;
+  if (!ok(i)) return null;
+  const nx = (j, d) => (j + d + N_TILES) % N_TILES;
+  let a = i, b = i, n = 1;
+  while (n < 3 && ok(nx(a, -1)) && nx(a, -1) !== b) {
+    a = nx(a, -1);
+    n++;
+  }
+  while (n < 3 && ok(nx(b, 1)) && nx(b, 1) !== a) {
+    b = nx(b, 1);
+    n++;
+  }
+  if (n === 3 && a !== i && nx(a, 1) !== i && ok(nx(b, 1))) {
+    a = nx(a, 1);
+    b = nx(b, 1);
+  }
+  if (n < 2) return null;
+  const ts = [];
+  for (let j = a; ; j = nx(j, 1)) {
+    ts.push(j);
+    if (j === b) break;
+  }
+  return ts;
+}
+function mgSet(s, ts, m) {
+  ts.forEach((j) => {
+    s.tiles[j].mg = m ? { ...m, ts: [...ts] } : null;
+    s.tiles[j].l = 0;
+  });
+}
+function mgBreak(s, i) {
+  const m = s.tiles[i] && s.tiles[i].mg;
+  if (!m) return;
+  mgSet(s, m.ts, null);
+}
+function mgDamage(s, i, n) {
+  const m = s.tiles[i].mg;
+  if (!m) return false;
+  const lv = m.lv - n;
+  if (lv <= 0) {
+    log(s, `💥 ${MG[m.k].name}被夷為平地，恢復成 ${m.ts.length} 塊空地`);
+    mgSet(s, m.ts, null);
+  } else mgSet(s, m.ts, { ...m, lv, inv: Math.round(m.inv * lv / m.lv) });
+  return true;
+}
+function mgDailyPay(s) {
+  const seen = /* @__PURE__ */ new Set(), got = {};
+  s.tiles.forEach((t, i) => {
+    if (!t || !t.mg || seen.has(t.mg.ts[0])) return;
+    seen.add(t.mg.ts[0]);
+    const o = pl(s, t.o);
+    if (!o || o.out) return;
+    const v = mgDaily(s, i);
+    if (!v) return;
+    o.cash += v;
+    got[o.id] = (got[o.id] || 0) + v;
+    fx(s, { k: "money", pid: o.id, d: v });
+  });
+  const txt = Object.entries(got).map(([id, v]) => `${pl(s, id).name} ${money(v)}`).join("、");
+  if (txt) log(s, `🏘️ 房租／工廠收入：${txt}`);
+}
 function propValue(s, i) {
   const t = TILES[i], st = s.tiles[i];
+  if (st.mg) return price(s, i) + Math.round((st.mg.inv || 0) / st.mg.ts.length);
   if (t.type === "company") return price(s, i);
   if (t.type === "bigland") return price(s, i) + (st.b ? BIG[st.b].cost + ((st.bl || 1) - 1) * bigUpCost(s, i) : 0);
   return price(s, i) + st.l * upCost(s, i);
@@ -854,6 +1106,7 @@ function baseToll(s, i) {
   let v = price(s, i) * TOLL_MUL[st.l];
   const gm = s.gmod[t.g];
   if (gm) v *= gm.m;
+  if (s.allMod) v *= s.allMod.m;
   return v;
 }
 function chainOf(s, i) {
@@ -862,7 +1115,7 @@ function chainOf(s, i) {
   const out = [i];
   for (const d of [-1, 1]) {
     let j = (i + d + N_TILES) % N_TILES;
-    while (j !== i && s.tiles[j] && TILES[j].type === "prop" && s.tiles[j].o === st.o) {
+    while (j !== i && s.tiles[j] && TILES[j].type === "prop" && s.tiles[j].o === st.o && !s.tiles[j].mg) {
       out.push(j);
       j = (j + d + N_TILES) % N_TILES;
     }
@@ -874,6 +1127,7 @@ function toll(s, i) {
   if (!st || st.o == null) return 0;
   if (TILES[i].type === "company") return companyFee(s, i, s.lastDice);
   if (TILES[i].type === "bigland") return bigFee(s, i);
+  if (st.mg) return mgToll(s, i);
   return r10(chainOf(s, i).reduce((a, j) => a + baseToll(s, j), 0));
 }
 function stockValue(s, p) {
@@ -1031,6 +1285,7 @@ function nextTurn(s, now) {
 function newRound(s) {
   s.round++;
   s.day++;
+  mgDailyPay(s);
   if (s.round % 7 === 0) drawLotto(s);
   if (s.day > 30) {
     s.day = 1;
@@ -1063,6 +1318,10 @@ function newRound(s) {
     m.h.push(m.p);
     if (m.h.length > 24) m.h.shift();
   });
+  if (s.allMod && --s.allMod.r <= 0) {
+    log(s, "📉 全台過路費恢復正常");
+    s.allMod = null;
+  }
   for (const g of Object.keys(s.gmod)) {
     if (--s.gmod[g].r <= 0) {
       log(s, `📉 ${GROUPS[g].name}的過路費恢復正常`);
@@ -1200,6 +1459,7 @@ function liquidate(s, p, need) {
     for (const i of mine) {
       if (short <= 0) break;
       const v = r10(propValue(s, i) * 0.5);
+      mgBreak(s, i);
       p.cash += v;
       short -= v;
       s.tiles[i].o = null;
@@ -1241,6 +1501,7 @@ function bankrupt(s, p) {
       t.l = 0;
       t.b = null;
       t.bl = 0;
+      t.mg = null;
     }
   });
   s.lotto.tix = s.lotto.tix.filter((x) => x.pid !== p.id);
@@ -1310,7 +1571,7 @@ function landProp(s, p, i, now) {
     let n = 0;
     TILES.forEach((q, j) => {
       const x = s.tiles[j];
-      if (q.g === t.g && x.o && x.l < 5) {
+      if (q.g === t.g && x.o && x.l < 5 && !x.mg) {
         x.l++;
         n++;
         fx(s, { k: "build", tile: j });
@@ -1322,7 +1583,8 @@ function landProp(s, p, i, now) {
     let n = 0;
     TILES.forEach((q, j) => {
       const x = s.tiles[j];
-      if (q.g === t.g && x.l > 0 && !hasSkill(pl(s, x.o), "armor")) {
+      if (q.g === t.g && (x.l > 0 || x.mg) && !hasSkill(pl(s, x.o), "armor")) {
+        if (x.mg) mgDamage(s, j, 9);
         x.l = 0;
         n++;
         fx(s, { k: "boom", tile: j, m: "monster" });
@@ -1342,7 +1604,13 @@ function landProp(s, p, i, now) {
     return done(s, now);
   }
   if (st.o === p.id) {
-    if (st.l < 5 && p.cash >= upCostFor(s, i, p)) return ask(s, { type: "upgrade", tile: i }, now);
+    if (st.mg) {
+      if (st.mg.lv < MG_MAX && p.cash >= mgUpCost(s, i)) return ask(s, { type: "mgup", tile: i }, now);
+      return done(s, now);
+    }
+    const run = mergeRun(s, p.id, i);
+    const canMerge = run && p.cash >= Math.min(...Object.keys(MG).map((k) => mgBuildCost(s, run, k)));
+    if (st.l < 5 && p.cash >= upCostFor(s, i, p) || canMerge) return ask(s, { type: "upgrade", tile: i, merge: canMerge ? run : null }, now);
     return done(s, now);
   }
   const o = pl(s, st.o);
@@ -1408,7 +1676,8 @@ function sellables(s, p) {
 function feeWhy(s, p, i, kind) {
   const t = TILES[i], st = s.tiles[i];
   let w;
-  if (kind === "prop") {
+  if (kind === "prop" && st.mg) w = `過路費：${MG[st.mg.k].icon}${MG[st.mg.k].name} ${st.mg.lv} 級（${st.mg.ts.length} 塊地合併）`;
+  else if (kind === "prop") {
     const ch = chainOf(s, i).length;
     w = `過路費：${t.name}・${LEVEL_NAMES[st.l]}${ch > 1 ? `・${ch} 塊連鎖` : ""}`;
   } else if (kind === "company") w = `公司收費：${t.name}（骰 ${s.lastDice} 點 × $200 × ${companyCount(s, st.o)} 家）`;
@@ -1480,6 +1749,7 @@ function sellOne(s, p, a) {
     const i = a.tile | 0, st = s.tiles[i];
     if (!st || st.o !== p.id) return "這不是你的地";
     const v2 = sellValue(s, i);
+    mgBreak(s, i);
     p.cash += v2;
     st.o = null;
     st.l = 0;
@@ -1606,6 +1876,28 @@ function drawLotto(s) {
   L.last = n;
   L.tix = [];
 }
+function draw(s, key, n) {
+  s.decks = s.decks || {};
+  let d = s.decks[key];
+  if (!d || !d.length || d.some((i2) => i2 >= n)) {
+    d = [...Array(n).keys()];
+    for (let i2 = d.length - 1; i2 > 0; i2--) {
+      const j = rnd(i2 + 1);
+      [d[i2], d[j]] = [d[j], d[i2]];
+    }
+  }
+  const i = d.pop();
+  s.decks[key] = d;
+  return i;
+}
+var ownProps = (s, p) => TILES.map((t, i) => t.type === "prop" && s.tiles[i].o === p.id ? i : -1).filter((i) => i >= 0);
+var mapGroups = () => [...new Set(TILES.filter((t) => t && t.type === "prop").map((t) => t.g))];
+function setGod(s, p, id, t) {
+  if (!GODS[id].good && hasGod(p, "mazu")) return false;
+  p.god = { id, t };
+  fx(s, { k: "emote", pid: p.id, e: GODS[id].icon });
+  return true;
+}
 var CHANCE = [
   { t: "統一發票中了二獎！", f: (s, p) => gain(s, p, 4e3) },
   { t: "在夜市擺攤大賺一筆", f: (s, p) => gain(s, p, 1500) },
@@ -1652,11 +1944,99 @@ var CHANCE = [
   } },
   { t: "抽中機車一台！", f: (s, p) => {
     if (p.veh < 1) p.veh = 1;
-  } }
+  } },
+  { t: "統一發票中了千萬特別獎！獎金 $10,000", f: (s, p) => gain(s, p, 1e4) },
+  { t: "過年回阿嬤家，紅包收到 $2,000", f: (s, p) => gain(s, p, 2e3) },
+  { t: "幫鄰居顧雜貨店，賺 $800 和點券 15 點", f: (s, p) => {
+    gain(s, p, 800);
+    addPts(p, 15);
+  } },
+  { t: "手搖飲集點集滿了，換到 2 張道具卡", f: (s, p) => {
+    giveCard(s, p);
+    giveCard(s, p);
+  } },
+  { t: "跨年晚會被拍上電視，點券 +50", f: (s, p) => addPts(p, 50) },
+  { t: "去墾丁衝浪曬傷了，住院 1 回合", bad: 1, f: (s, p) => sendHospital(s, p, 1), stop: 1 },
+  { t: "打卡送優惠券，開心前進 2 格", f: () => ({ move: 2 }) },
+  { t: "接到假冒客服的詐騙電話，被騙走 $2,000", bad: 1, f: (s, p) => pay(s, p, null, 2e3) },
+  { t: "繳交牌照稅：機車 $300、汽車 $800", bad: 1, f: (s, p) => pay(s, p, null, p.veh >= 2 ? 800 : p.veh >= 1 ? 300 : 0) },
+  { t: "政府老屋修繕補助：你的一塊地免費加蓋一層", f: (s, p) => {
+    const a = ownProps(s, p).filter((i) => s.tiles[i].l < 5 && !s.tiles[i].mg);
+    if (a.length) {
+      const i = pick(a);
+      s.tiles[i].l++;
+      fx(s, { k: "build", tile: i, pid: p.id });
+      return;
+    }
+    gain(s, p, 1e3);
+  } },
+  { t: "地震搖了一下，你的一塊地房子倒一層", bad: 1, f: (s, p) => {
+    const a = ownProps(s, p).filter((i) => s.tiles[i].l > 0 && !s.tiles[i].mg);
+    if (a.length && !hasSkill(p, "armor")) {
+      const i = pick(a);
+      s.tiles[i].l--;
+      fx(s, { k: "boom", tile: i, m: "quake" });
+    }
+  } },
+  { t: "遠房親戚留給你一塊地！", f: (s, p) => {
+    const a = TILES.map((t, i) => t.type === "prop" && s.tiles[i].o == null ? i : -1).filter((i) => i >= 0);
+    if (a.length) {
+      const i = pick(a);
+      s.tiles[i].o = p.id;
+      s.tiles[i].l = 0;
+      fx(s, { k: "buy", tile: i, pid: p.id });
+      log(s, `🏠 ${p.name} 繼承了 ${TILES[i].name}`);
+      return;
+    }
+    gain(s, p, 3e3);
+  } },
+  { t: "搭捷運坐過站，往回走 3 格", bad: 1, f: (s, p) => {
+    p.dir *= -1;
+    return { move: 3, flip: 1 };
+  } },
+  { t: "去廟裡擲到聖筊，財神附身 3 回合！", f: (s, p) => {
+    setGod(s, p, "caishen", 3);
+  } },
+  { t: "熬夜追劇精神不濟，在原地休息 1 回合", bad: 1, f: (s, p) => {
+    p.st.sleep = Math.max(p.st.sleep, 1);
+  } },
+  { t: "搭飛機說走就走，飛到隨機一個地方！", f: (s, p) => {
+    const a = TILES.map((t, i) => t.type === "prop" || t.type === "chance" || t.type === "shop" ? i : -1).filter((i) => i >= 0 && i !== p.pos);
+    teleport(s, p, pick(a));
+    return { land: 1 };
+  }, stop: 1 },
+  { t: "全民運動會拿到金牌！每位玩家送你 $300", f: (s, p) => alive(s).forEach((o) => {
+    if (o !== p) pay(s, o, p, 300, "機會：運動會金牌賀禮");
+  }) },
+  { t: "夏天冷氣開太兇，電費 $800", bad: 1, f: (s, p) => pay(s, p, null, 800) },
+  { t: "撿到錢包交給警察，好人有好報：$500 和點券 40", f: (s, p) => {
+    gain(s, p, 500);
+    addPts(p, 40);
+  } },
+  { t: "跟風投資虛擬幣慘賠，損失現金 15%", bad: 1, f: (s, p) => pay(s, p, null, r10(p.cash * 0.15)) },
+  { t: "銀行加碼優惠，你的存款增加 20%", f: (s, p) => {
+    const add = r10(p.deposit * 0.2);
+    p.deposit += add;
+    if (add) fx(s, { k: "money", pid: p.id, d: add });
+  } },
+  { t: "公司尾牙抽中頭獎 $3,000！", f: (s, p) => gain(s, p, 3e3) },
+  { t: "被野狗追，一路狂奔 5 格", f: () => ({ move: 5 }) },
+  { t: "換購電動機車，交通工具升級！", f: (s, p) => {
+    if (p.veh < 1) p.veh = 1;
+    else gain(s, p, 500);
+  } },
+  { t: "颱風天搶購泡麵，花了 $400", bad: 1, f: (s, p) => pay(s, p, null, 400) },
+  { t: "在路邊攤吃到超好吃的蚵仔煎，心情好點券 +20", f: (s, p) => addPts(p, 20) },
+  { t: "被選為里長伯的助手，下次過路費免付（獲得免費卡）", f: (s, p) => {
+    if (p.cards.length < cardLimit(p)) {
+      p.cards.push("free");
+      fx(s, { k: "card", pid: p.id, card: "free", got: 1 });
+    }
+  } },
+  { t: "健身房年費到期續約 $1,000", bad: 1, f: (s, p) => pay(s, p, null, 1e3) }
 ];
 function chance(s, p, now) {
-  const pool = CHANCE.flatMap((c2) => c2.w === 0.5 ? Math.random() < 0.5 ? [c2] : [] : [c2]);
-  const c = pick(pool);
+  const c = CHANCE[draw(s, "chance", CHANCE.length)];
   fx(s, { k: "notice", kind: "chance", title: "機會", text: c.t, pid: p.id });
   log(s, `❓ ${p.name}：${c.t}`);
   if (c.bad && hasGod(p, "mazu")) {
@@ -1667,6 +2047,12 @@ function chance(s, p, now) {
   const r = c.f(s, p) || {};
   s.chanceCtx = null;
   if (p.out) return done(s, now, 2e3);
+  if (r.land) {
+    s.step = "done";
+    s.until = now + 1800;
+    s.landAfter = true;
+    return;
+  }
   if (r.move) {
     s.until = 0;
     startMove(s, p, r.move, now + 1600, null);
@@ -1704,6 +2090,83 @@ var NEWS2 = [
     const paid = pay(s, rich, poor, amt, "新聞：富人捐給窮人");
     return `💰 ${rich.name}（最富有）➜ ${poor.name}（最窮）${money(paid)}`;
   } },
+  { t: "物價上漲！每位玩家多付生活費 $500", f: (s) => alive(s).forEach((p) => {
+    if (!hasGod(p, "mazu")) pay(s, p, null, 500);
+  }) },
+  { t: "年終獎金發放！每人領 $1,500", f: (s) => alive(s).forEach((p) => gain(s, p, 1500)) },
+  { t: "颱風假放一天，大家在家休息，點券各 +20", f: (s) => alive(s).forEach((p) => addPts(p, 20)) },
+  { t: "政府打炒房！全台過路費打 8 折，持續 3 回合", f: (s) => {
+    s.allMod = { m: 0.8, r: 3 };
+  } },
+  { t: "國際觀光客暴增！全台過路費 ×1.3，持續 3 回合", f: (s) => {
+    s.allMod = { m: 1.3, r: 3 };
+  } },
+  { t: "半導體股大漲！", f: (s) => {
+    const k = rnd(s.market.length), m = s.market[k];
+    m.p = Math.round(m.p * 15) / 10;
+    m.h.push(m.p);
+    return `📈 ${STOCKS[k].name} 股價漲 50%`;
+  } },
+  { t: "某產業爆出醜聞，股價崩跌！", f: (s) => {
+    const k = rnd(s.market.length), m = s.market[k];
+    m.p = Math.max(2, Math.round(m.p * 6) / 10);
+    m.h.push(m.p);
+    return `📉 ${STOCKS[k].name} 股價跌 40%`;
+  } },
+  { t: "流感大流行！", f: (s) => {
+    const a = alive(s).filter((p2) => !hasGod(p2, "mazu"));
+    if (!a.length) return "";
+    const p = pick(a);
+    sendHospital(s, p, 1);
+    return `🤧 ${p.name} 中標住院 1 回合`;
+  } },
+  { t: "大樂透連槓！彩金池增加 $5,000", f: (s) => {
+    s.lotto.pool += 5e3;
+  } },
+  { t: "政府普發現金！每人 $3,000", f: (s) => alive(s).forEach((p) => gain(s, p, 3e3)) },
+  { t: "地價稅開徵，每塊土地繳 $200", f: (s) => {
+    const out = [];
+    alive(s).forEach((p) => {
+      const n = s.tiles.filter((t) => t && t.o === p.id).length;
+      if (n && !hasGod(p, "mazu")) {
+        pay(s, p, null, n * 200);
+        out.push(`${p.name} ${n} 塊 ${money(n * 200)}`);
+      }
+    });
+    return out.join("、");
+  } },
+  { t: "慈善晚會，每人捐 $500 進樂透彩金", f: (s) => alive(s).forEach((p) => {
+    const v = Math.min(500, p.cash);
+    p.cash -= v;
+    s.lotto.pool += v;
+    if (v) fx(s, { k: "money", pid: p.id, d: -v });
+  }) },
+  { t: "窮神出巡，盯上了最有錢的人！", f: (s) => {
+    const a = alive(s).sort((x, y) => assets(s, y) - assets(s, x));
+    if (!a.length) return "";
+    const p = a[0];
+    return setGod(s, p, "qiong", 3) ? `💸 ${p.name} 被窮神附身 3 回合` : `🙏 ${p.name} 有媽祖保佑，窮神進不來`;
+  } },
+  { t: "財神出巡，照顧最窮的人！", f: (s) => {
+    const a = alive(s).sort((x, y) => assets(s, x) - assets(s, y));
+    if (!a.length) return "";
+    const p = a[0];
+    setGod(s, p, "caishen", 3);
+    return `💰 ${p.name} 被財神附身 3 回合`;
+  } },
+  { t: "中元普渡，大家準備供品，每人付 $300、點券 +15", f: (s) => alive(s).forEach((p) => {
+    pay(s, p, null, 300);
+    addPts(p, 15);
+  }) },
+  { tg: 1, t: (g) => `都市更新通過！${GROUPS[g].name}的房子各加蓋一層`, f: (s, g) => {
+    TILES.forEach((t, i) => {
+      const st = s.tiles[i];
+      if (t.g === g && st.o != null && st.l < 5 && !st.mg) st.l++;
+    });
+  } },
+  { tg: 1, t: (g) => `捷運新路線通車！${GROUPS[g].name}地價永久上漲 30%`, f: (s, g) => {
+    s.gprice[g] = (s.gprice[g] || 1) * 1.3;
+  } },
   { tg: 1, t: (g) => `觀光熱潮！${GROUPS[g].name}過路費 ×1.6，持續 4 回合`, f: (s, g) => {
     s.gmod[g] = { m: 1.6, r: 4 };
   } },
@@ -1721,10 +2184,10 @@ var NEWS2 = [
   } }
 ];
 function news(s, p, now) {
-  const n = pick(NEWS2);
+  const n = NEWS2[draw(s, "news", NEWS2.length)];
   let text;
   if (n.tg) {
-    const g = pick(Object.keys(GROUPS));
+    const g = pick(mapGroups());
     text = n.t(g);
     n.f(s, g);
   } else {
@@ -1814,6 +2277,13 @@ function act(s, pid, a, now) {
     return null;
   }
   if (s.phase !== "play") return "遊戲未進行";
+  if (a.type === "leave") {
+    const q = pl(s, pid);
+    if (!q || !q.out || q.left) return null;
+    q.left = true;
+    log(s, `🚪 ${q.name} 離開了房間`);
+    return null;
+  }
   if (a.type === "away") {
     const q = pl(s, pid);
     if (!q || q.out) return "無效";
@@ -1928,7 +2398,37 @@ function act(s, pid, a, now) {
       fx(s, { k: "notice", kind: "god", title: "🕹️ 小遊戲", text: `${p.name} 接到 ${sc} 枚金幣，點券 +${sc}` });
       return done(s, now, 1600), null;
     }
+    case "mgup": {
+      if (a.type === "yes") {
+        const st = s.tiles[pd.tile], m = st.mg;
+        if (!m || m.lv >= MG_MAX) return "已經最高級";
+        const c = mgUpCost(s, pd.tile);
+        if (p.cash < c) return "現金不足";
+        p.cash -= c;
+        mgSet(s, m.ts, { ...m, lv: m.lv + 1, inv: (m.inv || 0) + c });
+        log(s, `${MG[m.k].icon} ${p.name} 把${MG[m.k].name}擴建到 ${m.lv + 1} 級（${money(c)}）`);
+        fx(s, { k: "build", tile: pd.tile, pid: p.id, mg: 1 });
+        fx(s, { k: "money", pid: p.id, d: -c });
+      }
+      return done(s, now, 600), null;
+    }
     case "upgrade": {
+      if (a.type === "merge") {
+        const ts = pd.merge, k = a.kind;
+        if (!ts || !MG[k]) return "無效";
+        if (!ts.every((j) => s.tiles[j].o === p.id && !s.tiles[j].mg)) return "土地已經變動";
+        const c = mgBuildCost(s, ts, k);
+        if (p.cash < c) return "現金不足";
+        const inv = c + ts.reduce((a2, j) => a2 + s.tiles[j].l * upCost(s, j), 0) * 0.5;
+        p.cash -= c;
+        mgSet(s, ts, { k, lv: 1, inv: Math.round(inv) });
+        log(s, `${MG[k].icon} ${p.name} 把 ${ts.map((j) => TILES[j].name).join("、")} 合併蓋成${MG[k].name}！（${money(c)}）`);
+        ts.forEach((j) => fx(s, { k: "build", tile: j, pid: p.id, mg: 1 }));
+        if (c) fx(s, { k: "money", pid: p.id, d: -c });
+        fx(s, { k: "notice", kind: "god", title: `${MG[k].icon} 合併建設完成`, text: `${p.name} 的 ${ts.length} 塊地合併成${MG[k].name}
+${MG[k].desc}`, pid: p.id });
+        return done(s, now, 1500), null;
+      }
       if (a.type === "yes") {
         const st = s.tiles[pd.tile];
         const n = Math.max(1, Math.min(2, a.n | 0 || 1, 5 - st.l));
@@ -2069,9 +2569,9 @@ function cardTargets(s, p, card) {
     case "godplayer":
       return alive(s).filter((o) => o.god).map((o) => o.id);
     case "oppprop":
-      return s.tiles.map((t, i) => t && TILES[i].type === "prop" && t.o && t.o !== p.id && t.l > 0 ? i : -1).filter((i) => i >= 0);
+      return s.tiles.map((t, i) => t && TILES[i].type === "prop" && t.o && t.o !== p.id && (t.l > 0 || t.mg) ? i : -1).filter((i) => i >= 0);
     case "myprop":
-      return s.tiles.map((t, i) => t && TILES[i].type === "prop" && t.o === p.id && t.l < 5 ? i : -1).filter((i) => i >= 0);
+      return s.tiles.map((t, i) => t && TILES[i].type === "prop" && t.o === p.id && t.l < 5 && !t.mg ? i : -1).filter((i) => i >= 0);
     case "here": {
       const t = s.tiles[p.pos];
       return t && t.o && t.o !== p.id && p.cash >= propValue(s, p.pos) ? [p.pos] : [];
@@ -2156,6 +2656,7 @@ function useCard(s, p, a, now) {
       break;
     case "buyland": {
       const i = p.pos, st = s.tiles[i], o = pl(s, st.o), v = propValue(s, i);
+      mgBreak(s, i);
       p.cash -= v;
       o.cash += v;
       st.o = p.id;
@@ -2171,6 +2672,11 @@ function useCard(s, p, a, now) {
       fx(s, { k: "boom", tile: a.tile, m: "monster", big: 1 });
       if (hasSkill(pl(s, st.o), "armor")) {
         log(s, `${pre}，但穿山甲的鱗甲擋住了！`);
+        break;
+      }
+      if (st.mg) {
+        log(s, `${pre}，${MG[st.mg.k].name}被怪獸踩爛了！`);
+        mgDamage(s, a.tile, 9);
         break;
       }
       st.l = 0;
@@ -2203,8 +2709,13 @@ function useCard(s, p, a, now) {
         log(s, `${pre}，但穿山甲的鱗甲擋住了！`);
         break;
       }
-      st.l = Math.max(0, st.l - 2);
-      log(s, `${pre}，${TILES[a.tile].name} 被炸掉兩層！`);
+      if (st.mg) {
+        log(s, `${pre}，${MG[st.mg.k].name}被炸掉一級！`);
+        mgDamage(s, a.tile, 1);
+      } else {
+        st.l = Math.max(0, st.l - 2);
+        log(s, `${pre}，${TILES[a.tile].name} 被炸掉兩層！`);
+      }
       sendHospital(s, o, 1);
       break;
     }
@@ -2234,7 +2745,7 @@ function useCard(s, p, a, now) {
     case "angel": {
       const g = TILES[a.tile].g;
       TILES.forEach((t, i) => {
-        if (t.g === g && s.tiles[i].o && s.tiles[i].l < 5) {
+        if (t.g === g && s.tiles[i].o && s.tiles[i].l < 5 && !s.tiles[i].mg) {
           s.tiles[i].l++;
           fx(s, { k: "build", tile: i });
         }
@@ -2335,7 +2846,13 @@ function botAction(s, p) {
       return { type: "auto" };
     case "buy":
       return { type: p.cash - price(s, pd.tile) >= 2500 ? "yes" : "no" };
+    case "mgup":
+      return { type: p.cash - mgUpCost(s, pd.tile) >= 5e3 ? "yes" : "no" };
     case "upgrade": {
+      if (pd.merge && Math.random() < 0.7) {
+        for (const k of ["com", "res", "ind"]) if (p.cash - mgBuildCost(s, pd.merge, k) >= 5e3) return { type: "merge", kind: k };
+      }
+      if (s.tiles[pd.tile].l >= 5) return { type: "no" };
       const c = upCostFor(s, pd.tile, p);
       if (p.cash - 2 * c >= 6e3) return { type: "yes", n: 2 };
       return { type: p.cash - c >= 3e3 ? "yes" : "no" };
@@ -4027,6 +4544,193 @@ function buildOwnerSign(color) {
   S(g, 0.06, "#ffd54f", 0, 1.25, 0);
   return g;
 }
+M.autumnvalley = (g) => {
+  platform(g, 1.75, "#7cb342", 0.12);
+  water(g, 1.05, 0, 0.2, 0.09, "#4fc3f7");
+  const br = B(g, 2, 0.05, 0.22, "#eceff1", 0, 0.3, 0.2);
+  br.rotation.y = 0.5;
+  for (const [x, z, h] of [[-1.2, -1, 2.2], [-0.5, -1.25, 2.8], [0.6, -1.2, 2.4]]) {
+    B(g, 0.5, h, 0.5, mat("#90a4ae", { r: 0.3, m: 0.4 }), x, 0.12, z);
+    B(g, 0.52, 0.06, 0.52, "#eceff1", x, 0.12 + h, z);
+  }
+  for (const [x, z] of [[1.2, 0.6], [-1.2, 0.8], [1, -0.2]]) roundTree(g, x, z, 0.28, "#e65100", 0.1);
+};
+M.miyahara = (g) => {
+  B(g, 3.2, 0.1, 2.6, "#9e9e9e");
+  B(g, 2.8, 1.5, 1.6, "#b5523b", 0, 0.1, -0.3);
+  for (let k = 0; k < 2; k++) B(g, 2.82, 0.07, 1.62, "#f5f5f5", 0, 0.55 + k * 0.6, -0.3);
+  for (let k = -2; k <= 2; k++) {
+    B(g, 0.32, 0.45, 0.03, "#263238", k * 0.55, 0.2, 0.51);
+    const ar = put(g, new THREE.CylinderGeometry(0.16, 0.16, 0.03, 10, 1, false, 0, Math.PI), "#f5f5f5", k * 0.55, 0.65, 0.51);
+    ar.rotation.x = Math.PI / 2;
+    ar.rotation.z = Math.PI / 2;
+  }
+  B(g, 0.9, 0.45, 0.25, "#b5523b", 0, 1.6, 0.35);
+  B(g, 0.7, 0.25, 0.03, "#ffd54f", 0, 1.7, 0.48);
+  B(g, 3, 0.08, 0.5, "#8d6e63", 0, 0.1, 0.9);
+};
+M.huxin = (g) => {
+  water(g, 1.75, 0, 0, 0.04, "#4db6ac");
+  B(g, 0.35, 0.08, 1.6, "#8d6e63", 0, 0.12, 0.9);
+  for (const sx of [-1, 1]) {
+    const x = sx * 0.55;
+    B(g, 0.9, 0.12, 0.9, "#eceff1", x, 0.12, -0.2);
+    for (const [cx, cz] of [[-0.35, -0.35], [0.35, -0.35], [-0.35, 0.35], [0.35, 0.35]]) C(g, 0.04, 0.04, 0.7, "#fafafa", x + cx, 0.24, -0.2 + cz, 6);
+    roof(g, 1.15, 1.15, 0.4, "#c62828", x, 0.94, -0.2);
+    put(g, new THREE.ConeGeometry(0.06, 0.25, 6), "#fbc02d", x, 1.45, -0.2);
+  }
+  for (const [x, z] of [[1.4, 1], [-1.4, 1]]) roundTree(g, x, z, 0.3, "#43a047", 0.05);
+};
+M.nmns = (g) => {
+  B(g, 3.3, 0.12, 3, "#bdbdbd");
+  frustum(g, 0.1, 1.9, 1.7, mat("#b3e5fc", { r: 0.1, m: 0.5, op: 0.85 }), -0.6, 0.12, -0.3);
+  B(g, 1.4, 0.8, 1.2, "#eceff1", 0.9, 0.12, 0.2);
+  const d = S(g, 0.62, "#cfd8dc", 0.9, 0.92, 0.2, void 0, 14, 8);
+  d.scale.y = 0.75;
+  roundTree(g, -0.6, 1.05, 0.25);
+  roundTree(g, 1.2, -1, 0.25);
+  B(g, 0.8, 0.5, 0.25, "#795548", -1.2, 0.12, 1.1);
+};
+M.luce = (g) => {
+  platform(g, 1.7, "#9ccc65", 0.12);
+  const tile = mat("#f9a825", { r: 0.5 });
+  for (const sx of [-1, 1]) {
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0);
+    shape.quadraticCurveTo(0.05 * sx, 1.4, 0.55 * sx, 2.6);
+    shape.lineTo(0.62 * sx, 2.55);
+    shape.quadraticCurveTo(0.3 * sx, 1.2, 1.1 * sx, 0);
+    shape.lineTo(0, 0);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 1.8, bevelEnabled: false });
+    geo.translate(sx * -0.62, 0, -0.9);
+    const m = new THREE.Mesh(geo, tile);
+    m.position.y = 0.12;
+    m.castShadow = true;
+    g.add(m);
+  }
+  for (let k = 0; k < 6; k++) B(g, 1.9, 0.03, 0.02, "#8d6e63", 0, 0.5 + k * 0.38, -0.9);
+  B(g, 0.08, 0.5, 0.02, "#fafafa", 0, 2.75, 0);
+  B(g, 0.3, 0.08, 0.02, "#fafafa", 0, 3, 0);
+  roundTree(g, 1.3, 1, 0.3);
+  roundTree(g, -1.3, 1, 0.3);
+  roundTree(g, 1.3, -1, 0.28);
+};
+M.flowersea = (g) => {
+  C(g, 1.75, 1.8, 0.12, "#8bc34a", 0, 0, 0, 12);
+  const cs = ["#e91e63", "#ffeb3b", "#ff9800", "#9c27b0", "#f44336", "#03a9f4"];
+  for (let r = 0; r < 6; r++) B(g, 2.6, 0.12, 0.38, cs[r], 0, 0.12, -1 + r * 0.42);
+  const w = new THREE.Group();
+  C(g, 0.1, 0.16, 1.6, "#fff3e0", 1.2, 0.12, -1.1, 8);
+  roof(g, 0.4, 0.4, 0.3, "#c62828", 1.2, 1.72, -1.1);
+  w.position.set(1.2, 1.5, -0.88);
+  g.add(w);
+  for (let i = 0; i < 4; i++) {
+    const b = B(w, 0.08, 0.7, 0.02, "#fafafa", 0, 0, 0);
+    b.geometry.translate(0, 0.35, 0);
+    b.position.y = 0;
+    b.rotation.z = i * Math.PI / 2;
+  }
+  anim(g, (t, dt) => {
+    w.rotation.z += dt * 1.2;
+  });
+};
+M.popmusic = (g) => {
+  B(g, 3.3, 0.1, 3, "#90a4ae");
+  water(g, 1, 0.8, 1, 0.11, "#29b6f6");
+  for (const [x, z, h] of [[-1, -0.7, 2.6], [-0.2, -0.9, 2], [0.6, -0.6, 1.5], [-0.8, 0.3, 1.2]]) {
+    C(g, 0.38, 0.42, h, mat("#fafafa", { r: 0.3 }), x, 0.1, z, 6);
+    for (let k = 1; k < 4; k++) C(g, 0.4, 0.4, 0.04, "#4fc3f7", x, 0.1 + h * k / 4, z, 6);
+  }
+};
+M.lightdome = (g) => {
+  B(g, 3.2, 0.12, 3.2, "#9e9e9e");
+  const cs = ["#e53935", "#fdd835", "#1e88e5", "#43a047", "#8e24aa", "#fb8c00"];
+  for (let i = 0; i < 6; i++) {
+    const seg = put(g, new THREE.SphereGeometry(1.25, 8, 6, i * Math.PI / 3, Math.PI / 3, 0, Math.PI / 2), mat(cs[i], { e: cs[i], ei: 0.35, op: 0.9 }), 0, 0.12, 0);
+    seg.material.side = THREE.DoubleSide;
+  }
+  for (const [x, z] of [[1.3, 1.3], [-1.3, 1.3], [1.3, -1.3], [-1.3, -1.3]]) {
+    B(g, 0.5, 1, 0.5, mat("#90caf9", { r: 0.1, m: 0.5, op: 0.85 }), x, 0.12, z);
+  }
+};
+M.consulate = (g) => {
+  C(g, 1.7, 1.8, 0.6, "#689f38", 0, 0, 0, 10);
+  B(g, 2.4, 0.9, 1.4, "#c0623b", 0, 0.6, -0.2);
+  roof(g, 2.8, 1.8, 0.45, "#5d4037", 0, 1.5, -0.2);
+  for (let k = -3; k <= 3; k++) {
+    const ar = put(g, new THREE.TorusGeometry(0.13, 0.025, 4, 10, Math.PI), "#fafafa", k * 0.33, 0.95, 0.51);
+  }
+  for (let k = -3; k <= 3; k++) B(g, 0.05, 0.5, 0.05, "#fafafa", k * 0.33 + 0.165, 0.6, 0.5);
+  B(g, 2.5, 0.05, 0.3, "#fafafa", 0, 1.45, 0.45);
+};
+M.weiwuying = (g) => {
+  B(g, 3.3, 0.1, 3, "#a5d6a7");
+  const geo = new THREE.PlaneGeometry(3, 2.4, 24, 16), pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i);
+    pos.setZ(i, 0.9 + Math.sin(x * 2.2) * 0.35 + Math.cos(y * 2.6 + x) * 0.25);
+  }
+  geo.computeVertexNormals();
+  geo.rotateX(-Math.PI / 2);
+  const roofm = new THREE.Mesh(geo, mat("#f5f5f5", { r: 0.35 }));
+  roofm.material.side = THREE.DoubleSide;
+  roofm.position.y = 0.1;
+  roofm.castShadow = true;
+  g.add(roofm);
+  for (const [x, z] of [[-1.2, -0.9], [1.2, -0.9], [-1.2, 0.9], [1.2, 0.9], [0, 0]]) C(g, 0.18, 0.35, 0.9, "#eceff1", x, 0.1, z, 8);
+  roundTree(g, 1.4, 1.3, 0.22);
+  roundTree(g, -1.4, 1.3, 0.22);
+};
+M.moonworld = (g) => {
+  C(g, 1.75, 1.85, 0.1, "#bcaaa4", 0, 0, 0, 10);
+  for (const [x, z, r, h] of [[-0.7, -0.6, 0.8, 1.4], [0.6, -0.8, 0.7, 1.1], [0.2, 0.4, 0.6, 0.9], [-0.9, 0.7, 0.45, 0.7], [1.1, 0.5, 0.45, 0.6]]) {
+    const m = put(g, new THREE.ConeGeometry(r, h, 7, 3), "#cfc6bb", x, 0.1 + h / 2, z);
+    m.rotation.y = x * 3;
+    for (let k = 0; k < 3; k++) {
+      const st = put(g, new THREE.ConeGeometry(r * 0.12, h * 0.9, 3), "#a1887f", x + Math.cos(k * 2) * r * 0.5, 0.1 + h * 0.4, z + Math.sin(k * 2) * r * 0.5);
+      st.rotation.x = 0.4;
+    }
+  }
+  water(g, 0.4, 0.9, 1.2, 0.11, "#4db6ac");
+};
+M.expo = (g) => {
+  B(g, 3.3, 0.1, 2.6, "#90a4ae");
+  B(g, 3.3, 0.06, 0.7, "#29b6f6", 0, 0.06, 1.2);
+  B(g, 2.8, 0.9, 1.5, mat("#b3e5fc", { r: 0.1, m: 0.5, op: 0.9 }), 0, 0.1, -0.3);
+  for (let k = 0; k < 5; k++) {
+    const w = put(g, new THREE.CylinderGeometry(0.4, 0.4, 1.7, 10, 1, true, 0, Math.PI), mat("#fafafa", { r: 0.3 }), -1.15 + k * 0.58, 1, -0.3);
+    w.rotation.x = Math.PI / 2;
+    w.rotation.y = 0;
+    w.rotation.z = Math.PI / 2;
+    w.material.side = THREE.DoubleSide;
+  }
+};
+M.duoliang = (g) => {
+  C(g, 1.6, 1.7, 0.8, "#689f38", -0.5, 0, -0.6, 10);
+  water(g, 1.6, 0.4, 0.9, 0.02, "#0288d1");
+  B(g, 3, 0.15, 0.5, "#b0bec5", 0, 1.1, -0.1);
+  for (let k = -1; k <= 1; k++) B(g, 0.15, 1.1, 0.15, "#90a4ae", k * 1.1, 0, -0.1);
+  B(g, 0.9, 0.5, 0.45, "#eceff1", -0.6, 1.25, -0.1);
+  B(g, 1, 0.07, 0.55, "#1e88e5", -0.6, 1.75, -0.1);
+  const tr = new THREE.Group();
+  tr.position.set(0.5, 1.4, 0.05);
+  g.add(tr);
+  B(tr, 1.2, 0.35, 0.28, "#fafafa");
+  B(tr, 1.21, 0.08, 0.29, "#e65100", 0, 0.12);
+  anim(g, (t) => {
+    tr.position.x = Math.sin(t * 0.5) * 0.9;
+  });
+};
+M.tribe = (g) => {
+  C(g, 1.7, 1.8, 0.1, "#a1887f", 0, 0, 0, 12);
+  for (const [x, z] of [[-0.8, -0.6], [0.8, -0.7], [0, 0.6]]) {
+    B(g, 0.8, 0.45, 0.6, "#8d6e63", x, 0.1, z);
+    roof(g, 1.1, 0.9, 0.55, "#d7ccc8", x, 0.55, z);
+  }
+  C(g, 0.12, 0.14, 1.6, "#6d4c41", -1.2, 0.1, 0.9, 8);
+  for (let k = 0; k < 3; k++) B(g, 0.3, 0.12, 0.3, ["#e53935", "#fdd835", "#212121"][k], -1.2, 0.5 + k * 0.4, 0.9);
+  S(g, 0.2, "#ff7043", 0.9, 0.2, 0.9, { e: "#ff3d00", ei: 0.8 }, 6, 5);
+};
 function buildLandmark(id) {
   const g = new THREE.Group();
   (M[id] || M.chance)(g);
@@ -4517,6 +5221,110 @@ function animateToken(tok, mode, t, dt) {
   L(u.body.rotation, "z", tz);
   L(u.torso.rotation, "x", tx);
 }
+var _winTex = {};
+function winMat(color, metal = 0) {
+  const k = color + metal;
+  if (!_winTex[k]) _winTex[k] = new THREE.MeshStandardMaterial({ map: windowsTex(color), roughness: metal ? 0.35 : 0.6, metalness: metal });
+  return _winTex[k];
+}
+function buildComplex(kind, lv, color, idx, n) {
+  const g = new THREE.Group();
+  if (kind === "res") {
+    const h = [1.5, 2.4, 3.3][lv - 1], m = winMat(color);
+    B(g, 1.25, 0.12, 1.25, "#9ccc65");
+    B(g, 0.75, h, 0.7, m, -0.18, 0.12, -0.12);
+    B(g, 0.8, 0.1, 0.75, "#eceff1", -0.18, 0.12 + h, -0.12);
+    if (lv >= 2) {
+      B(g, 0.45, h * 0.6, 0.45, m, 0.35, 0.12, 0.3);
+      B(g, 0.5, 0.08, 0.5, color, 0.35, 0.12 + h * 0.6, 0.3);
+    }
+    if (lv >= 3) {
+      B(g, 0.5, 0.18, 0.45, "#66bb6a", -0.18, 0.22 + h, -0.12);
+      roundTree(g, -0.05, -0.02, 0.12, "#43a047", 0.3 + h);
+    }
+    roundTree(g, 0.45, -0.4, 0.2);
+    roundTree(g, -0.5, 0.45, 0.18);
+  } else if (kind === "com") {
+    const glass = winMat("#4fc3f7", 0.4), h = [1.1, 2.1, 3.3][lv - 1];
+    B(g, 1.3, 0.75, 1.15, "#eceff1");
+    B(g, 1.34, 0.16, 1.19, color, 0, 0.6);
+    B(g, 1.1, 0.35, 0.02, glass, 0, 0.12, 0.585);
+    const tw = idx === Math.floor(n / 2) ? 0.7 : 0.5;
+    B(g, tw, h, tw, glass, 0, 0.75, -0.1);
+    B(g, tw + 0.06, 0.08, tw + 0.06, color, 0, 0.75 + h, -0.1);
+    if (lv >= 3 && idx === Math.floor(n / 2)) {
+      C(g, 0.02, 0.05, 0.9, "#cfd8dc", 0, 0.83 + h, -0.1, 5);
+      S(g, 0.07, "#ffd600", 0, 1.75 + h, -0.1, { e: "#ffab00", ei: 0.9 });
+    }
+    if (lv >= 2) for (const sx of [-0.45, 0.45]) S(g, 0.08, "#fff59d", sx, 0.95, 0.5, { e: "#ffee58", ei: 0.7 });
+  } else {
+    B(g, 1.3, 0.6, 1, "#b0bec5");
+    for (let k = 0; k < 3; k++) {
+      const r = roof(g, 0.46, 1, 0.3, k % 2 ? "#90a4ae" : color, -0.43 + k * 0.43, 0.6, 0);
+      r.rotation.y = 0;
+      r.scale.set(0.46, 0.3, 1);
+    }
+    B(g, 0.3, 0.38, 0.02, "#546e7a", 0.35, 0, 0.51);
+    const smokes = [];
+    for (let c = 0; c < lv; c++) {
+      const x = -0.45 + c * 0.35, z = -0.35, hh = 1.4 + c * 0.25;
+      C(g, 0.09, 0.11, hh, "#eceff1", x, 0, z, 8);
+      for (let b = 0; b < 2; b++) C(g, 0.1, 0.1, 0.12, "#e53935", x, hh * (0.55 + b * 0.3), z, 8);
+      for (let k = 0; k < 3; k++) {
+        const sm = S(g, 0.12, "#cfd8dc", x, hh, z, void 0, 6, 5);
+        sm.userData.noBake = true;
+        smokes.push({ sm, x, z, hh, ph: k / 3 });
+      }
+    }
+    g.userData.tick = (t) => {
+      for (const q of smokes) {
+        const f = (t * 0.4 + q.ph) % 1;
+        q.sm.position.set(q.x + f * 0.25, q.hh + f * 1.1, q.z);
+        q.sm.scale.setScalar(0.6 + f * 1.6);
+      }
+    };
+    if (lv >= 2) {
+      B(g, 0.55, 0.45, 0.5, "#78909c", 0.5, 0, 0.35);
+    }
+    if (lv >= 3) {
+      C(g, 0.28, 0.28, 0.7, "#cfd8dc", -0.5, 0, 0.35, 12);
+      S(g, 0.28, "#cfd8dc", -0.5, 0.7, 0.35, void 0, 10, 6);
+    }
+  }
+  B(g, 1.45, 0.06, 1.45, color, 0, -0.03, 0);
+  g.scale.setScalar(0.85);
+  return g;
+}
+function buildConnector(kind, lv, color, dx, dz) {
+  const g = new THREE.Group(), L = Math.hypot(dx, dz), a = Math.atan2(-dz, dx);
+  const piece = (w, h, d, c, y) => {
+    const m = B(g, L, h, w, c, 0, y, 0);
+    return m;
+  };
+  if (kind === "res") {
+    piece(0.5, 0.05, 0, "#9ccc65", 0.02);
+    if (lv >= 3) piece(0.25, 0.12, 0, "#eceff1", 1.6);
+  } else if (kind === "com") {
+    piece(0.9, 0.55, 0, "#eceff1", 0);
+    piece(0.94, 0.12, 0, color, 0.5);
+  } else {
+    const p = C(g, 0.06, 0.06, L, "#90a4ae", 0, 0, 0, 6);
+    p.rotation.z = Math.PI / 2;
+    p.position.set(0, 0.55, 0.15);
+    const q = C(g, 0.05, 0.05, L, color, 0, 0, 0, 6);
+    q.rotation.z = Math.PI / 2;
+    q.position.set(0, 0.35, -0.15);
+  }
+  g.children.forEach((m) => {
+    m.position.x += 0;
+  });
+  const holder = new THREE.Group();
+  g.position.set(L / 2, 0, 0);
+  holder.add(g);
+  holder.rotation.y = a;
+  holder.userData.noShrink = true;
+  return holder;
+}
 
 // src/world.js
 var COAST = [
@@ -4727,10 +5535,74 @@ var GEO = {
       }
       return h;
     }
+  },
+  taichung: {
+    a: 40,
+    b: 29,
+    W: 165,
+    H: 145,
+    ox: 0,
+    oz: 0,
+    view: [0, 114, 29, 0, 2],
+    city: 55,
+    height(x, z) {
+      const coast = -60 + Math.sin(z * 0.07) * 3;
+      if (x < coast) return Math.max(-2.5, -0.35 - (coast - x) * 0.25);
+      if (Math.abs(z) > 66) return -1.5;
+      const n = vnoise(x * 0.1, z * 0.1);
+      const mtn = smooth(44, 70, x) * (4 + 6 * n);
+      const dadu = Math.exp(-((x + 30) ** 2) / 60) * smooth(-10, 20, z) * 1.6;
+      return 0.4 + 0.3 * smooth(coast, coast + 5, x) + mtn + dadu * (1 - smooth(-36, -24, Math.abs(x + 30) * -1));
+    }
+  },
+  kaohsiung: {
+    a: 40,
+    b: 29,
+    W: 165,
+    H: 145,
+    ox: 0,
+    oz: 0,
+    view: [0, 114, 29, 0, 2],
+    city: 65,
+    height(x, z) {
+      const coast = -52 + Math.sin(z * 0.08) * 2;
+      const qj = Math.abs(x - (-61 + z * 0.06)) < 2.4 && z > -46 && z < 44;
+      if (x < coast) return qj ? 0.38 : Math.max(-2.5, -0.35 - (coast - x) * 0.25);
+      if (Math.abs(z) > 66) return -1.5;
+      const n = vnoise(x * 0.11, z * 0.11);
+      const shou = 4.2 * Math.exp(-((x + 42) ** 2 + (z + 40) ** 2) / 90);
+      const east = smooth(46, 68, x) * (2.5 + 4 * n);
+      const river = Math.abs(x + 16 + Math.sin(z * 0.1) * 4) < 1.8 && z > -64 && z < 24 && east < 0.3 && shou < 0.3 ? -0.9 : 0;
+      return 0.4 + 0.25 * smooth(coast, coast + 4, x) + shou + east + river;
+    }
+  },
+  huadong: {
+    a: 25,
+    b: 42,
+    W: 150,
+    H: 170,
+    ox: 0,
+    oz: 0,
+    view: [0, 138, 30, 0, 2],
+    isl: [[54, 18, 4.5], [58, 46, 5]],
+    height(x, z) {
+      const coast = 44 + Math.sin(z * 0.06) * 3;
+      const n = vnoise(x * 0.1, z * 0.1);
+      let isl = -9;
+      for (const [cx, cz, r] of this.isl) {
+        const d = r - Math.hypot(x - cx, z - cz) + n * 1.5;
+        isl = Math.max(isl, d > 0 ? Math.min(0.35 + d * 0.5, 3) : -0.3 + d * 0.3);
+      }
+      if (x > coast) return Math.max(isl, Math.max(-2.5, -0.35 - (x - coast) * 0.3));
+      if (Math.abs(z) > 80) return -1.5;
+      const central = smooth(-30, -60, x) * (3.5 + 4.2 * n);
+      const coastal = Math.exp(-((x - 14) ** 2) / 30) * (1.8 + 2.2 * n) * smooth(70, 40, Math.abs(z));
+      return 0.4 + 0.3 * smooth(coast, coast - 4, x) + central + coastal;
+    }
   }
 };
 var MAPK = 1.35;
-for (const k of ["taipei", "tainan", "islands"]) {
+for (const k of ["taipei", "tainan", "islands", "taichung", "kaohsiung", "huadong"]) {
   const g = GEO[k], h0 = g.height.bind(g);
   g.K = MAPK;
   g.height = (x, z) => h0(x / MAPK, z / MAPK);
@@ -4878,6 +5750,12 @@ var World = class {
     this.controls.addEventListener("change", () => {
       this.lastChange = performance.now();
     });
+    this.controls.addEventListener("start", () => {
+      this.lastChange = performance.now();
+    });
+    this.renderer.domElement.addEventListener("pointerdown", () => {
+      this.lastChange = performance.now();
+    }, { passive: true });
     let q = null;
     try {
       q = localStorage.getItem("tr3d-q");
@@ -4887,7 +5765,7 @@ var World = class {
     this.lastTs = 0;
     this.renderer.setAnimationLoop((ts) => {
       const fps = this.targetFps();
-      if (fps < 58 && ts - this.lastTs < 1e3 / fps - 4) return;
+      if (fps < 58 && ts - this.lastTs < 1e3 / fps - 2.5) return;
       this.lastTs = ts;
       this.frame();
     });
@@ -4920,11 +5798,12 @@ var World = class {
     const now = performance.now(), s = this.state;
     return now - (this.lastChange || 0) < 1200 || now - (this.userMoved || 0) < 1500 || this.anims && this.anims.length > 0 || this.floaters.length > 0 || !!this.camTo || s && s.step === "move" || now - (this.stateAt || 0) < 2500;
   }
+  // 只用 60 / 30 / 20 這種能整除螢幕更新率的數字，畫面間隔才平均、不會一頓一頓
   targetFps() {
     const b = this.busy(), q = this.quality;
-    if (q === "high") return b || !this.mobile ? 60 : 30;
-    if (q === "std") return this.mobile ? b ? 30 : 20 : b ? 60 : 30;
-    return b ? 24 : 12;
+    if (q === "high") return 60;
+    if (q === "std") return b ? 60 : 30;
+    return b ? 30 : 20;
   }
   loadMap(id) {
     if (this.mapId === id && this.scene) return;
@@ -5501,6 +6380,75 @@ var World = class {
       paddies(6);
       palms(6);
     }
+    const K2 = this.geo.K || 1;
+    const loopTrain = (rx, rz, colors, h = 1.6, col = "#cfd8dc") => {
+      const pts = this.ellipsePts(0, 0, rx, rz, 48);
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length], m = a.clone().lerp(b, 0.5);
+        const tr = B(new THREE2.Group(), 0.4, 0.08, a.distanceTo(b) + 0.05, col);
+        tr.position.set(m.x, H(m.x, m.y) + h, m.y);
+        tr.rotation.y = Math.atan2(b.x - a.x, b.y - a.y);
+        this.scene.add(tr);
+        if (h > 0.5 && i % 3 === 0) {
+          const pl2 = C(new THREE2.Group(), 0.08, 0.1, h, "#b0bec5", 0, 0, 0, 6);
+          pl2.position.set(a.x, H(a.x, a.y), a.y);
+          this.scene.add(pl2);
+        }
+      }
+      this.mover(this.train(colors, 3), pts, 6.5, true, (x, z) => H(x, z) + h + 0.05);
+    };
+    if (id === "taichung") {
+      loopTrain(this.geo.a * 0.6, this.geo.b * 0.56, ["#eceff1", "#7cb342"]);
+      turbines(10, () => new THREE2.Vector2((-58 + Math.random() * 4) * K2, (Math.random() - 0.5) * 100 * K2));
+      paddies(10);
+      temples(6);
+      palms(3);
+    }
+    if (id === "kaohsiung") {
+      loopTrain(this.geo.a * 0.62, this.geo.b * 0.58, ["#fafafa", "#43a047"], 0.15, "#9e9e9e");
+      for (let k = 0; k < 7; k++) {
+        const z = (-38 + k * 11) * K2, x = (-53 + Math.sin(z / K2 * 0.08) * 2) * K2 + 1.2;
+        const g = new THREE2.Group();
+        for (const sx of [-0.7, 0.7]) B(g, 0.15, 3.2, 0.15, "#e53935", sx, 0, 0);
+        B(g, 3.2, 0.25, 0.3, "#e53935", -0.6, 3.2, 0);
+        for (let c = 0; c < 4; c++) B(g, 1, 0.45, 0.5, ["#1e88e5", "#fb8c00", "#43a047", "#fdd835"][c], 1.6 + c % 2 * 1.05, Math.floor(c / 2) * 0.45, 0.5);
+        g.position.set(x, Math.max(0.35, H(x, z)), z);
+        g.rotation.y = Math.PI / 2;
+        this.scene.add(g);
+      }
+      const ferry = [];
+      for (let k = 0; k <= 8; k++) ferry.push(new THREE2.Vector2((-53 - k * 0.8) * K2, (-6 + k * 0.4) * K2));
+      this.mover(this.boat(), ferry, 1.2, false, () => 0.05);
+      temples(5);
+      palms(8);
+    }
+    if (id === "huadong") {
+      const rail = [];
+      for (let z = -34; z <= 34; z += 4) rail.push(new THREE2.Vector2((4 + Math.sin(z * 0.05) * 3) * K2, z * K2));
+      for (let i = 0; i < rail.length - 1; i++) {
+        const a = rail[i], b = rail[i + 1], m = a.clone().lerp(b, 0.5);
+        const tr = B(new THREE2.Group(), 0.45, 0.06, a.distanceTo(b) + 0.05, "#8d6e63");
+        tr.position.set(m.x, H(m.x, m.y) + 0.05, m.y);
+        tr.rotation.y = Math.atan2(b.x - a.x, b.y - a.y);
+        this.scene.add(tr);
+      }
+      this.mover(this.train(["#fafafa", "#e65100"], 4), rail, 5, false, (x, z) => H(x, z) + 0.12);
+      for (let k = 0; k < 5; k++) {
+        const g = new THREE2.Group(), c = ["#e53935", "#fdd835", "#1e88e5", "#8e24aa", "#43a047"][k];
+        const bb = S(g, 0.9, c, 0, 1.2, 0, void 0, 10, 8);
+        bb.scale.y = 1.15;
+        B(g, 0.35, 0.3, 0.35, "#8d6e63", 0, 0, 0);
+        const x = (-8 + Math.random() * 18) * K2, z = (-30 + k * 14) * K2, y0 = 6 + Math.random() * 4;
+        g.position.set(x, y0, z);
+        g.userData.tick = (t) => {
+          g.position.y = y0 + Math.sin(t * 0.4 + k) * 1.2;
+        };
+        this.scene.add(g);
+      }
+      paddies(20);
+      temples(4);
+      palms(6);
+    }
     if (id === "islands") {
       const KK = this.geo.K || 1, isl = this.geo.isl.map(([x, z, r]) => [x * KK, z * KK, r * KK]);
       for (let i = 1; i < isl.length; i++) {
@@ -5834,7 +6782,7 @@ var World = class {
         if (!t.o) o.level = -1;
         else if (o.level !== -1) o.level = "x";
       }
-      const key = t.l + ":" + (t.b || "") + ":" + (t.bl || 0);
+      const key = t.mg ? `mg:${t.mg.k}:${t.mg.lv}:${t.mg.ts.join(",")}` : t.l + ":" + (t.b || "") + ":" + (t.bl || 0);
       if (o.level !== key) {
         const grew = t.o && this.inited && o.level !== -1 && o.level !== key;
         const first = t.o && this.inited && o.level === -1;
@@ -5843,6 +6791,23 @@ var World = class {
         this.tickDirty = true;
         if (t.o) {
           const tp = TILES[i].type;
+          if (t.mg) {
+            const ts = t.mg.ts, j = ts.indexOf(i), h2 = buildComplex(t.mg.k, t.mg.lv, colors[t.o], j, ts.length);
+            if (grew || first) {
+              h2.userData.base = h2.scale.x;
+              h2.scale.setScalar(0.01);
+              h2.userData.growT = performance.now();
+            }
+            o.lot.add(h2);
+            if (j < ts.length - 1) {
+              const nxt = this.tileObjs[ts[j + 1]].lot;
+              o.lot.updateMatrixWorld(true);
+              const loc = o.lot.worldToLocal(nxt.position.clone());
+              const sc = o.lot.scale.x || 1;
+              o.lot.add(buildConnector(t.mg.k, t.mg.lv, colors[t.o], loc.x, loc.z));
+            }
+            return;
+          }
           const h = tp === "company" ? buildOwnerSign(colors[t.o]) : tp === "bigland" ? t.b ? buildBig(t.b, colors[t.o]) : buildOwnerSign(colors[t.o]) : buildHouses(t.l, colors[t.o]);
           if (tp === "bigland" && t.b && t.bl > 1) {
             h.scale.multiplyScalar(1 + (t.bl - 1) * 0.18);
@@ -6533,8 +7498,8 @@ function sampleOffset(host, sent) {
   G.offS.push([now, now - sent]);
   G.offset = Math.min(...G.offS.map((x) => x[1]));
 }
-function becomeHost(fromOther) {
-  const d = fromOther ? G.offset || 0 : 0, s = G.s;
+function becomeHost(fromOther, st) {
+  const d = fromOther ? G.offset || 0 : 0, s = st || G.s;
   if (d && s) {
     for (const k of ["deadline", "botAt", "until"]) if (typeof s[k] === "number") s[k] += d;
     if (s.anim && typeof s.anim.t0 === "number") s.anim.t0 += d;
@@ -6940,6 +7905,10 @@ function onStateMsg(m) {
     toast("房主已交給 " + (nameOf(s, s.host) || "其他玩家"));
   }
   if (!G.isHost && s.host === myId && G.s == null) becomeHost(false);
+  else if (!G.isHost && s.host === myId && G.s && G.s.host !== myId && s.phase === "play") {
+    becomeHost(true, s);
+    toast("原房主離開了，由你接手主持遊戲");
+  }
   applyState(s);
 }
 function nameOf(s, id) {
@@ -7284,7 +8253,7 @@ function renderPlayers() {
   $("#players").innerHTML = s.players.map((p, i) => {
     const c = charOf(p.char);
     const ic = [p.veh ? VEH[p.veh].icon : "", p.god ? GODS[p.god.id].icon : "", p.st.hosp ? "🏥" : "", p.st.jail ? "🚓" : "", p.st.sleep ? "😴" : "", p.st.turtle ? "🐢" : "", p.dir < 0 ? "🔄" : ""].join("");
-    const off = !p.bot && s.phase === "play" && !p.out ? p.away ? '<span class="off">☕暫離・託管</span>' : !online(p.ctl) ? '<span class="off">離線・託管</span>' : "" : "";
+    const off = p.left ? '<span class="off">🚪 已離開</span>' : !p.bot && s.phase === "play" && !p.out ? p.away ? '<span class="off">☕暫離・託管</span>' : !online(p.ctl) ? '<span class="off">離線・託管</span>' : "" : "";
     return `<div class="pc ${i === s.turn && s.phase === "play" ? "cur" : ""} ${p.out ? "out" : ""}" data-p="${esc(p.id)}">
       <div class="av" style="background:${c.color}33">${avHtml(p.ctl === p.id || p.bot ? p.id : "", c.emoji)}</div>
       <div><div class="nm" style="color:${c.color}">${esc(p.name)}${p.ctl === myId && !p.bot ? "（你）" : ""}</div>
@@ -7307,6 +8276,7 @@ function renderHud() {
   }
   const mps = myPlayers().filter((p) => !p.out);
   $("#awayBtn").classList.toggle("hidden", !mps.length);
+  $("#quitBtn").classList.toggle("hidden", !(myPlayers().length && !mps.length && !G.solo));
   $("#awayBox").classList.toggle("hidden", !(mps.length && mps.every((p) => p.away)));
   const c = cur(s), mine = isMyTurn() && !c.away;
   const acts = $("#acts");
@@ -7453,6 +8423,10 @@ function playFx(s, f) {
       break;
     case "bankrupt":
       showNotice("💸 破產", `${p ? p.name : ""} 破產出局了！`, "evil");
+      if (p && p.ctl === myId && !p.bot && !G.solo && myPlayers().every((q) => q.out || q.id === p.id) && !G.leaveAsked) {
+        G.leaveAsked = true;
+        setTimeout(askLeave, 2600);
+      }
       break;
     case "mark":
       world.burst(f.tile, "#ff9800", 10);
@@ -7520,6 +8494,13 @@ function tileInfoHtml(i) {
   }
   if (t.type === "prop" && s.tiles) {
     const st = s.tiles[i], o = st.o && pl(s, st.o);
+    if (st.mg) {
+      const m = st.mg, K = MG[m.k];
+      h += `<div class="kv"><b>建築</b><span style="font-weight:900">${K.icon} ${K.name} ${m.lv}/${MG_MAX} 級</span><b>合併土地</b><span>${m.ts.map((j) => esc(TILES[j].name)).join("、")}</span>
+        <b>地主</b><span>${o ? esc(o.name) : ""}</span><b>過路費</b><span style="color:#e53935;font-weight:900">${money(mgToll(s, i))}</span>${K.daily ? `<b>每天收入</b><span>${money(mgDaily(s, i))}</span>` : ""}</div>
+        <p class="note">${K.desc}。踩到任何一塊都算。被飛彈炸會降一級，降到 0 級恢復成空地。</p>`;
+      return h;
+    }
     h += `<div class="kv"><b>區域</b><span style="color:${GROUPS[t.g].color};font-weight:900">${GROUPS[t.g].name}</span>
       <b>地主</b><span>${o ? esc(o.name) : "（無）"}</span><b>建築</b><span>${LEVEL_NAMES[st.l]}</span>
       <b>地價</b><span>${money(price(s, i))}</span><b>加蓋費</b><span>${money(upCost(s, i))}／層</span>
@@ -7562,9 +8543,21 @@ function openDecide(refresh = false) {
       <div class="choice"><button class="green" data-a="yes">🏠 買下</button><button class="ghost" data-a="no">不買</button></div>`;
   } else if (pd.type === "upgrade") {
     const i = pd.tile, st = s.tiles[i], c1 = upCostFor(s, i, p);
-    const two = st.l <= 3 && p.cash >= c1 * 2;
-    h = tileInfoHtml(i) + `<p>要加蓋成 <b>${LEVEL_NAMES[st.l + 1]}</b> 嗎？每層 <b>${c1 ? money(c1) : "免費（福神）"}</b>（你有 ${money(p.cash)}）</p>
-      <div class="choice"><button class="green" data-a="yes">🏗️ 蓋一層</button>${two ? `<button class="green" data-n2>🏗️🏗️ 蓋兩層（${money(c1 * 2)}）</button>` : ""}<button class="ghost" data-a="no">不用</button></div>`;
+    const two = st.l <= 3 && p.cash >= c1 * 2, can1 = st.l < 5 && p.cash >= c1;
+    h = tileInfoHtml(i) + (can1 ? `<p>要加蓋成 <b>${LEVEL_NAMES[st.l + 1]}</b> 嗎？每層 <b>${c1 ? money(c1) : "免費（福神）"}</b>（你有 ${money(p.cash)}）</p>
+      <div class="choice"><button class="green" data-a="yes">🏗️ 蓋一層</button>${two ? `<button class="green" data-n2>🏗️🏗️ 蓋兩層（${money(c1 * 2)}）</button>` : ""}</div>` : `<p>現金 ${money(p.cash)}</p>`);
+    if (pd.merge) {
+      const ts = pd.merge, base = ts.reduce((a, j) => a + price(s, j), 0);
+      h += `<div class="mgbox"><b>🧩 合併建設</b>：你有 ${ts.length} 塊相連的地（${ts.map((j) => esc(TILES[j].name)).join("、")}），可以合併蓋成大型建築，三塊地一起收過路費！<div class="choice">` + Object.entries(MG).map(([k, K]) => {
+        const c = mgBuildCost(s, ts, k);
+        return `<button class="${k === "com" ? "pri" : k === "res" ? "green" : "blue"}" style="flex:1 1 30%" data-mg="${k}" ${p.cash < c ? "disabled" : ""}>${K.icon} ${K.name}<br><b>${money(c)}</b><br><small>過路費 ${money(Math.round(base * K.toll[0] / 10) * 10)}${K.daily ? `・每天 +${money(Math.round(base * K.daily / 10) * 10)}` : ""}</small></button>`;
+      }).join("") + `</div><p class="note">原本蓋的房子會折抵一半費用。之後再停到這裡可以擴建到 ${MG_MAX} 級。</p></div>`;
+    }
+    h += `<button class="ghost" style="width:100%;margin-top:6px" data-a="no">不用</button>`;
+  } else if (pd.type === "mgup") {
+    const i = pd.tile, m = s.tiles[i].mg, K = MG[m.k], c = mgUpCost(s, i);
+    h = tileInfoHtml(i) + `<p>要把${K.icon}${K.name}擴建到 <b>${m.lv + 1} 級</b>嗎？費用 <b>${money(c)}</b>（你有 ${money(p.cash)}）</p>
+      <div class="choice"><button class="green" data-a="yes">🏗️ 擴建</button><button class="ghost" data-a="no">不用</button></div>`;
   } else if (pd.type === "shop") {
     h = `<h3>🏪 道具店</h3><p>你的點券：<b>${p.points}</b>　道具卡 ${p.cards.length}/${cardLimit(p)}</p><div class="cards">` + Object.entries(CARDS).map(([k, c]) => `<div class="card"><div class="t">${c.icon} ${c.name}</div><div class="d">${c.desc}</div>
       <button class="${p.points >= cardCost(p, k) ? "pri" : "ghost"}" data-buy="${k}" ${p.points < cardCost(p, k) || p.cards.length >= cardLimit(p) ? "disabled" : ""}>${cardCost(p, k)} 點</button></div>`).join("") + `</div><button class="blue" style="width:100%;margin-top:10px" data-a="done">離開商店</button>`;
@@ -7619,6 +8612,10 @@ function openDecide(refresh = false) {
     closeSheet();
   });
   if (pd.type === "minigame" && !refresh) setupMinigame(id);
+  sh.querySelectorAll("[data-mg]").forEach((b) => b.onclick = () => {
+    send(id, { type: "merge", kind: b.dataset.mg });
+    closeSheet();
+  });
   sh.querySelectorAll("[data-n2]").forEach((b) => b.onclick = () => {
     send(id, { type: "yes", n: 2 });
     closeSheet();
@@ -7845,6 +8842,35 @@ function renderOver() {
   $("#status").textContent = "遊戲結束";
 }
 $("#fsBtn").onclick = () => enterFS(true);
+function askLeave() {
+  if (!G.s || G.s.phase !== "play") return;
+  openSheet(`<h3>😢 你破產了</h3><p class="note">可以留下來看其他人比完，也可以直接離開房間，不會影響其他玩家繼續玩。</p>
+    <button class="pri" style="width:100%;margin:6px 0" data-close>👀 繼續觀看</button>
+    <button class="ghost" style="width:100%;margin:6px 0" id="leaveGo">🚪 離開房間，回首頁</button>`);
+}
+function leaveRoom() {
+  const s = G.s;
+  if (s && s.phase === "play") {
+    myPlayers().forEach((p) => send(p.id, { type: "leave" }));
+    if (G.isHost && !G.solo) {
+      const cand = s.players.filter((p) => !p.bot && p.ctl !== myId && !p.left && online(p.ctl)).sort((a, b) => a.out - b.out || (a.ctl < b.ctl ? -1 : 1))[0];
+      if (cand) {
+        s.host = cand.ctl;
+        s.v += 1e3;
+        publish(true);
+      }
+      G.isHost = false;
+    }
+    LS.set("tr3d-lastroom", null);
+  }
+  setTimeout(() => {
+    location.href = location.pathname;
+  }, 700);
+}
+$("#quitBtn").onclick = askLeave;
+document.addEventListener("click", (e) => {
+  if (e.target && e.target.id === "leaveGo") leaveRoom();
+});
 function setAway(on) {
   myPlayers().filter((p) => !p.out).forEach((p) => send(p.id, { type: "away", on }));
   if (on) closeSheet();
@@ -7973,6 +8999,9 @@ $("#helpBtn").onclick = () => openSheet(`<button class="x" data-close>✕</butto
 window.__G = G;
 window.__world = world;
 window.__pickTile = (i) => onTileClick(i);
+window.__publish = publish;
+window.__apply = (s) => applyState(s);
+window.__isProp = (i) => !!(TILES[i] && TILES[i].type === "prop");
 
 </script>
 </body>

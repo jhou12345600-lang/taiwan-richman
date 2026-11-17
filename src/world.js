@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TILES, N_TILES, GROUPS, CHARS, useMap } from './data.js';
-import { buildLandmark, buildHouses, buildToken, animateToken, buildBig, buildOwnerSign, mat, B, C, S } from './landmarks.js';
+import { buildLandmark, buildHouses, buildToken, animateToken, buildBig, buildOwnerSign, buildComplex, buildConnector, mat, B, C, S } from './landmarks.js';
 
 // 台灣海岸線（經度, 緯度），順時針：北→東→南→西
 const COAST = [
@@ -131,9 +131,50 @@ const GEO = {
       return h;
     },
   },
+  taichung: {
+    a: 40, b: 29, W: 165, H: 145, ox: 0, oz: 0, view: [0, 114, 29, 0, 2], city: 55,
+    height(x, z) {
+      const coast = -60 + Math.sin(z * 0.07) * 3;
+      if (x < coast) return Math.max(-2.5, -0.35 - (coast - x) * 0.25);
+      if (Math.abs(z) > 66) return -1.5;
+      const n = vnoise(x * 0.1, z * 0.1);
+      const mtn = smooth(44, 70, x) * (4 + 6 * n);
+      const dadu = Math.exp(-((x + 30) ** 2) / 60) * smooth(-10, 20, z) * 1.6;   // 大肚山台地
+      return 0.4 + 0.3 * smooth(coast, coast + 5, x) + mtn + dadu * (1 - smooth(-36, -24, Math.abs(x + 30) * -1));
+    },
+  },
+  kaohsiung: {
+    a: 40, b: 29, W: 165, H: 145, ox: 0, oz: 0, view: [0, 114, 29, 0, 2], city: 65,
+    height(x, z) {
+      const coast = -52 + Math.sin(z * 0.08) * 2;
+      const qj = Math.abs(x - (-61 + z * 0.06)) < 2.4 && z > -46 && z < 44;   // 旗津沙洲
+      if (x < coast) return qj ? 0.38 : Math.max(-2.5, -0.35 - (coast - x) * 0.25);
+      if (Math.abs(z) > 66) return -1.5;
+      const n = vnoise(x * 0.11, z * 0.11);
+      const shou = 4.2 * Math.exp(-((x + 42) ** 2 + (z + 40) ** 2) / 90);           // 壽山
+      const east = smooth(46, 68, x) * (2.5 + 4 * n);
+      const river = Math.abs(x + 16 + Math.sin(z * 0.1) * 4) < 1.8 && z > -64 && z < 24 && east < 0.3 && shou < 0.3 ? -0.9 : 0;
+      return 0.4 + 0.25 * smooth(coast, coast + 4, x) + shou + east + river;
+    },
+  },
+  huadong: {
+    a: 25, b: 42, W: 150, H: 170, ox: 0, oz: 0, view: [0, 138, 30, 0, 2],
+    isl: [[54, 18, 4.5], [58, 46, 5]],
+    height(x, z) {
+      const coast = 44 + Math.sin(z * 0.06) * 3;
+      const n = vnoise(x * 0.1, z * 0.1);
+      let isl = -9;
+      for (const [cx, cz, r] of this.isl) { const d = r - Math.hypot(x - cx, z - cz) + n * 1.5; isl = Math.max(isl, d > 0 ? Math.min(0.35 + d * 0.5, 3) : -0.3 + d * 0.3); }
+      if (x > coast) return Math.max(isl, Math.max(-2.5, -0.35 - (x - coast) * 0.3));
+      if (Math.abs(z) > 80) return -1.5;
+      const central = smooth(-30, -60, x) * (3.5 + 4.2 * n);                       // 中央山脈
+      const coastal = Math.exp(-((x - 14) ** 2) / 30) * (1.8 + 2.2 * n) * smooth(70, 40, Math.abs(z));   // 海岸山脈
+      return 0.4 + 0.3 * smooth(coast, coast - 4, x) + central + coastal;
+    },
+  },
 };
 const MAPK = 1.35;   // 其他地圖整體放大倍率
-for (const k of ['taipei', 'tainan', 'islands']) {
+for (const k of ['taipei', 'tainan', 'islands', 'taichung', 'kaohsiung', 'huadong']) {
   const g = GEO[k], h0 = g.height.bind(g);
   g.K = MAPK; g.height = (x, z) => h0(x / MAPK, z / MAPK);
   g.a *= MAPK; g.b *= MAPK; g.W *= MAPK; g.H *= MAPK; g.view = g.view.map(v => v * MAPK);
@@ -216,13 +257,15 @@ export class World {
     });
     this.resize(); addEventListener('resize', () => this.resize());
     this.controls.addEventListener('change', () => { this.lastChange = performance.now(); });
+    this.controls.addEventListener('start', () => { this.lastChange = performance.now(); });
+    this.renderer.domElement.addEventListener('pointerdown', () => { this.lastChange = performance.now(); }, { passive: true });
     let q = null; try { q = localStorage.getItem('tr3d-q'); } catch (e) {}
     this.setQuality(q || (mobile ? 'std' : 'high'));
     // 依畫質限制每秒畫面數；沒有東西在動時再降低，手機比較不燙
     this.lastTs = 0;
     this.renderer.setAnimationLoop(ts => {
       const fps = this.targetFps();
-      if (fps < 58 && ts - this.lastTs < 1000 / fps - 4) return;
+      if (fps < 58 && ts - this.lastTs < 1000 / fps - 2.5) return;
       this.lastTs = ts; this.frame();
     });
   }
@@ -245,11 +288,12 @@ export class World {
     return now - (this.lastChange || 0) < 1200 || now - (this.userMoved || 0) < 1500 || (this.anims && this.anims.length > 0) || this.floaters.length > 0 || !!this.camTo ||
       (s && s.step === 'move') || now - (this.stateAt || 0) < 2500;
   }
+  // 只用 60 / 30 / 20 這種能整除螢幕更新率的數字，畫面間隔才平均、不會一頓一頓
   targetFps() {
     const b = this.busy(), q = this.quality;
-    if (q === 'high') return b || !this.mobile ? 60 : 30;
-    if (q === 'std') return this.mobile ? (b ? 30 : 20) : (b ? 60 : 30);
-    return b ? 24 : 12;
+    if (q === 'high') return 60;
+    if (q === 'std') return b ? 60 : 30;
+    return b ? 30 : 20;
   }
   loadMap(id) {
     if (this.mapId === id && this.scene) return;
@@ -552,6 +596,37 @@ export class World {
       });
       temples(8); paddies(6); palms(6);
     }
+    const K2 = this.geo.K || 1;
+    const loopTrain = (rx, rz, colors, h = 1.6, col = '#cfd8dc') => {
+      const pts = this.ellipsePts(0, 0, rx, rz, 48);
+      for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], m = a.clone().lerp(b, 0.5); const tr = B(new THREE.Group(), 0.4, 0.08, a.distanceTo(b) + 0.05, col); tr.position.set(m.x, H(m.x, m.y) + h, m.y); tr.rotation.y = Math.atan2(b.x - a.x, b.y - a.y); this.scene.add(tr); if (h > 0.5 && i % 3 === 0) { const pl = C(new THREE.Group(), 0.08, 0.1, h, '#b0bec5', 0, 0, 0, 6); pl.position.set(a.x, H(a.x, a.y), a.y); this.scene.add(pl); } }
+      this.mover(this.train(colors, 3), pts, 6.5, true, (x, z) => H(x, z) + h + 0.05);
+    };
+    if (id === 'taichung') {
+      loopTrain(this.geo.a * 0.6, this.geo.b * 0.56, ['#eceff1', '#7cb342']);           // 捷運綠線
+      turbines(10, () => new THREE.Vector2((-58 + Math.random() * 4) * K2, (Math.random() - 0.5) * 100 * K2));
+      paddies(10); temples(6); palms(3);
+    }
+    if (id === 'kaohsiung') {
+      loopTrain(this.geo.a * 0.62, this.geo.b * 0.58, ['#fafafa', '#43a047'], 0.15, '#9e9e9e');   // 環狀輕軌
+      // 港口貨櫃吊車與貨櫃
+      for (let k = 0; k < 7; k++) { const z = (-38 + k * 11) * K2, x = (-53 + Math.sin(z / K2 * 0.08) * 2) * K2 + 1.2; const g = new THREE.Group();
+        for (const sx of [-0.7, 0.7]) B(g, 0.15, 3.2, 0.15, '#e53935', sx, 0, 0); B(g, 3.2, 0.25, 0.3, '#e53935', -0.6, 3.2, 0);
+        for (let c = 0; c < 4; c++) B(g, 1.0, 0.45, 0.5, ['#1e88e5', '#fb8c00', '#43a047', '#fdd835'][c], 1.6 + (c % 2) * 1.05, Math.floor(c / 2) * 0.45, 0.5);
+        g.position.set(x, Math.max(0.35, H(x, z)), z); g.rotation.y = Math.PI / 2; this.scene.add(g); }
+      const ferry = []; for (let k = 0; k <= 8; k++) ferry.push(new THREE.Vector2((-53 - k * 0.8) * K2, (-6 + k * 0.4) * K2));
+      this.mover(this.boat(), ferry, 1.2, false, () => 0.05);
+      temples(5); palms(8);
+    }
+    if (id === 'huadong') {
+      // 縱谷鐵路、熱氣球、大片稻田
+      const rail = []; for (let z = -34; z <= 34; z += 4) rail.push(new THREE.Vector2((4 + Math.sin(z * 0.05) * 3) * K2, z * K2));
+      for (let i = 0; i < rail.length - 1; i++) { const a = rail[i], b = rail[i + 1], m = a.clone().lerp(b, 0.5); const tr = B(new THREE.Group(), 0.45, 0.06, a.distanceTo(b) + 0.05, '#8d6e63'); tr.position.set(m.x, H(m.x, m.y) + 0.05, m.y); tr.rotation.y = Math.atan2(b.x - a.x, b.y - a.y); this.scene.add(tr); }
+      this.mover(this.train(['#fafafa', '#e65100'], 4), rail, 5, false, (x, z) => H(x, z) + 0.12);
+      for (let k = 0; k < 5; k++) { const g = new THREE.Group(), c = ['#e53935', '#fdd835', '#1e88e5', '#8e24aa', '#43a047'][k]; const bb = S(g, 0.9, c, 0, 1.2, 0, undefined, 10, 8); bb.scale.y = 1.15; B(g, 0.35, 0.3, 0.35, '#8d6e63', 0, 0, 0);
+        const x = (-8 + Math.random() * 18) * K2, z = (-30 + k * 14) * K2, y0 = 6 + Math.random() * 4; g.position.set(x, y0, z); g.userData.tick = t => { g.position.y = y0 + Math.sin(t * 0.4 + k) * 1.2; }; this.scene.add(g); }
+      paddies(20); temples(4); palms(6);
+    }
     if (id === 'islands') {
       // 渡輪往返各島、珊瑚礁、燈塔
       const KK = this.geo.K || 1, isl = this.geo.isl.map(([x, z, r]) => [x * KK, z * KK, r * KK]);
@@ -767,13 +842,26 @@ export class World {
       if (hold['t' + i] && hnow < hold['t' + i]) return;   // 飛彈還沒落地，先保留原本的房子
       const o = this.tileObjs[i];
       if (o.owner !== t.o) { o.owner = t.o; this.tintBase(i, t.o ? colors[t.o] : '#cbbf9f'); if (!t.o) o.level = -1; else if (o.level !== -1) o.level = 'x'; }
-      const key = t.l + ':' + (t.b || '') + ':' + (t.bl || 0);
+      const key = t.mg ? `mg:${t.mg.k}:${t.mg.lv}:${t.mg.ts.join(',')}` : t.l + ':' + (t.b || '') + ':' + (t.bl || 0);
       if (o.level !== key) {
         const grew = t.o && this.inited && o.level !== -1 && o.level !== key;
         const first = t.o && this.inited && o.level === -1;
         o.level = key; o.lot.clear(); this.tickDirty = true;
         if (t.o) {
           const tp = TILES[i].type;
+          if (t.mg) {   // 合併建設：每塊地一棟，並連到下一塊地
+            const ts = t.mg.ts, j = ts.indexOf(i), h = buildComplex(t.mg.k, t.mg.lv, colors[t.o], j, ts.length);
+            if (grew || first) { h.userData.base = h.scale.x; h.scale.setScalar(0.01); h.userData.growT = performance.now(); }
+            o.lot.add(h);
+            if (j < ts.length - 1) {
+              const nxt = this.tileObjs[ts[j + 1]].lot; o.lot.updateMatrixWorld(true);
+              const loc = o.lot.worldToLocal(nxt.position.clone());
+              const sc = o.lot.scale.x || 1;
+              o.lot.add(buildConnector(t.mg.k, t.mg.lv, colors[t.o], loc.x, loc.z));
+              void sc;
+            }
+            return;
+          }
           const h = tp === 'company' ? buildOwnerSign(colors[t.o]) : tp === 'bigland' ? (t.b ? buildBig(t.b, colors[t.o]) : buildOwnerSign(colors[t.o])) : buildHouses(t.l, colors[t.o]);
           if (tp === 'bigland' && t.b && t.bl > 1) { h.scale.multiplyScalar(1 + (t.bl - 1) * 0.18); for (let k = 0; k < t.bl; k++) { const st = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), mat('#ffd600', { e: '#ffab00', ei: 0.6 })); st.position.set((k - (t.bl - 1) / 2) * 0.4, 3.0, 0); h.add(st); } }
           if (grew || first) { h.userData.base = h.scale.x; h.scale.setScalar(0.01); h.userData.growT = performance.now(); }

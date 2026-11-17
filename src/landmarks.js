@@ -783,6 +783,114 @@ export function buildBig(kind, color) {
 }
 export function buildOwnerSign(color) { const g = new THREE.Group(); C(g, 0.03, 0.03, 1.2, '#eeeeee', 0, 0, 0, 4); B(g, 0.6, 0.38, 0.03, color, 0.3, 0.8, 0); S(g, 0.06, '#ffd54f', 0, 1.25, 0); return g; }
 
+// ===== 台中・高雄・花東 新地圖景點 =====
+M.autumnvalley = g => {   // 秋紅谷：下凹的湖景公園＋周圍高樓
+  platform(g, 1.75, '#7cb342', 0.12); water(g, 1.05, 0, 0.2, 0.09, '#4fc3f7');
+  const br = B(g, 2.0, 0.05, 0.22, '#eceff1', 0, 0.3, 0.2); br.rotation.y = 0.5;
+  for (const [x, z, h] of [[-1.2, -1.0, 2.2], [-0.5, -1.25, 2.8], [0.6, -1.2, 2.4]]) { B(g, 0.5, h, 0.5, mat('#90a4ae', { r: 0.3, m: 0.4 }), x, 0.12, z); B(g, 0.52, 0.06, 0.52, '#eceff1', x, 0.12 + h, z); }
+  for (const [x, z] of [[1.2, 0.6], [-1.2, 0.8], [1.0, -0.2]]) roundTree(g, x, z, 0.28, '#e65100', 0.1);
+};
+M.miyahara = g => {     // 宮原眼科：紅磚洋樓、拱窗
+  B(g, 3.2, 0.1, 2.6, '#9e9e9e');
+  B(g, 2.8, 1.5, 1.6, '#b5523b', 0, 0.1, -0.3);
+  for (let k = 0; k < 2; k++) B(g, 2.82, 0.07, 1.62, '#f5f5f5', 0, 0.55 + k * 0.6, -0.3);
+  for (let k = -2; k <= 2; k++) { B(g, 0.32, 0.45, 0.03, '#263238', k * 0.55, 0.2, 0.51); const ar = put(g, new THREE.CylinderGeometry(0.16, 0.16, 0.03, 10, 1, false, 0, Math.PI), '#f5f5f5', k * 0.55, 0.65, 0.51); ar.rotation.x = Math.PI / 2; ar.rotation.z = Math.PI / 2; }
+  B(g, 0.9, 0.45, 0.25, '#b5523b', 0, 1.6, 0.35); B(g, 0.7, 0.25, 0.03, '#ffd54f', 0, 1.7, 0.48);
+  B(g, 3.0, 0.08, 0.5, '#8d6e63', 0, 0.1, 0.9);
+};
+M.huxin = g => {        // 台中公園湖心亭：湖上雙亭
+  water(g, 1.75, 0, 0, 0.04, '#4db6ac');
+  B(g, 0.35, 0.08, 1.6, '#8d6e63', 0, 0.12, 0.9);
+  for (const sx of [-1, 1]) {
+    const x = sx * 0.55;
+    B(g, 0.9, 0.12, 0.9, '#eceff1', x, 0.12, -0.2);
+    for (const [cx, cz] of [[-0.35, -0.35], [0.35, -0.35], [-0.35, 0.35], [0.35, 0.35]]) C(g, 0.04, 0.04, 0.7, '#fafafa', x + cx, 0.24, -0.2 + cz, 6);
+    roof(g, 1.15, 1.15, 0.4, '#c62828', x, 0.94, -0.2); put(g, new THREE.ConeGeometry(0.06, 0.25, 6), '#fbc02d', x, 1.45, -0.2);
+  }
+  for (const [x, z] of [[1.4, 1.0], [-1.4, 1.0]]) roundTree(g, x, z, 0.3, '#43a047', 0.05);
+};
+M.nmns = g => {         // 自然科學博物館：金字塔溫室＋太空劇場球頂
+  B(g, 3.3, 0.12, 3.0, '#bdbdbd');
+  frustum(g, 0.1, 1.9, 1.7, mat('#b3e5fc', { r: 0.1, m: 0.5, op: 0.85 }), -0.6, 0.12, -0.3);
+  B(g, 1.4, 0.8, 1.2, '#eceff1', 0.9, 0.12, 0.2); const d = S(g, 0.62, '#cfd8dc', 0.9, 0.92, 0.2, undefined, 14, 8); d.scale.y = 0.75;
+  roundTree(g, -0.6, 1.05, 0.25); roundTree(g, 1.2, -1.0, 0.25);
+  B(g, 0.8, 0.5, 0.25, '#795548', -1.2, 0.12, 1.1); // 恐龍看板
+};
+M.luce = g => {         // 東海路思義教堂：雙曲面金黃屋頂
+  platform(g, 1.7, '#9ccc65', 0.12);
+  const tile = mat('#f9a825', { r: 0.5 });
+  for (const sx of [-1, 1]) {
+    const shape = new THREE.Shape(); shape.moveTo(0, 0); shape.quadraticCurveTo(0.05 * sx, 1.4, 0.55 * sx, 2.6); shape.lineTo(0.62 * sx, 2.55); shape.quadraticCurveTo(0.3 * sx, 1.2, 1.1 * sx, 0); shape.lineTo(0, 0);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 1.8, bevelEnabled: false }); geo.translate(sx * -0.62, 0, -0.9);
+    const m = new THREE.Mesh(geo, tile); m.position.y = 0.12; m.castShadow = true; g.add(m);
+  }
+  for (let k = 0; k < 6; k++) B(g, 1.9, 0.03, 0.02, '#8d6e63', 0, 0.5 + k * 0.38, -0.9);
+  B(g, 0.08, 0.5, 0.02, '#fafafa', 0, 2.75, 0.0); B(g, 0.3, 0.08, 0.02, '#fafafa', 0, 3.0, 0.0);
+  roundTree(g, 1.3, 1.0, 0.3); roundTree(g, -1.3, 1.0, 0.3); roundTree(g, 1.3, -1.0, 0.28);
+};
+M.flowersea = g => {    // 新社花海：彩色花田＋風車
+  C(g, 1.75, 1.8, 0.12, '#8bc34a', 0, 0, 0, 12);
+  const cs = ['#e91e63', '#ffeb3b', '#ff9800', '#9c27b0', '#f44336', '#03a9f4'];
+  for (let r = 0; r < 6; r++) B(g, 2.6, 0.12, 0.38, cs[r], 0, 0.12, -1.0 + r * 0.42);
+  const w = new THREE.Group(); C(g, 0.1, 0.16, 1.6, '#fff3e0', 1.2, 0.12, -1.1, 8); roof(g, 0.4, 0.4, 0.3, '#c62828', 1.2, 1.72, -1.1);
+  w.position.set(1.2, 1.5, -0.88); g.add(w); for (let i = 0; i < 4; i++) { const b = B(w, 0.08, 0.7, 0.02, '#fafafa', 0, 0, 0); b.geometry.translate(0, 0.35, 0); b.position.y = 0; b.rotation.z = i * Math.PI / 2; }
+  anim(g, (t, dt) => { w.rotation.z += dt * 1.2; });
+};
+M.popmusic = g => {     // 高雄流行音樂中心：六角形白色塔群
+  B(g, 3.3, 0.1, 3.0, '#90a4ae'); water(g, 1.0, 0.8, 1.0, 0.11, '#29b6f6');
+  for (const [x, z, h] of [[-1.0, -0.7, 2.6], [-0.2, -0.9, 2.0], [0.6, -0.6, 1.5], [-0.8, 0.3, 1.2]]) {
+    C(g, 0.38, 0.42, h, mat('#fafafa', { r: 0.3 }), x, 0.1, z, 6);
+    for (let k = 1; k < 4; k++) C(g, 0.4, 0.4, 0.04, '#4fc3f7', x, 0.1 + h * k / 4, z, 6);
+  }
+};
+M.lightdome = g => {    // 美麗島站光之穹頂：彩色玻璃圓頂
+  B(g, 3.2, 0.12, 3.2, '#9e9e9e');
+  const cs = ['#e53935', '#fdd835', '#1e88e5', '#43a047', '#8e24aa', '#fb8c00'];
+  for (let i = 0; i < 6; i++) { const seg = put(g, new THREE.SphereGeometry(1.25, 8, 6, i * Math.PI / 3, Math.PI / 3, 0, Math.PI / 2), mat(cs[i], { e: cs[i], ei: 0.35, op: 0.9 }), 0, 0.12, 0); seg.material.side = THREE.DoubleSide; }
+  for (const [x, z] of [[1.3, 1.3], [-1.3, 1.3], [1.3, -1.3], [-1.3, -1.3]]) { B(g, 0.5, 1.0, 0.5, mat('#90caf9', { r: 0.1, m: 0.5, op: 0.85 }), x, 0.12, z); }
+};
+M.consulate = g => {    // 打狗英國領事館：山丘上的紅磚拱廊
+  C(g, 1.7, 1.8, 0.6, '#689f38', 0, 0, 0, 10);
+  B(g, 2.4, 0.9, 1.4, '#c0623b', 0, 0.6, -0.2); roof(g, 2.8, 1.8, 0.45, '#5d4037', 0, 1.5, -0.2);
+  for (let k = -3; k <= 3; k++) { const ar = put(g, new THREE.TorusGeometry(0.13, 0.025, 4, 10, Math.PI), '#fafafa', k * 0.33, 0.95, 0.51); }
+  for (let k = -3; k <= 3; k++) B(g, 0.05, 0.5, 0.05, '#fafafa', k * 0.33 + 0.165, 0.6, 0.5);
+  B(g, 2.5, 0.05, 0.3, '#fafafa', 0, 1.45, 0.45);
+};
+M.weiwuying = g => {    // 衛武營：起伏的白色波浪屋頂
+  B(g, 3.3, 0.1, 3.0, '#a5d6a7');
+  const geo = new THREE.PlaneGeometry(3.0, 2.4, 24, 16), pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), y = pos.getY(i); pos.setZ(i, 0.9 + Math.sin(x * 2.2) * 0.35 + Math.cos(y * 2.6 + x) * 0.25); }
+  geo.computeVertexNormals(); geo.rotateX(-Math.PI / 2);
+  const roofm = new THREE.Mesh(geo, mat('#f5f5f5', { r: 0.35 })); roofm.material.side = THREE.DoubleSide; roofm.position.y = 0.1; roofm.castShadow = true; g.add(roofm);
+  for (const [x, z] of [[-1.2, -0.9], [1.2, -0.9], [-1.2, 0.9], [1.2, 0.9], [0, 0]]) C(g, 0.18, 0.35, 0.9, '#eceff1', x, 0.1, z, 8);
+  roundTree(g, 1.4, 1.3, 0.22); roundTree(g, -1.4, 1.3, 0.22);
+};
+M.moonworld = g => {    // 月世界：灰白泥岩惡地
+  C(g, 1.75, 1.85, 0.1, '#bcaaa4', 0, 0, 0, 10);
+  for (const [x, z, r, h] of [[-0.7, -0.6, 0.8, 1.4], [0.6, -0.8, 0.7, 1.1], [0.2, 0.4, 0.6, 0.9], [-0.9, 0.7, 0.45, 0.7], [1.1, 0.5, 0.45, 0.6]]) {
+    const m = put(g, new THREE.ConeGeometry(r, h, 7, 3), '#cfc6bb', x, 0.1 + h / 2, z); m.rotation.y = x * 3;
+    for (let k = 0; k < 3; k++) { const st = put(g, new THREE.ConeGeometry(r * 0.12, h * 0.9, 3), '#a1887f', x + Math.cos(k * 2) * r * 0.5, 0.1 + h * 0.4, z + Math.sin(k * 2) * r * 0.5); st.rotation.x = 0.4; }
+  }
+  water(g, 0.4, 0.9, 1.2, 0.11, '#4db6ac');
+};
+M.expo = g => {         // 高雄展覽館：港邊白色波浪長廊
+  B(g, 3.3, 0.1, 2.6, '#90a4ae'); B(g, 3.3, 0.06, 0.7, '#29b6f6', 0, 0.06, 1.2);
+  B(g, 2.8, 0.9, 1.5, mat('#b3e5fc', { r: 0.1, m: 0.5, op: 0.9 }), 0, 0.1, -0.3);
+  for (let k = 0; k < 5; k++) { const w = put(g, new THREE.CylinderGeometry(0.4, 0.4, 1.7, 10, 1, true, 0, Math.PI), mat('#fafafa', { r: 0.3 }), -1.15 + k * 0.58, 1.0, -0.3); w.rotation.x = Math.PI / 2; w.rotation.y = 0; w.rotation.z = Math.PI / 2; w.material.side = THREE.DoubleSide; }
+};
+M.duoliang = g => {     // 多良車站：海邊高架月台
+  C(g, 1.6, 1.7, 0.8, '#689f38', -0.5, 0, -0.6, 10); water(g, 1.6, 0.4, 0.9, 0.02, '#0288d1');
+  B(g, 3.0, 0.15, 0.5, '#b0bec5', 0, 1.1, -0.1); for (let k = -1; k <= 1; k++) B(g, 0.15, 1.1, 0.15, '#90a4ae', k * 1.1, 0, -0.1);
+  B(g, 0.9, 0.5, 0.45, '#eceff1', -0.6, 1.25, -0.1); B(g, 1.0, 0.07, 0.55, '#1e88e5', -0.6, 1.75, -0.1);
+  const tr = new THREE.Group(); tr.position.set(0.5, 1.4, 0.05); g.add(tr); B(tr, 1.2, 0.35, 0.28, '#fafafa'); B(tr, 1.21, 0.08, 0.29, '#e65100', 0, 0.12);
+  anim(g, (t) => { tr.position.x = Math.sin(t * 0.5) * 0.9; });
+};
+M.tribe = g => {        // 原住民部落：茅草屋＋圖騰柱
+  C(g, 1.7, 1.8, 0.1, '#a1887f', 0, 0, 0, 12);
+  for (const [x, z] of [[-0.8, -0.6], [0.8, -0.7], [0, 0.6]]) { B(g, 0.8, 0.45, 0.6, '#8d6e63', x, 0.1, z); roof(g, 1.1, 0.9, 0.55, '#d7ccc8', x, 0.55, z); }
+  C(g, 0.12, 0.14, 1.6, '#6d4c41', -1.2, 0.1, 0.9, 8); for (let k = 0; k < 3; k++) B(g, 0.3, 0.12, 0.3, ['#e53935', '#fdd835', '#212121'][k], -1.2, 0.5 + k * 0.4, 0.9);
+  S(g, 0.2, '#ff7043', 0.9, 0.2, 0.9, { e: '#ff3d00', ei: 0.8 }, 6, 5);
+};
 export function buildLandmark(id) {
   const g = new THREE.Group();
   (M[id] || M.chance)(g);
@@ -1018,4 +1126,60 @@ export function animateToken(tok, mode, t, dt) {
   L(u.legL.rotation, 'x', lL); L(u.legR.rotation, 'x', lR);
   L(u.armL.rotation, 'z', aL); L(u.armR.rotation, 'z', aR); L(u.armL.rotation, 'x', aLx); L(u.armR.rotation, 'x', aRx);
   L(u.body.position, 'y', 0.06 + by); L(u.head.rotation, 'y', hy); L(u.body.rotation, 'z', tz); L(u.torso.rotation, 'x', tx);
+}
+
+// ---------- 合併建設：住宅區／商業區／工業區（每塊地一棟，加上連接的部分） ----------
+const _winTex = {};
+function winMat(color, metal = 0) {
+  const k = color + metal;
+  if (!_winTex[k]) _winTex[k] = new THREE.MeshStandardMaterial({ map: windowsTex(color), roughness: metal ? 0.35 : 0.6, metalness: metal });
+  return _winTex[k];
+}
+export function buildComplex(kind, lv, color, idx, n) {
+  const g = new THREE.Group();
+  if (kind === 'res') {           // 住宅區：社區大樓＋中庭綠地
+    const h = [1.5, 2.4, 3.3][lv - 1], m = winMat(color);
+    B(g, 1.25, 0.12, 1.25, '#9ccc65');                       // 綠地
+    B(g, 0.75, h, 0.7, m, -0.18, 0.12, -0.12); B(g, 0.8, 0.1, 0.75, '#eceff1', -0.18, 0.12 + h, -0.12);
+    if (lv >= 2) { B(g, 0.45, h * 0.6, 0.45, m, 0.35, 0.12, 0.3); B(g, 0.5, 0.08, 0.5, color, 0.35, 0.12 + h * 0.6, 0.3); }
+    if (lv >= 3) { B(g, 0.5, 0.18, 0.45, '#66bb6a', -0.18, 0.22 + h, -0.12); roundTree(g, -0.05, -0.02, 0.12, '#43a047', 0.3 + h); }
+    roundTree(g, 0.45, -0.4, 0.2); roundTree(g, -0.5, 0.45, 0.18);
+  } else if (kind === 'com') {    // 商業區：百貨商場＋玻璃帷幕大樓
+    const glass = winMat('#4fc3f7', 0.4), h = [1.1, 2.1, 3.3][lv - 1];
+    B(g, 1.3, 0.75, 1.15, '#eceff1'); B(g, 1.34, 0.16, 1.19, color, 0, 0.6);   // 商場與招牌色帶
+    B(g, 1.1, 0.35, 0.02, glass, 0, 0.12, 0.585);
+    const tw = idx === Math.floor(n / 2) ? 0.7 : 0.5;
+    B(g, tw, h, tw, glass, 0, 0.75, -0.1); B(g, tw + 0.06, 0.08, tw + 0.06, color, 0, 0.75 + h, -0.1);
+    if (lv >= 3 && idx === Math.floor(n / 2)) { C(g, 0.02, 0.05, 0.9, '#cfd8dc', 0, 0.83 + h, -0.1, 5); S(g, 0.07, '#ffd600', 0, 1.75 + h, -0.1, { e: '#ffab00', ei: 0.9 }); }
+    if (lv >= 2) for (const sx of [-0.45, 0.45]) S(g, 0.08, '#fff59d', sx, 0.95, 0.5, { e: '#ffee58', ei: 0.7 });
+  } else {                        // 工業區：鋸齒屋頂廠房＋煙囪（會冒煙）
+    B(g, 1.3, 0.6, 1.0, '#b0bec5');
+    for (let k = 0; k < 3; k++) { const r = roof(g, 0.46, 1.0, 0.3, k % 2 ? '#90a4ae' : color, -0.43 + k * 0.43, 0.6, 0); r.rotation.y = 0; r.scale.set(0.46, 0.3, 1.0); }
+    B(g, 0.3, 0.38, 0.02, '#546e7a', 0.35, 0, 0.51);
+    const smokes = [];
+    for (let c = 0; c < lv; c++) {
+      const x = -0.45 + c * 0.35, z = -0.35, hh = 1.4 + c * 0.25;
+      C(g, 0.09, 0.11, hh, '#eceff1', x, 0, z, 8); for (let b = 0; b < 2; b++) C(g, 0.1, 0.1, 0.12, '#e53935', x, hh * (0.55 + b * 0.3), z, 8);
+      for (let k = 0; k < 3; k++) { const sm = S(g, 0.12, '#cfd8dc', x, hh, z, undefined, 6, 5); sm.userData.noBake = true; smokes.push({ sm, x, z, hh, ph: k / 3 }); }
+    }
+    g.userData.tick = (t) => { for (const q of smokes) { const f = (t * 0.4 + q.ph) % 1; q.sm.position.set(q.x + f * 0.25, q.hh + f * 1.1, q.z); q.sm.scale.setScalar(0.6 + f * 1.6); } };
+    if (lv >= 2) { B(g, 0.55, 0.45, 0.5, '#78909c', 0.5, 0, 0.35); }
+    if (lv >= 3) { C(g, 0.28, 0.28, 0.7, '#cfd8dc', -0.5, 0, 0.35, 12); S(g, 0.28, '#cfd8dc', -0.5, 0.7, 0.35, undefined, 10, 6); }
+  }
+  // 地基：顯示這是一整個開發區
+  B(g, 1.45, 0.06, 1.45, color, 0, -0.03, 0);
+  g.scale.setScalar(0.85);
+  return g;
+}
+// 連接相鄰兩塊地的部分（從原點連到 (dx, dz)）
+export function buildConnector(kind, lv, color, dx, dz) {
+  const g = new THREE.Group(), L = Math.hypot(dx, dz), a = Math.atan2(-dz, dx);
+  const piece = (w, h, d, c, y) => { const m = B(g, L, h, w, c, 0, y, 0); return m; };
+  if (kind === 'res') { piece(0.5, 0.05, 0, '#9ccc65', 0.02); if (lv >= 3) piece(0.25, 0.12, 0, '#eceff1', 1.6); }
+  else if (kind === 'com') { piece(0.9, 0.55, 0, '#eceff1', 0); piece(0.94, 0.12, 0, color, 0.5); }
+  else { const p = C(g, 0.06, 0.06, L, '#90a4ae', 0, 0, 0, 6); p.rotation.z = Math.PI / 2; p.position.set(0, 0.55, 0.15); const q = C(g, 0.05, 0.05, L, color, 0, 0, 0, 6); q.rotation.z = Math.PI / 2; q.position.set(0, 0.35, -0.15); }
+  g.children.forEach(m => { m.position.x += 0; });
+  const holder = new THREE.Group(); g.position.set(L / 2, 0, 0); holder.add(g); holder.rotation.y = a;
+  holder.userData.noShrink = true;
+  return holder;
 }
